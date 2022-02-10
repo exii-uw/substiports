@@ -308,6 +308,10 @@
                 // process defaults FDM:Process
                 p:{
                     processName: "default",
+                    surrogateSearchQual: "good",
+                    surrogateInteraction: "low",
+                    surrogateTowers: true,
+                    surrogateTextSize: 10,
                     sliceHeight: 0.25,
                     sliceShells: 3,
                     sliceShellOrder: "in-out",

@@ -317,6 +317,19 @@ kiri.lang['en-us'] = {
     ad_thin_s:      "thin walls",
     ad_thin_l:      ["detect and fill gaps","between shell walls"],
 
+    // SURROGATE SUPPORTS
+    ss_inte_s:      "interaction level",
+    ss_inte_l:      "How much the user can\nbe involved in the\nfabrication process",
+    ss_qual_s:      "search quality",
+    ss_qual_l:      "Fidelity level of the\nsurrogate search",
+    ss_menu:        "surrogates",
+    ss_level:       "level",
+    ss_quali:       "quality",
+    ss_stac_s:      "allow stacking",
+    ss_stac_l:      "Allows placing surrogates on top of each other",
+    ss_text_s:      "text size",
+    ss_text_l:      "Changes the text size of the instructions",
+
     // FDM FILL
     fi_menu:        "infill",
     fi_type:        "fill type",

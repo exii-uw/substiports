@@ -1803,6 +1803,12 @@
                 (UI.ssmClr = UC.newButton(undefined, onButtonClick, {icon:'<i class="fas fa-trash-alt"></i>'}))
             ], {modes:FDM, class:"ext-buttons f-row"}),
 
+            fdmSurrogates:       UC.newGroup(LANG.ss_menu, $('settings'), {modes:FDM}),
+            surrogateInteraction:UC.newSelect(LANG.ss_inte_s, {title:LANG.ss_inte_l, modes:FDM}, "interactionLevel"),
+            surrogateSearchQual: UC.newSelect(LANG.ss_qual_s, {title:LANG.ss_qual_l, modes:FDM}, "qualityLevel"),
+            surrogateTowers:     UC.newBoolean(LANG.ss_stac_s, onBooleanClick, {title:LANG.ss_stac_l, modes:FDM}),
+            surrogateTextSize:   UC.newInput(LANG.ss_text_s, {title:LANG.ss_text_l, convert:UC.toFloat, bound:UC.bound(8.0,30.0), modes:FDM}),
+
             camTabs:             UC.newGroup(LANG.ct_menu, null, {modes:CAM, marker:true}),
             camTabsWidth:        UC.newInput(LANG.ct_wdth_s, {title:LANG.ct_wdth_l, convert:UC.toFloat, bound:UC.bound(0.005,100), modes:CAM, units:true}),
             camTabsHeight:       UC.newInput(LANG.ct_hght_s, {title:LANG.ct_hght_l, convert:UC.toFloat, bound:UC.bound(0.005,100), modes:CAM, units:true}),
