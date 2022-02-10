@@ -1856,6 +1856,12 @@ gapp.register("kiri.init", [], (root, exports) => {
                 (ui.ssmClr = uc.newButton(undefined, onButtonClick, {icon:'<i class="fas fa-trash-alt"></i>'}))
             ], {modes:FDM, class:"ext-buttons f-row"}),
 
+            fdmSurrogates:       uc.newGroup(LANG.ss_menu, $('settings'), {modes:FDM}),
+            surrogateInteraction:uc.newSelect(LANG.ss_inte_s, {title:LANG.ss_inte_l, modes:FDM}, "interactionLevel"),
+            surrogateSearchQual: uc.newSelect(LANG.ss_qual_s, {title:LANG.ss_qual_l, modes:FDM}, "qualityLevel"),
+            surrogateTowers:     uc.newBoolean(LANG.ss_stac_s, onBooleanClick, {title:LANG.ss_stac_l, modes:FDM}),
+            surrogateTextSize:   uc.newInput(LANG.ss_text_s, {title:LANG.ss_text_l, convert:uc.toFloat, bound:uc.bound(8.0,30.0), modes:FDM}),
+
             camTabs:             uc.newGroup(LANG.ct_menu, null, {modes:CAM, marker:true}),
             camTabsWidth:        uc.newInput(LANG.ct_wdth_s, {title:LANG.ct_wdth_l, convert:uc.toFloat, bound:uc.bound(0.005,100), modes:CAM, units:true}),
             camTabsHeight:       uc.newInput(LANG.ct_hght_s, {title:LANG.ct_hght_l, convert:uc.toFloat, bound:uc.bound(0.005,100), modes:CAM, units:true}),

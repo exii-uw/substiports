@@ -94,6 +94,14 @@ class Widget {
             file: null,
             saved: false
         };
+
+        // LWW
+        this.surrogate_data = {
+            timestamp: Date.now(),
+            surrogating_duration: 0,
+            combined_total_duration: 0
+        }
+
         // if this is a synthesized support widget
         this.support = false;
     }
@@ -385,6 +393,17 @@ class Widget {
             mesh.material.visible = true;
         }
     }
+
+
+    // LWW
+    /**
+     * @param {number} surrogate_duration
+     * @param {number} total_combined_duration
+     */
+     PRO.setSurrogateData = function(surrogate_duration,total_combined_duration) {
+        this.surrogate_data.surrogating_duration = surrogate_duration;
+        this.surrogate_data.combined_total_duration = total_combined_duration;
+    };
 
     /**
      * center geometry bottom (on platform) at 0,0,0

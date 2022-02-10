@@ -20,6 +20,18 @@ const COLOR = {
 };
 
 const LISTS = {
+    qualityLevel: [
+        { name: "best" },
+        { name: "good" },
+        { name: "fair" },
+        { name: "fastest" },
+    ],
+    interactionLevel: [
+        { name: "high" },
+        { name: "medium" },
+        { name: "low" },
+        { name: "off" },
+    ],
     shell: [
         { name: "in-out" },
         { name: "out-in" },

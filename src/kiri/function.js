@@ -139,6 +139,13 @@ function prepareSlices(callback, scale = 1, offset = 0) {
                 // update segment time
                 if (lastMsg) {
                     segtimes[`${widget.id}_${segNumber++}_${lastMsg}`] = mark - startTime;
+
+                    if (lastMsg == "surrogating") {
+                        // let timeToSurrogate = mark - startTime;
+                        surrogating_times.push({filename:widget.meta.file, duration:mark - startTime, id:widget.id});
+                        console.log({warning:"CONCERN ABOUT LOGGING TIME"});
+                    }
+
                 }
                 event.emit('slice', settings.mode);
             }
@@ -164,6 +171,23 @@ function prepareSlices(callback, scale = 1, offset = 0) {
                 if (lastMsg) {
                     segtimes[`${widget.id}_${segNumber++}_${lastMsg}`] = mark - startTime;
                 }
+                
+                if (msg == "surrogating") {
+                    // let timeToSurrogate = mark - startTime;
+                    surrogating_times.push({filename:widget.meta.file, duration:mark - startTime, id:widget.id, widget:widget});
+                    let duration = mark - startTime;
+                    widget.setSurrogateData(duration,0);
+                }
+                // console.log({msg:msg});
+                // console.log(msg.search("draw"));
+                if (msg == "transfer") {
+                    console.log({Note:"Found transfer"});
+                    // let timeToSurrogate = mark - startTime;
+                    surrogating_times.push({filename:widget.meta.file, id:widget.id, widget:widget});
+                    let duration = mark - startTime;
+                    widget.setSurrogateData(duration,0);
+                }
+
                 lastMsg = msg;
                 startTime = mark;
             }
@@ -218,6 +242,18 @@ function prepareSlices(callback, scale = 1, offset = 0) {
         // print stats
         segtimes.total = Date.now() - mark;
         console.log(segtimes);
+
+        // Log to file
+        // LWW Hack to get one widget (first)
+        let firstWidget = null;
+        // Log to file
+        for (let widget of slicing) {
+            if (firstWidget === null) {
+                firstWidget = widget;
+            }
+        }
+        API.event.emit('log.file', {surrogating_times:surrogating_times, segtimes:segtimes, timestamp:firstWidget.surrogate_data.timestamp, startStamp:alwaysStartTime});
+
         if (callback && typeof callback === 'function') {
             callback();
         }
