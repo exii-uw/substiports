@@ -1100,17 +1100,32 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             [200, 0, 23],
             [100, 54, 100],
             [255, 13, 8]
-         ];
-         
-         // Calculate clusters.
-         var kmeans = new KMEANS.KMeans();
-         //var clusters = KMEANS.KMeans(colors, 3);
+        ];
 
-         var clusters = kmeans.cluster(valid_points, 3);
-         console.log({KMEANS:KMEANS});
-         console.log({kmeans:kmeans});
-         console.log({clusters:clusters});
-         //console.log({clusters2:clusters2});
+        var colors2 = [
+            [20, 20],
+            [22, 22],
+            [250, 255],
+            [0, 30],
+            [200, 0],
+            [100, 54],
+            [255, 13]
+        ];
+            
+        // Calculate clusters.
+        var kmeans = new KMEANS.KMeans();
+        //var clusters = KMEANS.KMeans(colors, 3);
+
+        var clusters = kmeans.cluster(valid_points, 3);
+        console.log({KMEANS:KMEANS});
+        console.log({kmeans:kmeans});
+        console.log({clusters:clusters});
+        //console.log({clusters2:clusters2});
+
+        //  var hull = new HULL.hull();
+        var colorHull = HULL.hull(colors2, 500);
+
+        console.log({colorHull:colorHull});
 
     }
 
