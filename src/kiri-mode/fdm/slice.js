@@ -1691,7 +1691,22 @@
 
     }
 
-
+    function getSimplePointsArray(pointArray, fromSimple) {
+        let simplePointsArray = [];
+        if (fromSimple) {
+            for (let i = 0; i < pointArray.length; i++) {
+                simplePointsArray.push([pointArray[i][0], pointArray[i][1]]);
+            }
+        } else {
+            pointArray.forEach(function(point) {
+                simplePointsArray.push([point.x, point.y, point.z]);
+            });  
+        }
+        // for (let i = 0; i < pointArray.length; i++) {
+        //     simplePointsArray.push([pointArray[i].x, pointArray[i].y, pointArray[i].z]);
+        // }
+        return simplePointsArray;
+    }
 
     function getSupportPoints(slice, proc, settings) {
 
@@ -1738,6 +1753,15 @@
 
             }
 
+            // Also add outlines of all polygons to get high fidelity outlines
+            for (let support_poly of bottom_slice.supports)  {
+                console.log({support_poly:support_poly});
+                for (let point of support_poly.points) {
+                    valid_points.push(point);
+                }
+            }
+
+
             // Check how high supports are for each point
             let height_points = [...valid_points];
             let next_slice = bottom_slice.up;
@@ -1747,23 +1771,40 @@
                 next_slice = next_slice.up;
                 if (skip_counter == 20) {
                     skip_counter = 0;
-                    height_points.forEach(function(heightPoint, index, object) {
+                    let height_points_i = height_points.length;
+                    while(height_points_i--) {
                         if (next_slice.supports) {
                             let point_valid = false;
                             for (let support_poly of next_slice.supports)  {
-                                if (heightPoint.isInPolygon(support_poly)) { // TODO: inPolygon vs. isInPolygon checks for holes(children)
+                                if (height_points[height_points_i].isInPolygon(support_poly)) { // TODO: inPolygon vs. isInPolygon checks for holes(children)
                                     point_valid = true;
                                     break;
                                 }
                             }
-
                             if (point_valid) {
-                                heightPoint.z = next_slice.z;
+                                height_points[height_points_i].z = next_slice.z;
                             } else {
-                                object.splice(index, 1);
+                                height_points.splice(height_points_i, 1);
                             }
                         }
-                    });
+                    }
+                    // height_points.forEach(function(heightPoint, index, object) {
+                    //     if (next_slice.supports) {
+                    //         let point_valid = false;
+                    //         for (let support_poly of next_slice.supports)  {
+                    //             if (heightPoint.isInPolygon(support_poly)) { // TODO: inPolygon vs. isInPolygon checks for holes(children)
+                    //                 point_valid = true;
+                    //                 break;
+                    //             }
+                    //         }
+
+                    //         if (point_valid) {
+                    //             heightPoint.z = next_slice.z;
+                    //         } else {
+                    //             object.splice(index, 1);
+                    //         }
+                    //     }
+                    // });
                     console.log({height_points:height_points});
                 }
                 
@@ -1794,9 +1835,13 @@
             
         // Calculate clusters.
         var kmeans = new KMEANS.KMeans();
-        //var clusters = KMEANS.KMeans(colors, 3);
+        // var clusters = KMEANS.KMeans(colors, 3);
 
-        var clusters = kmeans.cluster(valid_points, 3);
+        // var clusters = kmeans.cluster(colors, 3);
+
+        let simple_valid_p = getSimplePointsArray(valid_points, false);
+        console.log({simple_valid_p:simple_valid_p});
+        var clusters = kmeans.cluster(simple_valid_p, 7);
         console.log({KMEANS:KMEANS});
         console.log({kmeans:kmeans});
         console.log({clusters:clusters});
@@ -1805,7 +1850,33 @@
         //  var hull = new HULL.hull();
         var colorHull = HULL.hull(colors2, 500);
 
+        for (let cluster of clusters) {
+            var cluster_2d = getSimplePointsArray(cluster, true);
+            var new_hull = HULL.hull(cluster_2d, 50);
+            console.log({new_hull:new_hull});
+
+
+            if (!(bottom_slice.tops[0].fill_sparse)) {
+                bottom_slice.tops[0].fill_sparse = [];
+            }
+
+            let hull_points = [];
+
+            for (let simplePoint of new_hull) {
+                let point = newPoint(simplePoint[0], simplePoint[1], bottom_slice.z);
+                hull_points.push(point);
+            }
+            hull_points.pop();
+            let debug_outline_poly = BASE.newPolygon(hull_points);
+            console.log({debug_outline_poly:debug_outline_poly});
+            bottom_slice.tops[0].fill_sparse.push(debug_outline_poly);
+        }
+
         console.log({colorHull:colorHull});
+
+        
+
+
 
     }
 
