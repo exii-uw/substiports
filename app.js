@@ -392,6 +392,7 @@ const script = {
         "kiri/parallelenv",
         "kiri/pso",
         "kiri/kmeans",
+        "kiri/hull",
         "kiri/slice",
         "kiri/slicer",
         "kiri/layers",
