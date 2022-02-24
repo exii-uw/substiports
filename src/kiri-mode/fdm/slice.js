@@ -1720,7 +1720,7 @@
         bottom_slice = last_bottom_slice;
         console.log({bottom_slice: bottom_slice});
 
-        let search_density = 2;
+        let search_density = 1;
         let search_padding = 0; // TODO: Adjust to size of surrogate/largest surrogate?
         // Search bounds
         const min_x = bottom_slice.widget.bounds.min.x - search_padding;
@@ -1729,6 +1729,7 @@
         const max_y = bottom_slice.widget.bounds.max.y + search_padding;
 
         let valid_points = [];
+        // let supp_outline_points = [];
         if (!bottom_slice.supports || bottom_slice.supports.length === 0) {
         } else {
             for (let point_x = min_x; point_x < max_x; point_x += search_density) {
@@ -1748,28 +1749,32 @@
                     if (point_valid) {
                         valid_points.push(test_point);
                     }
-                    
                 }
-
             }
 
-            // Also add outlines of all polygons to get high fidelity outlines
+            console.log({valid_points_length:valid_points.length});
+
+            // Also add outlines of all polygons to get high fidelity clusters
             for (let support_poly of bottom_slice.supports)  {
                 console.log({support_poly:support_poly});
                 for (let point of support_poly.points) {
-                    valid_points.push(point);
+                    let test_point = newPoint(point.x, point.y, point.z);
+                    valid_points.push(test_point);
                 }
             }
-
+            bottom_slice.support_points = valid_points;
 
             // Check how high supports are for each point
             let height_points = [...valid_points];
+            // let height_points_outline = [...supp_outline_points]; // TODO: Faster to handle outline points differently? Compare points to all outline points directly?
             let next_slice = bottom_slice.up;
             let skip_counter = 0;
             while (next_slice) {
+                let points_slice_copy = [...height_points];
+                next_slice.support_points = points_slice_copy;
                 skip_counter += 1;
                 next_slice = next_slice.up;
-                if (skip_counter == 20) {
+                if (skip_counter == 1) {
                     skip_counter = 0;
                     let height_points_i = height_points.length;
                     while(height_points_i--) {
@@ -1788,71 +1793,44 @@
                             }
                         }
                     }
-                    // height_points.forEach(function(heightPoint, index, object) {
+
+                    // height_points_i = height_points_outline.length;
+                    // while(height_points_i--) {
                     //     if (next_slice.supports) {
                     //         let point_valid = false;
                     //         for (let support_poly of next_slice.supports)  {
-                    //             if (heightPoint.isInPolygon(support_poly)) { // TODO: inPolygon vs. isInPolygon checks for holes(children)
+                    //             if (height_points_outline[height_points_i].nearPolygon(support_poly, 0.1, true)) { // check if point still on polygon outline (within distance), including inner polys
                     //                 point_valid = true;
                     //                 break;
                     //             }
                     //         }
-
                     //         if (point_valid) {
-                    //             heightPoint.z = next_slice.z;
+                    //             height_points_outline[height_points_i].z = next_slice.z;
                     //         } else {
-                    //             object.splice(index, 1);
+                    //             height_points_outline.splice(height_points_i, 1);
                     //         }
                     //     }
-                    // });
-                    console.log({height_points:height_points});
+                    // }
                 }
-                
             }
-
         }
+        // valid_points.push(...supp_outline_points);
         console.log({valid_points:valid_points});
 
-        var colors = [
-            [20, 20, 80],
-            [22, 22, 90],
-            [250, 255, 253],
-            [0, 30, 70],
-            [200, 0, 23],
-            [100, 54, 100],
-            [255, 13, 8]
-        ];
-
-        var colors2 = [
-            [20, 20],
-            [22, 22],
-            [250, 255],
-            [0, 30],
-            [200, 0],
-            [100, 54],
-            [255, 13]
-        ];
-            
         // Calculate clusters.
         var kmeans = new KMEANS.KMeans();
         // var clusters = KMEANS.KMeans(colors, 3);
-
         // var clusters = kmeans.cluster(colors, 3);
 
         let simple_valid_p = getSimplePointsArray(valid_points, false);
-        console.log({simple_valid_p:simple_valid_p});
-        var clusters = kmeans.cluster(simple_valid_p, 7);
-        console.log({KMEANS:KMEANS});
-        console.log({kmeans:kmeans});
-        console.log({clusters:clusters});
-        //console.log({clusters2:clusters2});
+        var clusters = kmeans.cluster(simple_valid_p, 2);
 
         //  var hull = new HULL.hull();
-        var colorHull = HULL.hull(colors2, 500);
+        // var colorHull = HULL.hull(colors2, 500);
 
         for (let cluster of clusters) {
             var cluster_2d = getSimplePointsArray(cluster, true);
-            var new_hull = HULL.hull(cluster_2d, 50);
+            var new_hull = HULL.hull(cluster_2d, 100);
             console.log({new_hull:new_hull});
 
 
@@ -1870,11 +1848,68 @@
             let debug_outline_poly = BASE.newPolygon(hull_points);
             console.log({debug_outline_poly:debug_outline_poly});
             bottom_slice.tops[0].fill_sparse.push(debug_outline_poly);
+
+
+            
+
+            // make debug rectangle
+            function generateRectangleDEBUG(start_x, start_y, start_z, length, width, rot, padding, debug_slice) {
+                // const halfLength = length*0.5;
+                // const halfWidth = width*0.5;
+                // let point1 = newPoint(start_x - halfLength, start_y - halfWidth, start_z);
+                // let point2 = newPoint(start_x + halfLength, start_y - halfWidth, start_z);
+                // let point3 = newPoint(start_x + halfLength, start_y + halfWidth, start_z);
+                // let point4 = newPoint(start_x - halfLength, start_y + halfWidth, start_z);
+                // let rect_points = [point1, point2, point3, point4];
+                // let rectanglePolygon = BASE.newPolygon(rect_points);
+                // rectanglePolygon = rectanglePolygon.rotateXY(rot);
+                // //rectanglePolygon.parent = top.poly;
+                // rectanglePolygon.depth = 0;
+                // rectanglePolygon.area2 = length * width * -2; // This winding direction is negative
+            
+                // let rectanglePolygon_padded = [];
+                // rectanglePolygon_padded = POLY.expand([rectanglePolygon], padding, start_z, rectanglePolygon_padded, 1); 
+                // return rectanglePolygon_padded[0];
+                let rotation = rot * Math.PI / 180;
+                let point1 = newPoint(start_x, start_y, start_z);
+                let point2 = newPoint(start_x + length*Math.cos(rotation), start_y + length*Math.sin(rotation), start_z);
+                let point3 = newPoint(point2.x + width*Math.sin(-rotation), point2.y + width*Math.cos(-rotation), start_z);
+                let point4 = newPoint(start_x + width*Math.sin(-rotation), start_y + width*Math.cos(-rotation), start_z);
+                let rect_points = [point1, point2, point3, point4];
+                let rectanglePolygon = BASE.newPolygon(rect_points);
+                //rectanglePolygon.parent = top.poly;
+                rectanglePolygon.depth = 0;
+                // rectanglePolygon.area2 = length * width * 2;
+                let rectanglePolygon_padded = [];
+                rectanglePolygon_padded = POLY.expand([rectanglePolygon], padding, start_z, rectanglePolygon_padded, 1); 
+                // console.log({rectanglePolygon:rectanglePolygon});
+                // if (!debug_slice.tops[0].fill_sparse) debug_slice.tops[0].fill_sparse = [];
+                // debug_slice.tops[0].fill_sparse.push(rectanglePolygon_padded[0]);
+                return rectanglePolygon_padded[0];
+            }
+
+
+            let debugint = Math.floor(Math.random()*(debug_outline_poly.length-1))+1;
+            // for (let debugint = 1; debugint < debug_outline_poly.length; debugint++) {
+            let x_dir = debug_outline_poly.points[debugint-1].x - debug_outline_poly.points[debugint].x;
+            let y_dir = debug_outline_poly.points[debugint-1].y - debug_outline_poly.points[debugint].y;
+
+            let hull_rot = Math.atan2(y_dir, x_dir)*180/Math.PI;
+            let one_candidate = generateRectangleDEBUG(debug_outline_poly.points[debugint].x, debug_outline_poly.points[debugint].y, bottom_slice.z, 20, -10, hull_rot, 0.4, bottom_slice);
+            bottom_slice.tops[0].fill_sparse.push(one_candidate);
+            // }
+
         }
 
-        console.log({colorHull:colorHull});
+        let slice_debug_counter = 0;
+        let a_slice = bottom_slice;
+        while (a_slice.up && slice_debug_counter < 100) {
+            a_slice = a_slice.up;
+            slice_debug_counter++;
+        }
 
-        
+        console.log({support_points_save:a_slice.support_points});
+
 
 
 
