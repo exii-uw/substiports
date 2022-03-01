@@ -2070,6 +2070,25 @@
         let bottom_slice = slice.down;
         let last_bottom_slice;
 
+
+        function getBestFittingSurrogateL2(surrogateList, desired_length, desired_width, desired_height) {
+            let lowest_error = Infinity;
+            let best_option = surrogateList[0];
+            for (let surrogate of surrogateList) {
+                let current_error = (surrogate.length - desired_length)**2 + (surrogate.width - desired_width)**2;
+                if (desired_height > surrogate.maxHeight) {
+                    current_error += (desired_height - surrogate.maxHeight)**2;
+                } else if (desired_height < surrogate.minHeight) {
+                    current_error += (desired_height - surrogate.minHeight)**2;
+                }
+                if (current_error < lowest_error) {
+                    lowest_error = current_error;
+                    best_option = surrogate;
+                }
+            }
+            return best_option;
+        }
+
         function getSurrogateGeometryAtIndexHeight(surrogate, z_height, index) {
             if (true) { // If surrogate is simple rectangular geometry
                 if (z_height >= surrogate.starting_height && z_height <= surrogate.end_height) {
@@ -3678,7 +3697,7 @@
         // // addOption(books, 63.77, 31.85, 44.55, "Lego 8x4x4.3");
 
         addOption(books, 63.77, 31.85, 63.65, "Lego 8x4x6.3");
-        // addPrism(books, prisms[0], prisms[1]);
+        addPrism(books, prisms[0], prisms[1]);
         // addPrism(books, prisms[0], prisms[1]);
 
         // addStackableOptions(books, 12.75, 9.55, 4, 31.85, 15.9, "Lego 4x2");
@@ -3971,6 +3990,38 @@
         surrogate_settings.all_slices = all_slices;
         surrogate_settings.precomputed_slice_heights = [];
         surrogate_settings.pauseLayers = [];
+
+        surrogate_settings.smallest_length = Infinity;
+        surrogate_settings.smallest_width = Infinity;
+        surrogate_settings.smallest_height = Infinity;
+        surrogate_settings.biggest_length = 0;
+        surrogate_settings.biggest_width = 0;
+        surrogate_settings.biggest_height = 0;
+
+        for (let book of books) {
+            if (surrogate_settings.smallest_length > book.length) {
+                surrogate_settings.smallest_length = book.length;
+            }
+            if (surrogate_settings.smallest_width > book.width) {
+                surrogate_settings.smallest_width = book.width;
+            }
+            if (surrogate_settings.smallest_height > book.minHeight) {
+                surrogate_settings.smallest_height = book.minHeight;
+            }
+            if (surrogate_settings.biggest_length < book.length) {
+                surrogate_settings.biggest_length = book.length;
+            }
+            if (surrogate_settings.biggest_width < book.width) {
+                surrogate_settings.biggest_width = book.width;
+            }
+            if (surrogate_settings.biggest_height < book.maxHeight) {
+                surrogate_settings.biggest_height = book.maxHeight;
+            }
+        }
+
+        console.log({surrogate_settings:surrogate_settings});
+
+
         // For all slices
 
         let mina = min; //numOrDefault(min, 0.1);
@@ -4986,21 +5037,27 @@
                             let pso_y = var_list[iteration_number*this.surrogate_settings.number_of_vars + 2];
                             let pso_tower_index = var_list[iteration_number*this.surrogate_settings.number_of_vars + 3];
                             let pso_rotation = var_list[iteration_number*this.surrogate_settings.number_of_vars + 4];
-                            let pso_library_index = var_list[iteration_number*this.surrogate_settings.number_of_vars + 5];
+                            // let pso_library_index = var_list[iteration_number*this.surrogate_settings.number_of_vars + 5];
 
                             // let pso_use_this_surrogate = var_list[iteration_number*this.surrogate_settings.number_of_vars + 7];
 
                             // if(true) {
-                            // Select test surrogate
-                            if (pso_library_index >= this.surrogate_library.length) {
-                                pso_library_index = this.surrogate_library.length - (pso_library_index - this.surrogate_library.length); // Bounce of max index of available surrogates
-                            }
-                            else if (pso_library_index < 0) {
-                                pso_library_index = -pso_library_index; // Bounce of start of surrogate list index 
-                            }
-                            var_list[iteration_number*this.surrogate_settings.number_of_vars + 5] = pso_library_index; // update PSO variable with bounced value
-                            const library_index = Math.floor(pso_library_index);
-                            let pso_surrogate = this.surrogate_library[library_index];
+                            // Select test surrogate // Old way letting PSO select library index
+                            // if (pso_library_index >= this.surrogate_library.length) {
+                            //     pso_library_index = this.surrogate_library.length - (pso_library_index - this.surrogate_library.length); // Bounce of max index of available surrogates
+                            // }
+                            // else if (pso_library_index < 0) {
+                            //     pso_library_index = -pso_library_index; // Bounce of start of surrogate list index 
+                            // }
+                            // var_list[iteration_number*this.surrogate_settings.number_of_vars + 5] = pso_library_index; // update PSO variable with bounced value
+                            // const library_index = Math.floor(pso_library_index);
+                            // let pso_surrogate = this.surrogate_library[library_index];
+
+                            let pso_desired_length = var_list[iteration_number*this.surrogate_settings.number_of_vars + 5];
+                            let pso_desired_width = var_list[iteration_number*this.surrogate_settings.number_of_vars + 10];
+                            let pso_desired_height = var_list[iteration_number*this.surrogate_settings.number_of_vars + 11];
+
+                            let pso_surrogate = getBestFittingSurrogateL2(this.surrogate_library, pso_desired_length, pso_desired_width, pso_desired_height);
 
                             // Select test tower position/on baseplate
                             let pso_z = 0;
@@ -5498,12 +5555,17 @@
                 pso_variable_list.push({ start: 0, end: 360});          // 4: Rotation in degrees
                 // Z height from 0 to model_height for bridge surrogates
                 // yes/no switch between index-height and absolute-height method
-                pso_variable_list.push({ start: 0, end: optimizer.surrogate_library.length}); 
+                // pso_variable_list.push({ start: 0, end: optimizer.surrogate_library.length}); 
                                                                         // 5: Which surrogate was placed: library index, mapped from 0 to library_length
+
+                pso_variable_list.push({ start: surrogate_settings.smallest_length, end: surrogate_settings.biggest_length});  // 5: Desired length of ideal surrogate, mapped from smallest to biggest available lengths                                                   
                 pso_variable_list.push({ start: 0, end: 1});            // 6: Target extension for height-varying surrogates, 0 = min_height, 1 = max_height
                 pso_variable_list.push({ start: 0, end: 0});            // 7: local meta variable: if this surrogate data should be used or not
                 pso_variable_list.push({ start: 0, end: 0});            // 8: local meta variable: Post-tower X position
                 pso_variable_list.push({ start: 0, end: 0});            // 9: local meta variable: Post-tower Y position
+                pso_variable_list.push({ start: surrogate_settings.smallest_width, end: surrogate_settings.biggest_width});  // 10: Desired length of ideal surrogate, mapped from smallest to biggest available lengths                                                   
+                pso_variable_list.push({ start: surrogate_settings.smallest_height, end: surrogate_settings.biggest_height});  // 11: Desired length of ideal surrogate, mapped from smallest to biggest available lengths                                                   
+                
             }
 
             // TODO: Sort surrogate library by ??? surface area? height? volume?
@@ -5615,18 +5677,24 @@
                         try_y = pso_position_vars[pso_result_surrogate_index * surrogate_settings.number_of_vars + 2];
                         try_rotation = pso_position_vars[pso_result_surrogate_index * surrogate_settings.number_of_vars + 4];
 
-                        // Select chosen surrogate
-                        let pso_chosen_book = Math.floor(pso_position_vars[pso_result_surrogate_index * surrogate_settings.number_of_vars + 5]);
-                        if (pso_chosen_book >= books.length) {
-                            pso_chosen_book = books.length-1; // Probably unnecessary with bounce
-                            console.log({WARNING:"outside (above) of bounce range"});
-                        }
-                        else if (pso_chosen_book < 0) {
-                            pso_chosen_book = 0;
-                            console.log({WARNING:"outside (below) of bounce range"});
-                        }
+                        let pso_desired_length = pso_position_vars[pso_result_surrogate_index * surrogate_settings.number_of_vars + 5];
+                        let pso_desired_width = pso_position_vars[pso_result_surrogate_index * surrogate_settings.number_of_vars + 10];
+                        let pso_desired_height = pso_position_vars[pso_result_surrogate_index * surrogate_settings.number_of_vars + 11];
 
-                        try_book = books[pso_chosen_book];
+                        try_book = getBestFittingSurrogateL2(books, pso_desired_length, pso_desired_width, pso_desired_height);
+
+                        // // Select chosen surrogate
+                        // let pso_chosen_book = Math.floor(pso_position_vars[pso_result_surrogate_index * surrogate_settings.number_of_vars + 5]);
+                        // if (pso_chosen_book >= books.length) {
+                        //     pso_chosen_book = books.length-1; // Probably unnecessary with bounce
+                        //     console.log({WARNING:"outside (above) of bounce range"});
+                        // }
+                        // else if (pso_chosen_book < 0) {
+                        //     pso_chosen_book = 0;
+                        //     console.log({WARNING:"outside (below) of bounce range"});
+                        // }
+
+                        // try_book = books[pso_chosen_book];
 
                         // Select test tower position/on baseplate
                         try_z = 0;
