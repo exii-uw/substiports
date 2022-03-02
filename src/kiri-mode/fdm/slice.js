@@ -3017,7 +3017,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         // // addOption(books, 63.77, 31.85, 44.55, "Lego 8x4x4.3");
 
         addOption(books, 63.77, 31.85, 63.65, "Lego 8x4x6.3");
-        addPrism(books, prisms[0], prisms[1]);
+        // addPrism(books, prisms[0], prisms[1]);
         // addPrism(books, prisms[0], prisms[1]);
 
         // addStackableOptions(books, 12.75, 9.55, 4, 31.85, 15.9, "Lego 4x2");
@@ -4009,9 +4009,11 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
         if (searchType == "PSO") {
             // Optimizer area ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            let valid_answers = [];
             var optimizer = new PSO.Optimizer(); // TODO: Add min and max values for particle variable ranges
             optimizer.surrogate_library = books;
             optimizer.surrogate_settings = surrogate_settings;
+            optimizer.valid_answers = [];
             // set the objective function
             optimizer.setObjectiveFunction(function (var_list, done) { 
                 if (var_list[0] < 1) var_list[0] = 1.0;
@@ -4791,6 +4793,20 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                     // console.log({surrogate_area_estimate:surrogate_area_estimate});
 
 
+                    let surrogates_placed = 0;
+                    for (let iteration_number = 0; iteration_number < this.surrogate_settings.searchspace_max_number_of_surrogates; iteration_number++) {
+                        if (var_list[iteration_number * this.surrogate_settings.number_of_vars + 7] > 0.999999 && var_list[iteration_number * this.surrogate_settings.number_of_vars + 7] < 1.000001) {// If surrogate was placed without problem by PSO
+                            surrogates_placed += 1;
+                        }
+                    }
+
+                    if (valid_combination && surrogates_placed > 0) {
+                        let current_answer = [...var_list];
+                        this.valid_answers.push(current_answer);
+                        valid_answers.push(current_answer);
+                    }
+
+
                     
                     
                     const w_pieces = 0.3;
@@ -4986,6 +5002,9 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                 // Optimizer area ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
                 let pso_position_vars = optimizer.getBestPosition();
+
+                console.log({all_valid_answers_found:optimizer.valid_answers});
+                console.log({all_valid_answers_found_global:valid_answers});
 
 
                 for (let pso_result_surrogate_index = 0; pso_result_surrogate_index < surrogate_settings.searchspace_max_number_of_surrogates; pso_result_surrogate_index++) {
