@@ -3968,7 +3968,7 @@
         surrogate_settings.layer_height_fudge = layer_height_fudge;
         surrogate_settings.start_slice = bottom_slice;
         surrogate_settings.existing_surrogates = [];
-        surrogate_settings.number_of_vars = 9; // Number of variables per surrogate PSO test
+        surrogate_settings.number_of_vars = 7; // Number of variables per surrogate PSO test
         surrogate_settings.average_so_far = 0;
 
         surrogate_settings.fitness_offset = 0;
@@ -5025,6 +5025,9 @@
                     let average_overlap_factor = 0;
                     let overlap_counter = 0;
 
+
+                    let results_meta_data = {valid:false, candidate_details:[]};
+
                     // let pso_collision_and_volumes = checkVolumeAndCollisions(books, optimizer.surrogate_settings, bottom_slice, try_book_index, try_book_polygons_list, try_z, books_placed);
 
                     if (var_list[0] < this.surrogate_settings.searchspace_min_number_of_surrogates) var_list[0] = this.surrogate_settings.searchspace_min_number_of_surrogates;
@@ -5280,7 +5283,8 @@
                             let quickList = splitLists[0];
                             let remainderList = splitLists[1];
 
-                            var_list[iteration_number*this.surrogate_settings.number_of_vars + 7] = 0;
+                            // var_list[iteration_number*this.surrogate_settings.number_of_vars + 7] = 0;
+                            let pso_use_this_surrogate = 0;
 
                             // let pso_collision_and_volumes = checkVolumeAndCollisions(this.surrogate_library, this.surrogate_settings, this.surrogate_settings.start_slice, library_index, pso_polygons_list, pso_z, all_surrogates);
                             let pso_collision_and_volumes = checkVolumeAndCollisionsListQuick(this.surrogate_settings.all_slices, quickList, sliceIndexList.length, pso_polygons_list, all_surrogates);
@@ -5330,6 +5334,7 @@
                                         }
                                         else {
                                             var_list[iteration_number*this.surrogate_settings.number_of_vars + 7] = 1; // Set to no collision
+                                            pso_use_this_surrogate = 1;
                                             
                                             let finalHeight = pso_z + pso_surrogate.height;
 
@@ -5408,6 +5413,12 @@
                                 else results_array.push(pso_collision_and_volumes);
                             }
                         }
+                        let current_details = [];
+                        for (let j = iteration_number*this.surrogate_settings.number_of_vars + 1; j < (1+iteration_number)*this.surrogate_settings.number_of_vars; j++) {
+                            current_details = [...var_list];
+                            current_details = current_details.slice(iteration_number*this.surrogate_settings.number_of_vars + 1, (1+iteration_number)*this.surrogate_settings.number_of_vars)
+                        }
+                        results_meta_data.candidate_details.push({pso_details:current_details});
                     }
 
                     let valid_combination = true;
@@ -5478,14 +5489,22 @@
                         if (var_list[iteration_number * this.surrogate_settings.number_of_vars + 7] > 0.999999 && var_list[iteration_number * this.surrogate_settings.number_of_vars + 7] < 1.000001) {// If surrogate was placed without problem by PSO
                             surrogates_placed += 1;
                         }
+                        // if (pso_use_this_surrogate == 1) {
+                        //     surrogates_placed += 1;
+                        // }
                     }
+
+
 
                     if (valid_combination && surrogates_placed > 0) {
                         let current_answer = [...var_list];
                         this.valid_answers.push(current_answer);
                         valid_answers.push(current_answer);
+                        results_meta_data.valid = true;
                     }
 
+                    proceed working from here 
+                    // TODO: Fill list of objects with details, including tower position and whether it should be used or not
 
                     
                     
@@ -5575,10 +5594,10 @@
                                                                         // 5: Which surrogate was placed: library index, mapped from 0 to library_length
 
                 pso_variable_list.push({ start: surrogate_settings.smallest_length, end: surrogate_settings.biggest_length});  // 5: Desired length of ideal surrogate, mapped from smallest to biggest available lengths                                                   
-                pso_variable_list.push({ start: 0, end: 1});            // 6: Target extension for height-varying surrogates, 0 = min_height, 1 = max_height
-                pso_variable_list.push({ start: 0, end: 0});            // 7: local meta variable: if this surrogate data should be used or not
-                pso_variable_list.push({ start: 0, end: 0});            // 8: local meta variable: Post-tower X position
-                pso_variable_list.push({ start: 0, end: 0});            // 9: local meta variable: Post-tower Y position
+                // pso_variable_list.push({ start: 0, end: 1});            // 6: Target extension for height-varying surrogates, 0 = min_height, 1 = max_height
+                // pso_variable_list.push({ start: 0, end: 0});            // 7: local meta variable: if this surrogate data should be used or not
+                // pso_variable_list.push({ start: 0, end: 0});            // 8: local meta variable: Post-tower X position
+                // pso_variable_list.push({ start: 0, end: 0});            // 9: local meta variable: Post-tower Y position
                 pso_variable_list.push({ start: surrogate_settings.smallest_width, end: surrogate_settings.biggest_width});  // 10: Desired length of ideal surrogate, mapped from smallest to biggest available lengths                                                   
                 pso_variable_list.push({ start: surrogate_settings.smallest_height, end: surrogate_settings.biggest_height});  // 11: Desired length of ideal surrogate, mapped from smallest to biggest available lengths                                                   
                 
@@ -5688,10 +5707,11 @@
 
 
                 for (let pso_result_surrogate_index = 0; pso_result_surrogate_index < surrogate_settings.searchspace_max_number_of_surrogates; pso_result_surrogate_index++) {
-                    console.log({number_in_array:pso_result_surrogate_index * surrogate_settings.number_of_vars + 7});
-                    console.log(pso_position_vars[pso_result_surrogate_index * surrogate_settings.number_of_vars + 7]);
+                    // console.log({number_in_array:pso_result_surrogate_index * surrogate_settings.number_of_vars + 7});
+                    // console.log(pso_position_vars[pso_result_surrogate_index * surrogate_settings.number_of_vars + 7]);
+                    console.log({candidate_number:pso_result_surrogate_index, useOrIgnore:valid_answers[pso_result_surrogate_index].use});
                     if (pso_position_vars[pso_result_surrogate_index * surrogate_settings.number_of_vars + 7] > 0.999999 && pso_position_vars[pso_result_surrogate_index * surrogate_settings.number_of_vars + 7] < 1.000001) {// If surrogate was placed without problem by PSO
-                        
+                    // if (pso_use_this_surrogate == 1) {// If surrogate was placed without problem by PSO
                         try_x = pso_position_vars[pso_result_surrogate_index * surrogate_settings.number_of_vars + 1];
                         try_y = pso_position_vars[pso_result_surrogate_index * surrogate_settings.number_of_vars + 2];
                         try_rotation = pso_position_vars[pso_result_surrogate_index * surrogate_settings.number_of_vars + 4];
