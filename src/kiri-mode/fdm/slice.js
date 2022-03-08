@@ -4747,10 +4747,10 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                                         pso_collision_and_volumes[0] = true;// Treat not explored as collision
                                     }
                                 }
-                                if ((Math.random() < 0.1) && (pso_collision_and_volumes[0] == true) && (tower_library_index >= 0)) { // Encourage build plate exploration if bad tower
-                                    var_list[iteration_number*this.surrogate_settings.number_of_vars + 3] = 0;
-                                } else if ((Math.random() < 0.02) && (pso_collision_and_volumes[0] == true) && (tower_library_index < 0)) { // Encourage tower exploration if bad build plate placement
-                                    var_list[iteration_number*this.surrogate_settings.number_of_vars + 3] = Math.random();
+                                if ((Math.random() < 0.2) && (pso_collision_and_volumes[0] == true) && (tower_library_index >= 0)) { // Encourage build plate exploration if bad tower
+                                    var_list[iteration_number*this.surrogate_settings.number_of_vars + 3] = var_list[iteration_number*this.surrogate_settings.number_of_vars + 3] - 0.05; // = 0
+                                } else if ((Math.random() < 0.05) && (pso_collision_and_volumes[0] == true) && (tower_library_index < 0)) { // Encourage tower exploration if bad build plate placement
+                                    var_list[iteration_number*this.surrogate_settings.number_of_vars + 3] = var_list[iteration_number*this.surrogate_settings.number_of_vars + 3] + 0.05; // = Math.random()
                                 }
                                 else results_array.push(pso_collision_and_volumes);
                             }
