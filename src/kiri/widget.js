@@ -400,7 +400,7 @@ class Widget {
      * @param {number} surrogate_duration
      * @param {number} total_combined_duration
      */
-     PRO.setSurrogateData = function(surrogate_duration,total_combined_duration) {
+    setSurrogateData = function(surrogate_duration,total_combined_duration) {
         this.surrogate_data.surrogating_duration = surrogate_duration;
         this.surrogate_data.combined_total_duration = total_combined_duration;
     };
@@ -411,7 +411,7 @@ class Widget {
      * @param {number} surrogate_duration
      * @param {number} total_combined_duration
      */
-     PRO.setSurrogateData = function(surrogate_duration,total_combined_duration) {
+    setSurrogateData = function(surrogate_duration,total_combined_duration) {
         this.surrogate_data.surrogating_duration = surrogate_duration;
         this.surrogate_data.combined_total_duration = total_combined_duration;
     };

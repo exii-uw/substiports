@@ -1,58 +1,63 @@
 // var distances = require("./distance");
 
-(function () {
-   'use strict';
+   
+"use strict";
 
-   if (self.kiri.kmeans) return;
+// dep: geo.base
+// dep: geo.polygons
+gapp.register("kiri.kmeans", [], (root, exports) => {
 
-   self.kiri.kmeans = {
-      KMeans: KMeans
+const { base, kiri } = root;
 
-   };
+// const { api, client, consts, utils } = kiri;
+// const { consts, utils } = kiri;
 
-   let KIRI = self.kiri,
-      BASE = self.base,
-      CONF = BASE.config,
-      UTIL = BASE.util
+const { key, polygons } = base;
+const { util } = base;
 
-   function KMeans(centroids) {
-      this.centroids = centroids || [];
-   }
+const POLY = base.polygons;
+const NOKEY = key.NONE;
 
-   var distances = {
-      euclidean: function(v1, v2) {
-         var total = 0;
-         // for (var i = 0; i < v1.length; i++) {
-         //    total += Math.pow(v2[i] - v1[i], 2);      
-         // }
-         // total += Math.pow(v2.x - v1.x, 2);
-         // total += Math.pow(v2.y - v1.y, 2);
-         // total += (Math.pow(v2.z - v1.z, 2)*0.5);
-         total += Math.pow(v2[0] - v1[0], 2);
-         total += Math.pow(v2[1] - v1[1], 2);
-         total += (Math.pow(v2[2] - v1[2], 2)*0.25);
-         return Math.sqrt(total);
-      },
-      manhattan: function(v1, v2) {
-         var total = 0;
-         for (var i = 0; i < v1.length ; i++) {
-            total += Math.abs(v2[i] - v1[i]);      
-         }
-         return total;
-      },
-      max: function(v1, v2) {
-         var max = 0;
-         for (var i = 0; i < v1.length; i++) {
-            max = Math.max(max , Math.abs(v2[i] - v1[i]));      
-         }
-         return max;
+var distances = {
+   euclidean: function(v1, v2) {
+      var total = 0;
+      // for (var i = 0; i < v1.length; i++) {
+      //    total += Math.pow(v2[i] - v1[i], 2);      
+      // }
+      // total += Math.pow(v2.x - v1.x, 2);
+      // total += Math.pow(v2.y - v1.y, 2);
+      // total += (Math.pow(v2.z - v1.z, 2)*0.5);
+      total += Math.pow(v2[0] - v1[0], 2);
+      total += Math.pow(v2[1] - v1[1], 2);
+      total += (Math.pow(v2[2] - v1[2], 2)*0.25);
+      return Math.sqrt(total);
+   },
+   manhattan: function(v1, v2) {
+      var total = 0;
+      for (var i = 0; i < v1.length ; i++) {
+         total += Math.abs(v2[i] - v1[i]);      
       }
+      return total;
+   },
+   max: function(v1, v2) {
+      var max = 0;
+      for (var i = 0; i < v1.length; i++) {
+         max = Math.max(max , Math.abs(v2[i] - v1[i]));      
+      }
+      return max;
+   }
+}
+
+class KMeans {
+
+   constructor(centroids) {
+      this.centroids = centroids || [];
    }
 
    /**
 	 * K-means++ initial centroid selection
 	 */
-    KMeans.prototype.kmpp = function(points, k, distance) {
+   kmpp = function(points, k, distance) {
       // var distance = fndist || (points[0].length? eudist : dist);
       var ks = [], len = points.length;
       var multi = points[0].length>0;
@@ -179,7 +184,7 @@
    //    return centroids;
    // }
 
-   KMeans.prototype.randomCentroids = function(points, k) {
+   randomCentroids = function(points, k) {
       var centroids = points.slice(0); // copy
       centroids.sort(function() {
          return (Math.round(Math.random()) - 0.5);
@@ -187,7 +192,7 @@
       return centroids.slice(0, k);
    }
 
-   KMeans.prototype.classify = function(point, distance) {
+   classify = function(point, distance) {
       var min = Infinity,
          index = 0;
 
@@ -207,7 +212,7 @@
       return index;
    }
 
-   KMeans.prototype.cluster = function(points, k, distance, snapshotPeriod, snapshotCb) {
+   cluster = function(points, k, distance, snapshotPeriod, snapshotCb) {
       k = k || Math.max(2, Math.ceil(Math.sqrt(points.length / 2)));
 
       distance = distance || "euclidean";
@@ -274,20 +279,26 @@
       return clusters;
    }
 
-   KMeans.prototype.toJSON = function() {
+   toJSON = function() {
       return JSON.stringify(this.centroids);
    }
 
-   KMeans.prototype.fromJSON = function(json) {
+   fromJSON = function(json) {
       this.centroids = JSON.parse(json);
       return this;
    }
 
-   if (false) { // Node
-      module.exports = KMeans;
+}
 
-      module.exports.kmeans = function(vectors, k) {
-         return (new KMeans()).cluster(vectors, k);
-      }
-   }
-})();
+function newKMeans(centroids) {
+   return new KMeans(centroids);
+}
+
+gapp.overlay(kiri, {
+   KMeans,
+   newKMeans
+});
+
+kiri.KMeans = KMeans;
+
+});

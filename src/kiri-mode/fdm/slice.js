@@ -12,10 +12,11 @@
 // use: kiri-mode.fdm.fill
 // use: ext.clip2
 // use: add.three
+// use: kiri.kmeans
 gapp.register("kiri-mode.fdm.slice", [], (root, exports) => {
 
 const { base, kiri, noop } = root;
-const { consts, driver, fill, fill_fixed, newSlice, utils, parallelenv, PSO, KMEANS} = kiri;
+const { consts, driver, fill, fill_fixed, newSlice, utils, newKMeans, KMeans, PSO, parallelenv} = kiri;
 const { config, polygons, util, newPoint } = base;
 const { fillArea } = polygons;
 const { beltfact } = consts;
@@ -1138,7 +1139,12 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         console.log({valid_points:valid_points});
 
         // Calculate clusters.
-        var kmeans = new KMEANS.KMeans();
+        // var kmeans = new kmeans.KMeans();
+        console.log(newKMeans);
+        console.log(kiri.newKMeans);
+        console.log(newSlice);
+        console.log(kiri);
+        var kmeans = newKMeans();
         // var clusters = KMEANS.KMeans(colors, 3);
         // var clusters = kmeans.cluster(colors, 3);
 
