@@ -1096,7 +1096,6 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                 let points_slice_copy = [...height_points];
                 next_slice.support_points = points_slice_copy;
                 skip_counter += 1;
-                next_slice = next_slice.up;
                 if (skip_counter == 1) {
                     skip_counter = 0;
                     let height_points_i = height_points.length;
@@ -1135,6 +1134,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                     //     }
                     // }
                 }
+                next_slice = next_slice.up;
             }
         }
         // valid_points.push(...supp_outline_points);

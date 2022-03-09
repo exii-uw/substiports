@@ -325,6 +325,8 @@ const client = exports({
 });
 
 // start worker
+console.log("Client starting");
+console.log({client:client});
 client.restart();
 
 });
