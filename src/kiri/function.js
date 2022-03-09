@@ -84,6 +84,7 @@ function prepareSlices(callback, scale = 1, offset = 0) {
         segNumber = 0,
         errored = false,
         startTime = Date.now(),
+        alwaysStartTime = Date.now(),
         toSlice = slicing.slice(),
         camOrLaser = mode.is_cam() || mode.is_laser(),
         extruders = {},
@@ -123,6 +124,8 @@ function prepareSlices(callback, scale = 1, offset = 0) {
             client.sliceAll(settings, sliceDone);
         }
     }
+
+    let surrogating_times = [];
 
     function sliceWidget(widget) {
         widget.stack = stacks.create(widget.id, widget.mesh);
