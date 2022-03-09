@@ -26,6 +26,7 @@
     "data/local",
     "load/stl",
     "kiri/kmeans",
+    "kiri/hull",
     "kiri/parallelenv",
     "kiri/pso",
     "kiri/conf",

@@ -252,7 +252,7 @@ function prepareSlices(callback, scale = 1, offset = 0) {
                 firstWidget = widget;
             }
         }
-        API.event.emit('log.file', {surrogating_times:surrogating_times, segtimes:segtimes, timestamp:firstWidget.surrogate_data.timestamp, startStamp:alwaysStartTime});
+        api.event.emit('log.file', {surrogating_times:surrogating_times, segtimes:segtimes, timestamp:firstWidget.surrogate_data.timestamp, startStamp:alwaysStartTime});
 
         if (callback && typeof callback === 'function') {
             callback();

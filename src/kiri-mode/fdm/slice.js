@@ -13,10 +13,12 @@
 // use: ext.clip2
 // use: add.three
 // use: kiri.kmeans
+// use: kiri.hull
+// use: kiri.pso
 gapp.register("kiri-mode.fdm.slice", [], (root, exports) => {
 
 const { base, kiri, noop } = root;
-const { consts, driver, fill, fill_fixed, newSlice, utils, newKMeans, KMeans, PSO, parallelenv} = kiri;
+const { consts, driver, fill, fill_fixed, newSlice, utils, newKMeans, KMeans, Optimizer, hull, parallelenv} = kiri;
 const { config, polygons, util, newPoint } = base;
 const { fillArea } = polygons;
 const { beltfact } = consts;
@@ -1139,12 +1141,8 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         console.log({valid_points:valid_points});
 
         // Calculate clusters.
-        // var kmeans = new kmeans.KMeans();
-        console.log(newKMeans);
-        console.log(kiri.newKMeans);
-        console.log(newSlice);
-        console.log(kiri);
-        var kmeans = newKMeans();
+
+        var kmeans = kiri.newKMeans();
         // var clusters = KMEANS.KMeans(colors, 3);
         // var clusters = kmeans.cluster(colors, 3);
 
@@ -1154,9 +1152,13 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         //  var hull = new HULL.hull();
         // var colorHull = HULL.hull(colors2, 500);
 
+        console.log({kiri:kiri});
+        // console.log(kiri.hull());
+
         for (let cluster of clusters) {
             var cluster_2d = getSimplePointsArray(cluster, true);
-            var new_hull = HULL.hull(cluster_2d, 100);
+            console.log({cluster_2d:cluster_2d});
+            var new_hull = kiri.hull(cluster_2d, 100);
             console.log({new_hull:new_hull});
 
 
@@ -1171,7 +1173,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                 hull_points.push(point);
             }
             hull_points.pop();
-            let debug_outline_poly = BASE.newPolygon(hull_points);
+            let debug_outline_poly = base.newPolygon(hull_points);
             console.log({debug_outline_poly:debug_outline_poly});
             bottom_slice.tops[0].fill_sparse.push(debug_outline_poly);
 
@@ -1187,7 +1189,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                 // let point3 = newPoint(start_x + halfLength, start_y + halfWidth, start_z);
                 // let point4 = newPoint(start_x - halfLength, start_y + halfWidth, start_z);
                 // let rect_points = [point1, point2, point3, point4];
-                // let rectanglePolygon = BASE.newPolygon(rect_points);
+                // let rectanglePolygon = base.newPolygon(rect_points);
                 // rectanglePolygon = rectanglePolygon.rotateXY(rot);
                 // //rectanglePolygon.parent = top.poly;
                 // rectanglePolygon.depth = 0;
@@ -1202,7 +1204,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                 let point3 = newPoint(point2.x + width*Math.sin(-rotation), point2.y + width*Math.cos(-rotation), start_z);
                 let point4 = newPoint(start_x + width*Math.sin(-rotation), start_y + width*Math.cos(-rotation), start_z);
                 let rect_points = [point1, point2, point3, point4];
-                let rectanglePolygon = BASE.newPolygon(rect_points);
+                let rectanglePolygon = base.newPolygon(rect_points);
                 //rectanglePolygon.parent = top.poly;
                 rectanglePolygon.depth = 0;
                 // rectanglePolygon.area2 = length * width * 2;
@@ -1490,7 +1492,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
             // Must pad first, padding centers polygon as well somehow?
 
-            const geometry_bounds_poly = BASE.newPolygon(geometry_points);
+            const geometry_bounds_poly = base.newPolygon(geometry_points);
             // console.log({geometry_points:geometry_points});
             // console.log({geometry_bounds_poly:geometry_bounds_poly});
             const halfX = geometry_bounds_poly.bounds.maxx*0.5;
@@ -1502,7 +1504,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                 // geometry_points[point_index].y += halfY;
             }
 
-            let rectanglePolygon = BASE.newPolygon(geometry_points);
+            let rectanglePolygon = base.newPolygon(geometry_points);
             //rectanglePolygon.parent = top.poly;
             
             // console.log({rectanglePolygon:rectanglePolygon});
@@ -1513,10 +1515,10 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             rectanglePolygon_padded = POLY.expand([rectanglePolygon], padding, start_z, rectanglePolygon_padded, 1); 
 
             let translation_points_copy = rectanglePolygon_padded[0].points.clone();
-            let after_padding_poly = BASE.newPolygon(translation_points_copy);
+            let after_padding_poly = base.newPolygon(translation_points_copy);
             let geometry_points2 = after_padding_poly.translatePoints(translation_points_copy, {x:start_x-halfX, y:start_y-halfY, z:start_z});
 
-            let prismPolygon = BASE.newPolygon(geometry_points2);
+            let prismPolygon = base.newPolygon(geometry_points2);
             prismPolygon.depth = 0;
             prismPolygon.area2 = prismPolygon.area(true);
 
@@ -1539,7 +1541,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             let point3 = newPoint(point2.x + width*Math.sin(-rotation), point2.y + width*Math.cos(-rotation), start_z);
             let point4 = newPoint(start_x + width*Math.sin(-rotation), start_y + width*Math.cos(-rotation), start_z);
             let rect_points = [point1, point2, point3, point4];
-            let rectanglePolygon = BASE.newPolygon(rect_points);
+            let rectanglePolygon = base.newPolygon(rect_points);
             //rectanglePolygon.parent = top.poly;
             rectanglePolygon.depth = 0;
             // rectanglePolygon.area2 = length * width * 2;
@@ -1560,7 +1562,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             let point3 = newPoint(start_x + halfLength, start_y + halfWidth, start_z);
             let point4 = newPoint(start_x - halfLength, start_y + halfWidth, start_z);
             let rect_points = [point1, point2, point3, point4];
-            let rectanglePolygon = BASE.newPolygon(rect_points);
+            let rectanglePolygon = base.newPolygon(rect_points);
             rectanglePolygon = rectanglePolygon.rotateXY(rot);
             //rectanglePolygon.parent = top.poly;
             rectanglePolygon.depth = 0;
@@ -1577,7 +1579,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         // generate text polygon
         function generateAsciiPolygons(text, start_x, start_y, text_rotation, text_size) {
             function finishPoly(points) {
-                let asciiPolygon = BASE.newPolygon(points);
+                let asciiPolygon = base.newPolygon(points);
                 asciiPolygon.depth = 0;
                 asciiPolygon.open = true;
                 return asciiPolygon;
@@ -1682,7 +1684,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                 //     }
                 // }
                 // if (multiplePolys) {
-                //     let finalAsciiPolygon = BASE.newPolygon(temp_point_list);
+                //     let finalAsciiPolygon = base.newPolygon(temp_point_list);
                 //     pList.push(finalAsciiPolygon);
                 // } else {
 
@@ -4033,7 +4035,8 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         if (searchType == "PSO") {
             // Optimizer area ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             let valid_answers = [];
-            var optimizer = new PSO.Optimizer(); // TODO: Add min and max values for particle variable ranges
+            var optimizer = new kiri.Optimizer();
+            // var optimizer = new PSO.Optimizer(); // TODO: Add min and max values for particle variable ranges
             optimizer.surrogate_library = books;
             optimizer.surrogate_settings = surrogate_settings;
             optimizer.valid_answers = [];
@@ -5659,9 +5662,9 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                                     // }
                                     // for (let ascii_poly of ascii_poly_list2) {
                                     //     let translation_points_copy = ascii_poly.points.clone();
-                                    //     let after_padding_poly = BASE.newPolygon(translation_points_copy);
+                                    //     let after_padding_poly = base.newPolygon(translation_points_copy);
                                     //     let geometry_points2 = after_padding_poly.translatePoints(translation_points_copy, {x:surrogate_outline_area_only[0].bounds.maxx, y:surrogate_outline_area_only[0].bounds.maxy, z:0});
-                                    //     let prismPolygon = BASE.newPolygon(geometry_points2);
+                                    //     let prismPolygon = base.newPolygon(geometry_points2);
                                     //     up.tops[0].fill_sparse.push(prismPolygon);
 
                                     // } 
