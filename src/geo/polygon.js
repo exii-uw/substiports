@@ -1780,18 +1780,77 @@ class Polygon {
         return null;
     }
 
-    midpoint = function() {
+    // midpoint = function() {
+    //     let mid_x = (this.bounds.minx + this.bounds.maxx) / 2;
+    //     let mid_y = (this.bounds.miny + this.bounds.maxy) / 2;
+    //     let mid_z = 0;
+    //     let midpoint = newPoint(mid_x, mid_y, mid_z);
+    //     //let midpoint = newPoint(0, 0, 0);
+        
+
+    //     return midpoint;
+    // }
+
+    // translatePoints = function(poly_points, translation_vector) {
+    //     let new_points = [];
+    //     let old_points = poly_points.clone();
+    //     for(let i = 0; i < old_points.length; i++) {
+    //         let trans_x = old_points[i].x + translation_vector.x;
+    //         let trans_y = old_points[i].y + translation_vector.y;
+    //         let trans_z = old_points[i].z + translation_vector.z;
+
+    //         new_points[i] = newPoint(trans_x, trans_y, trans_z);
+    //     }
+    //     return new_points;
+    // }
+
+    // rotateXY = function(angle) {
+    //     // Converting degree to radians!
+    //     let angle_radians = angle * Math.PI / 180;
+
+    //     let midpoint = this.midpoint();
+    //     let inverse_midpoint_vector = newPoint(0-midpoint.x, 0-midpoint.y, 0-midpoint.z);
+
+    //     let translation_poly_copy = this.points.clone();
+    //     this.points = this.translatePoints(translation_poly_copy, inverse_midpoint_vector);
+        
+    //     for(let i = 0; i < this.points.length; i++) {
+    //         let prev_x = this.points[i].x
+    //         let prev_y = this.points[i].y;
+
+    //         this.points[i].x = prev_x * Math.cos(angle_radians) - prev_y * Math.sin(angle_radians);
+    //         this.points[i].y = prev_x * Math.sin(angle_radians) + prev_y * Math.cos(angle_radians);
+    //     }
+    //     let translation_poly_copy2 = this.points.clone();
+    //     this.points = this.translatePoints(translation_poly_copy2, midpoint);
+    //     return this;
+    // }
+
+    // rotateXYsimple = function(angle) {
+    //     // Converting degree to radians!
+    //     let angle_radians = angle * Math.PI / 180;
+        
+    //     for(let i = 0; i < this.points.length; i++) {
+    //         let prev_x = this.points[i].x
+    //         let prev_y = this.points[i].y;
+
+    //         this.points[i].x = prev_x * Math.cos(angle_radians) - prev_y * Math.sin(angle_radians);
+    //         this.points[i].y = prev_x * Math.sin(angle_radians) + prev_y * Math.cos(angle_radians);
+    //     }
+    //     return this;
+    // }
+
+    midpoint() {
         let mid_x = (this.bounds.minx + this.bounds.maxx) / 2;
         let mid_y = (this.bounds.miny + this.bounds.maxy) / 2;
         let mid_z = 0;
         let midpoint = newPoint(mid_x, mid_y, mid_z);
         //let midpoint = newPoint(0, 0, 0);
-        
 
         return midpoint;
     }
 
-    translatePoints = function(poly_points, translation_vector) {
+    translatePoints(poly_points, translation_vector) {
         let new_points = [];
         let old_points = poly_points.clone();
         for(let i = 0; i < old_points.length; i++) {
@@ -1804,7 +1863,7 @@ class Polygon {
         return new_points;
     }
 
-    rotateXY = function(angle) {
+    rotateXY(angle) {
         // Converting degree to radians!
         let angle_radians = angle * Math.PI / 180;
 
@@ -1826,7 +1885,7 @@ class Polygon {
         return this;
     }
 
-    rotateXYsimple = function(angle) {
+    rotateXYsimple(angle) {
         // Converting degree to radians!
         let angle_radians = angle * Math.PI / 180;
         

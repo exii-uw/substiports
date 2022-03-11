@@ -215,6 +215,33 @@ kiri.minions = {
         }
     },
 
+    test(numb, sl, top) { // Making preparations for the (equally named) minion function
+        return new Promise((resolve, reject) => {
+            if (concurrent < 2) {
+                reject("concurrent test unavaiable");
+            }
+            // let { each } = options;
+            // let i = 0, floatP = new Float32Array(points.length * 3);
+            // for (let p of points) {
+            //     floatP[i++] = p.x;
+            //     floatP[i++] = p.y;
+            //     floatP[i++] = p.z;
+            // }
+            console.log({worker_top:top});
+            minwork.queue({
+                cmd: "test",
+                number: numb,
+                // test_slice: sl,
+                coded_slice: codec.encode(sl),
+                coded_top: codec.encode(top, {full: true})
+            }, data => { // This handles the data returned by the minion function 
+                // let polys = codec.decode(data.clips);
+                let result_number = data.output;
+                resolve(data);
+            });
+        });
+    },
+
     wasm(enable) {
         for (let minion of minions) {
             minion.postMessage({

@@ -10,11 +10,12 @@
 // dep: kiri.codec
 // dep: kiri-mode.fdm.post
 // dep: ext.clip2
+// use: kiri.pso
 gapp.register("kiri-run.minion", [], (root, exports) => {
 
 const { base, kiri } = root;
 const { polygons } = base;
-const { codec } = kiri;
+const { codec, Optimizer } = kiri;
 
 const POLY = polygons;
 const clib = self.ClipperLib;
@@ -130,6 +131,21 @@ const funcs = {
         } else {
             base.wasm_ctrl.disable();
         }
+    },
+
+    test: (data, seq) => {
+        console.log({minion_data:data});
+        console.log({minion_data:data});
+        var optimizer = new kiri.Optimizer();
+        console.log({minion_optimizer:optimizer});
+        let { number, coded_slice, slice2 } = data;
+        let slice3 = codec.decode(data.coded_slice);
+        let slice4 = codec.encode(slice3);
+        let out = [];
+        let outtop = codec.decode(data.coded_top, {full: true});
+        out.push(number*100);
+        out.push(data.number*100);
+        reply({ seq, output: out, coded_slice, slice2, slice3, slice4, outtop });
     },
 
     bad: (data, seq) => {

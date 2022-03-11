@@ -416,6 +416,27 @@ class Widget {
         this.surrogate_data.combined_total_duration = total_combined_duration;
     };
 
+    // // LWW
+    // /**
+    //  * @param {number} surrogate_duration
+    //  * @param {number} total_combined_duration
+    // */
+    // setSurrogateData(surrogate_duration,total_combined_duration) {
+    //     this.surrogate_data.surrogating_duration = surrogate_duration;
+    //     this.surrogate_data.combined_total_duration = total_combined_duration;
+    // };
+
+
+    // // LWW
+    // /**
+    //  * @param {number} surrogate_duration
+    //  * @param {number} total_combined_duration
+    // */
+    // setSurrogateData(surrogate_duration,total_combined_duration) {
+    //     this.surrogate_data.surrogating_duration = surrogate_duration;
+    //     this.surrogate_data.combined_total_duration = total_combined_duration;
+    // };
+
     /**
      * center geometry bottom (on platform) at 0,0,0
      */

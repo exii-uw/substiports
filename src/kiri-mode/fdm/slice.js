@@ -975,6 +975,61 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
             let support_points = getSupportPoints(highest_slice, process, settings);
 
+
+            let test_promises = [];
+
+            let test_array = [5, 8, 10, 3, 7, 29, 1, 15, 88, 6];
+            let test_out = [];
+    
+
+            console.log({top_kiri:kiri});
+            console.log({aSlice:highest_slice.down});
+
+            for (let integr of test_array) {
+                test_promises.push(kiri.minions.test(integr, highest_slice, highest_slice.down.tops[0]));
+            }
+    
+            // if (test_promises) {
+            //     await Promise.all(test_promises);
+            //     .then(() => {
+            //         api.log.emit('analysis complete').unpin();
+            //     });
+            //     // await tracker(test_promises, (i, t) => {
+            //     //     trackupdate(i / t, 0.1, 0.9);
+            //     // });
+            //     for (let tp of test_promises) {
+            //         console.log(tp);
+            //         let numberBig = false;
+            //         // if (tp.PromiseResult[0] > 200) numberBig = true;
+            //         if (tp[0][0] > 200) numberBig = true;
+            //         console.log({numberBig:numberBig});
+            //     }
+            // }
+
+
+            if (test_promises) {
+                console.log(test_out.length);
+                for (let p of test_promises) {
+                    p.then(data => {
+                        // tracker(count++, promises.length, data);
+                        console.log({data:data});
+                        console.log({p:p});
+                        test_out.push(data[0]);
+                        let numberBig = false;
+                        if (data.output[0] > 200) numberBig = true;
+                        // if (p[0][0] > 200) numberBig = true;
+                        console.log({numberBig:numberBig});
+
+                    });
+                }
+                await Promise.all(test_promises);
+            }
+
+            console.log({test_out:test_out});
+            console.log(test_out.length);
+    
+
+
             let surrogated_slices = doSurrogates(highest_slice, process, widget.shadow, settings, view, prisms_obj);
             widget.slices = surrogated_slices;
 
@@ -1237,9 +1292,6 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         }
 
         console.log({support_points_save:a_slice.support_points});
-
-
-
 
     }
 
@@ -6725,6 +6777,7 @@ function doSparseLayerFill(slice, options = {}) {
 
     if (options.promises) {
         options.promises.push(kiri.minions.clip(slice, polys, lines));
+        console.log({clipping_promises:options.promises});
         return;
     }
 
