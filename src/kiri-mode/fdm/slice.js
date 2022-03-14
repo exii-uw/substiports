@@ -982,7 +982,13 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             let sliceStackData = getEncodedData(bottom_slice);
             console.log({sliceStackData:sliceStackData});
 
-            let surrogate_library = getSurrogateLibrary();
+            let surrogate_library = getSurrogateLibrary(prisms_obj);
+
+            let prepared_slices, surrogate_settings = prepareSurrogating(surrogate_library, highest_slice, process, settings);
+            // let surrogate_settings = {};
+
+            // widget.slices = prepared_slices;
+            
             let test_promises = [];
 
             let test_array = [5, 8, 10, 3, 7, 29, 1, 15, 88, 6];
@@ -1057,16 +1063,17 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
     
 
 
-            let surrogated_slices, surro_settings = doSurrogates(surrogate_library, highest_slice, process, widget.shadow, settings, view, prisms_obj);
-            surro_settings.start_slice = null;
-            surro_settings.all_slices = null;
-            console.log({surro_settings:surro_settings}); 
+            let surrogated_slices = doSurrogates(surrogate_library, surrogate_settings, highest_slice, process, widget.shadow, settings, view, prisms_obj);
+            surrogate_settings.start_slice = null;
+            surrogate_settings.all_slices = null;
+            console.log({surrogate_settings:surrogate_settings}); 
+            // console.log({surro_settings:surro_settings}); 
             widget.slices = surrogated_slices;
 
 
             let search_promises = [];
 
-            search_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surro_settings));
+            search_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings));
 
             if (search_promises) {
                 console.log(test_out.length);
@@ -1496,7 +1503,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         
     }
 
-    function getSurrogateLibrary() {
+    function getSurrogateLibrary(prisms) {
         let surrogates = [];
         // surrogates.push({width:100.5, length:152.7, height:10.9});
         // surrogates.push({width:136.8, length:190.1, height:24.1});
@@ -1614,13 +1621,657 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         return surrogates;
     }
 
-    function doSurrogates(library_in, slice, proc, shadow, settings, view, prisms) {
+
+    /**
+     * Simplifies mesh and support polygons
+     * Sets/determines surrogate settings
+     */
+    function prepareSurrogating(library_in, slice, proc, settings) {
+        if (true)
+        {
+            console.log({status:"Preparing surrogate search"});
+        }
+
+        let surros = library_in;
+    
+        let minArea = proc.supportMinArea,
+            min = minArea || 0.01,
+            ctre = new ClipperLib.PolyTree();
+        // create inner clip offset from tops
+        //POLY.expand(tops, offset, slice.z, slice.offsets = []);
+
+        let bottom_slice = slice.down;
+        let last_bottom_slice;
+
+        // make test object polygons
+        function generateRectanglePolygonCentered(start_x, start_y, start_z, length, width, rot, padding, debug_slice) {
+            const halfLength = length*0.5;
+            const halfWidth = width*0.5;
+            let point1 = newPoint(start_x - halfLength, start_y - halfWidth, start_z);
+            let point2 = newPoint(start_x + halfLength, start_y - halfWidth, start_z);
+            let point3 = newPoint(start_x + halfLength, start_y + halfWidth, start_z);
+            let point4 = newPoint(start_x - halfLength, start_y + halfWidth, start_z);
+            let rect_points = [point1, point2, point3, point4];
+            let rectanglePolygon = base.newPolygon(rect_points);
+            rectanglePolygon = rectanglePolygon.rotateXY(rot);
+            //rectanglePolygon.parent = top.poly;
+            rectanglePolygon.depth = 0;
+            rectanglePolygon.area2 = length * width * -2; // This winding direction is negative
+            
+            let rectanglePolygon_padded = [];
+            rectanglePolygon_padded = POLY.expand([rectanglePolygon], padding, start_z, rectanglePolygon_padded, 1); 
+            // console.log({rectanglePolygon:rectanglePolygon});
+            // if (!debug_slice.tops[0].fill_sparse) debug_slice.tops[0].fill_sparse = [];
+            // debug_slice.tops[0].fill_sparse.push(rectanglePolygon_padded[0]);
+            return rectanglePolygon_padded[0];
+        }
+
+        function getTotalSupportVolume(bottom_slice) {
+            let iterate_layers_support = bottom_slice;
+            let total_support_volume = 0;
+            let total_support_area = 0;
+            while (iterate_layers_support) {
+                if (iterate_layers_support.supports) {
+                    iterate_layers_support.supports.forEach(function(supp) {
+                        total_support_area += supp.areaDeep();
+                        total_support_volume += Math.abs((supp.areaDeep() * iterate_layers_support.height));
+                    });
+                }
+                iterate_layers_support = iterate_layers_support.up;
+            }
+            return [total_support_volume, total_support_area];
+        }
+
+        function adaptivePolySimplify(flatFactor, logFactor, poly, perimeterLength, prevArea2, zed, mina, coff) {
+            const averageLineLength = perimeterLength / poly.length;
+            // const LengthPerArea = Math.abs(poly.area2)/averageLineLength;)
+            let checkOut = false;
+
+            if (averageLineLength < 2.0 && poly.length > 10) {
+                coff = new ClipperLib.ClipperOffset();
+                const simplification_factor = 2182.24*flatFactor * Math.log(16.1379*logFactor * averageLineLength);
+                let inputPolyClipped = poly.toClipper();
+                inputPolyClipped = ClipperLib.Clipper.CleanPolygons(inputPolyClipped, simplification_factor);
+                // inputPolyClipped= ClipperLib.Clipper.SimplifyPolygons(inputPolyClipped, 1);
+
+                // const newLength = inputPolyClipped[0].length;
+                // const newALL = perimeterLength / newLength;
+                // if (newLength > 100 || newLength < 4 || newALL > 6 || newALL < 1.0) {
+                //     console.log({WARNING:"Check simplification result"});
+                //     console.log({poly:poly});
+                //     console.log({inputPolyClipped:inputPolyClipped});
+                //     console.log({newALL:newALL});
+                //     console.log({oldAll:averageLineLength});
+                //     console.log({perimeterLength:perimeterLength});
+                //     console.log({inputPolyClippedLength:newLength});
+                //     checkOut = true;
+                // }
+
+                // if (inputPolyClipped.length > 0) {
+                //     for (let justIterate = 0; justIterate < inputPolyClipped[0].length; justIterate += 1) {
+                //         inputPolyClipped[0][justIterate].Y += 1000000;
+                //     }
+                // }
+
+                coff.AddPaths(inputPolyClipped, 2, 4);
+                coff.Execute(ctre, 0);
+                let outputPolys = POLY.fromClipperTree(ctre, zed, null, null, mina);
+
+                
+
+                if (outputPolys.length > 0) {
+                    outputPolys[0].area2 = outputPolys[0].area(true);
+                    // if (Math.abs(Math.abs(outputPolys[0].area2) - Math.abs(prevArea2) > 5)) {
+                    //     console.log({WARNING:"Area after simplifying top polygon changed a lot."});
+                    //     console.log("Simplified_area: " + outputPolys[0].area2.toString());
+                    //     console.log("Original_area: " + prevArea2.toString());
+                    //     checkOut = true;
+                    //     for (let justIterate = 0; justIterate < outputPolys[0].points.length; justIterate += 1) {
+                    //         outputPolys[0].points[justIterate].Y += 10000000;
+                    //         outputPolys[0].points[justIterate].y += 100;
+                    //     }
+                    // }
+                    if (outputPolys.length > 1) {
+                        // console.log({WARNING:"More than one output poly after simplification."});
+                        // console.log({outputPolys:outputPolys});
+                        checkOut = true;
+                        
+                        outputPolys[0].points.push(...outputPolys[1].points); // TODO: Handle this more cleanly
+                        // for (let justIterate = 0; justIterate < outputPolys[0].points.length; justIterate += 1) {
+                        //     outputPolys[0].points[justIterate].Y += 10000000;
+                        //     outputPolys[0].points[justIterate].y += 100;
+                        // }
+                    }
+                    outputPolys[0].checkOut = checkOut;
+                    return outputPolys[0];
+                }
+                else {
+
+                    // for (let justIterate = 0; justIterate < poly.length; justIterate += 1) {
+                    //     poly.points[justIterate].Y += 600000;
+                    //     poly.points[justIterate].y += 6;
+                    // }
+                    // console.log({WARNING:"Clipper returned empty polygon"});
+                    // console.log({outputPolys:outputPolys});
+                    // console.log({poly:poly});
+                    // console.log({inputPolyClipped:inputPolyClipped});
+                    // console.log({oldAll:averageLineLength});
+                    checkOut = true;
+                    poly.checkOut = checkOut;
+                    return poly;
+                }
+            }
+            else {
+                poly.perim = perimeterLength;
+                poly.area2 = prevArea2;
+                poly.checkOut = checkOut;
+                return poly;
+            }
+        }
+
+        function adaptivePolySimplifyList(flatFactor, logFactor, poly, perimeterLength, prevArea2, zed, mina, coff) {
+            const averageLineLength = perimeterLength / poly.length;
+            // const LengthPerArea = Math.abs(poly.area2)/averageLineLength;)
+            let checkOut = false;
+
+            if (averageLineLength < 2.0 && poly.length > 10) {
+                coff = new ClipperLib.ClipperOffset();
+                const simplification_factor = 2182.24*flatFactor * Math.log(16.1379*logFactor * averageLineLength);
+                let inputPolyClipped = poly.toClipper();
+                inputPolyClipped = ClipperLib.Clipper.CleanPolygons(inputPolyClipped, simplification_factor);
+                // inputPolyClipped= ClipperLib.Clipper.SimplifyPolygons(inputPolyClipped, 1);
+
+                // const newLength = inputPolyClipped[0].length;
+                // const newALL = perimeterLength / newLength;
+                // if (newLength > 100 || newLength < 4 || newALL > 6 || newALL < 1.0) {
+                //     console.log({WARNING:"Check simplification result"});
+                //     console.log({poly:poly});
+                //     console.log({inputPolyClipped:inputPolyClipped});
+                //     console.log({newALL:newALL});
+                //     console.log({oldAll:averageLineLength});
+                //     console.log({perimeterLength:perimeterLength});
+                //     console.log({inputPolyClippedLength:newLength});
+                //     checkOut = true;
+                // }
+
+                // if (inputPolyClipped.length > 0) {
+                //     for (let justIterate = 0; justIterate < inputPolyClipped[0].length; justIterate += 1) {
+                //         inputPolyClipped[0][justIterate].Y += 1000000;
+                //     }
+                // }
+
+                coff.AddPaths(inputPolyClipped, 2, 4);
+                coff.Execute(ctre, 0);
+                let outputPolys = POLY.fromClipperTree(ctre, zed, null, null, mina);
+
+                
+
+                if (outputPolys.length > 0) {
+                    outputPolys[0].area2 = outputPolys[0].area(true);
+                    if (Math.abs(Math.abs(outputPolys[0].area2) - Math.abs(prevArea2) > 5)) {
+                        console.log({WARNING:"Area after simplifying top polygon changed a lot."});
+                        console.log("Simplified_area: " + outputPolys[0].area2.toString());
+                        console.log("Original_area: " + prevArea2.toString());
+                    }
+                    if (outputPolys.length > 1) {
+                        console.log({WARNING:"More than one output poly after simplification."});
+                        console.log({outputPolys:outputPolys});
+                        checkOut = true;
+                        
+                        outputPolys[0].points.push(...outputPolys[1].points);
+
+
+                        for (let justIterate = 0; justIterate < outputPolys[0].points.length; justIterate += 1) {
+                            outputPolys[0].points[justIterate].Y += 2000000;
+                            outputPolys[0].points[justIterate].y += 20;
+                        }
+                    }
+                    outputPolys[0].checkOut = checkOut;
+                    return outputPolys[0];
+                }
+                else {
+
+                    // for (let justIterate = 0; justIterate < poly.length; justIterate += 1) {
+                    //     poly.points[justIterate].Y += 600000;
+                    //     poly.points[justIterate].y += 6;
+                    // }
+                    console.log({WARNING:"Clipper returned empty polygon"});
+                    console.log({outputPolys:outputPolys});
+                    console.log({poly:poly});
+                    console.log({inputPolyClipped:inputPolyClipped});
+                    console.log({oldAll:averageLineLength});
+                    checkOut = true;
+                    poly.checkOut = checkOut;
+                    return poly;
+                }
+            }
+            else {
+                poly.perim = perimeterLength;
+                poly.area2 = prevArea2;
+                poly.checkOut = checkOut;
+                return poly;
+            }
+        }
+
+        let otherWidget;
+        
+        while (bottom_slice) {
+            last_bottom_slice = bottom_slice;
+            bottom_slice = bottom_slice.down;
+            if (!otherWidget) { // The second widget has the manual support pillars 
+                try {
+                    const thisWidgetID = bottom_slice.widget.id;
+                    for (let widInd = 0; widInd < bottom_slice.widget.group.length; widInd +=1 ) {
+                        if (bottom_slice.widget.group[widInd].id != thisWidgetID)  {
+                            otherWidget = bottom_slice.widget.group[widInd]; // Get widget with manual supports
+                            break;
+                        }
+                    }
+                }
+                catch { } // We don't care if there is none
+            }
+        }
+
+        bottom_slice = last_bottom_slice;
+        console.log({bottom_slice: bottom_slice});
+
+        let up = bottom_slice;
+
+        if (!bottom_slice.tops[0].fill_sparse) bottom_slice.tops[0].fill_sparse = [];
+
+        bottom_slice.efficiencyData = {numberPauses:0, numberSurrogates:0, materialWeightEstimateTube: 0, materialWeightEstimateBar: 0, materialWeightEstimateEllipse: 0, timestamp:0, id:0, previous_volume:0, new_volume:0, volume_percentage_saved:0}; 
+
+        let surrogate_settings = {};
+
+        if (proc.surrogateInteraction == "off") {
+            surrogate_settings.minVolume = 10;
+            surrogate_settings.interaction_N_penalty_factor = 0;
+            surrogate_settings.surrogate_N_penalty_factor = 0;
+            surrogate_settings.searchspace_min_number_of_surrogates = 0;
+        } else if(proc.surrogateInteraction == "low") {
+            surrogate_settings.minVolume = 100;
+            surrogate_settings.interaction_N_penalty_factor = 0.35;
+            surrogate_settings.surrogate_N_penalty_factor = 0.8;
+            surrogate_settings.searchspace_min_number_of_surrogates = 2;
+        } else if(proc.surrogateInteraction == "medium") {
+            surrogate_settings.minVolume = 50;
+            surrogate_settings.interaction_N_penalty_factor = 0.3;
+            surrogate_settings.surrogate_N_penalty_factor = 0.65;
+            surrogate_settings.searchspace_min_number_of_surrogates = 3;
+        } else if(proc.surrogateInteraction == "high") {
+            surrogate_settings.minVolume = 10;
+            surrogate_settings.interaction_N_penalty_factor = 0.0;
+            surrogate_settings.surrogate_N_penalty_factor = 0.0;
+            surrogate_settings.searchspace_min_number_of_surrogates = 5;
+        }
+
+        if (proc.surrogateSearchQual == "fastest") {
+            surrogate_settings.exploration_factor = 0.3;
+            surrogate_settings.simplification_factor = 4.0;
+            surrogate_settings.search_persistance = 4;
+            surrogate_settings.minImprovementPercentage = 0.08;
+            surrogate_settings.numberOfParticles = 175;
+            surrogate_settings.searchspace_max_number_of_surrogates = 4;
+            
+        } else if(proc.surrogateSearchQual == "fair") {
+            surrogate_settings.exploration_factor = 0.2;
+            surrogate_settings.simplification_factor = 3.5;
+            surrogate_settings.search_persistance = 5;
+            surrogate_settings.minImprovementPercentage = 0.04;
+            surrogate_settings.numberOfParticles = 175;
+            surrogate_settings.searchspace_max_number_of_surrogates = 5;
+
+        } else if(proc.surrogateSearchQual == "good") {
+            surrogate_settings.exploration_factor = 0.12;
+            surrogate_settings.simplification_factor = 3;
+            surrogate_settings.search_persistance = 5;
+            surrogate_settings.minImprovementPercentage = 0.015;
+            surrogate_settings.numberOfParticles = 250;
+            surrogate_settings.searchspace_max_number_of_surrogates = 6;
+
+        } else if(proc.surrogateSearchQual == "best") {
+            surrogate_settings.exploration_factor = 0.0;
+            surrogate_settings.simplification_factor = 2.5;
+            surrogate_settings.search_persistance = 8;
+            surrogate_settings.minImprovementPercentage = 0.01;
+            surrogate_settings.numberOfParticles = 600;//275;
+            surrogate_settings.searchspace_max_number_of_surrogates = 2;
+        }
+
+        console.log({surrogateSearchQual:proc.surrogateSearchQual});
+        console.log({surrogateInteraction:proc.surrogateInteraction});
+
+        let search_padding = 50; // TODO: Adjust to size of surrogate/largest surrogate?
+        // Search bounds
+        const min_x = bottom_slice.widget.bounds.min.x - search_padding;
+        const max_x = bottom_slice.widget.bounds.max.x + search_padding;
+        const min_y = bottom_slice.widget.bounds.min.y - search_padding;
+        const max_y = bottom_slice.widget.bounds.max.y + search_padding;
+        const bedDepthArea = settings.device.bedDepth / 2;
+        const bedWidthArea = settings.device.bedWidth / 2;
+        const shift_x = bottom_slice.widget.track.pos.x;
+        const shift_y = bottom_slice.widget.track.pos.y;
+
+        console.log({bedDepthArea:bedDepthArea});
+        console.log({bedWidthArea:bedWidthArea});
+
+        console.log({shift_x:shift_x});
+        console.log({shift_y:shift_y});
+
+        let rotations = [0,45,90,135,180,225,270,315];
+        let layer_height_fudge = settings.process.sliceHeight/1.75;
+        let print_on_surrogate_extra_height_for_extrusion = 0;
+        surrogate_settings.surrogate_padding = 0.1;
+        surrogate_settings.min_squish_height = settings.process.sliceHeight/4;
+        surrogate_settings.max_extra_droop_height = settings.process.sliceHeight/4;
+        surrogate_settings.minimum_clearance_height = settings.process.sliceHeight/4;
+        surrogate_settings.rotations = rotations;
+        surrogate_settings.print_on_surrogate_extra_height_for_extrusion = print_on_surrogate_extra_height_for_extrusion;
+        surrogate_settings.layer_height_fudge = layer_height_fudge;
+        surrogate_settings.start_slice = bottom_slice;
+        surrogate_settings.existing_surrogates = [];
+        surrogate_settings.number_of_vars = 7; // Number of variables per surrogate PSO test
+        surrogate_settings.average_so_far = 0;
+
+        surrogate_settings.fitness_offset = 0;
+        
+        surrogate_settings.best_valid = 0;
+        surrogate_settings.leniency = 1.0;
+
+        surrogate_settings.text_size = proc.surrogateTextSize;
+
+        // surrogate_settings.minVolume = 10;
+        surrogate_settings.skimPercentage = 0.05;
+
+        surrogate_settings.allow_towers = proc.surrogateTowers;
+        // surrogate_settings.allow_height_variable = true;
+        // surrogate_settings.allow_stackable = true;
+        
+
+        let all_slices = [];
+        surrogate_settings.all_slices = all_slices;
+        surrogate_settings.precomputed_slice_heights = [];
+        surrogate_settings.pauseLayers = [];
+
+        surrogate_settings.smallest_length = Infinity;
+        surrogate_settings.smallest_width = Infinity;
+        surrogate_settings.smallest_height = Infinity;
+        surrogate_settings.biggest_length = 0;
+        surrogate_settings.biggest_width = 0;
+        surrogate_settings.biggest_height = 0;
+
+        for (let surro of surros) {
+            if (surrogate_settings.smallest_length > surro.length) {
+                surrogate_settings.smallest_length = surro.length;
+            }
+            if (surrogate_settings.smallest_width > surro.width) {
+                surrogate_settings.smallest_width = surro.width;
+            }
+            if (surrogate_settings.smallest_height > surro.minHeight) {
+                surrogate_settings.smallest_height = surro.minHeight;
+            }
+            if (surrogate_settings.biggest_length < surro.length) {
+                surrogate_settings.biggest_length = surro.length;
+            }
+            if (surrogate_settings.biggest_width < surro.width) {
+                surrogate_settings.biggest_width = surro.width;
+            }
+            if (surrogate_settings.biggest_height < surro.maxHeight) {
+                surrogate_settings.biggest_height = surro.maxHeight;
+            }
+        }
+    
+        let mina = min; //numOrDefault(min, 0.1);
+        let coff = new ClipperLib.ClipperOffset();
+        const unreachable_poly = generateRectanglePolygonCentered(1000, 1000, 1000, 10, 10, 0, 0, bottom_slice);
+            
+        while (up) {
+            if (proc.surrogateInteraction != "off") {
+                let zed = up.z || 0;
+
+                // console.log({up:up});
+                // if (up.tops) {
+                //     let overlap_found = false;
+                //     if (up.tops.length > 1) {
+                //         for (let topsIndex = 0; topsIndex < up.tops.length; topsIndex+=1) {
+                //             for (let topsIndex2 = 0; topsIndex2 < up.tops.length; topsIndex2+=1) {
+                //                 if (topsIndex != topsIndex2) {
+                //                     let outs = [];
+                //                     let overlapA = -1*Math.abs(up.tops[topsIndex].poly.areaDeep());
+                //                     POLY.subtract([up.tops[topsIndex].poly], [up.tops[topsIndex2].poly], outs, null, up.z, min);
+                //                     outs.forEach(function(outP) {
+                //                         overlapA += Math.abs(outP.areaDeep());
+                //                     });
+
+                //                     if (Math.abs(overlapA) > 0.00001) {
+                //                         console.log({overlapA_Before:overlapA});
+                //                         // for (let justIterate = 0; justIterate < up.tops[topsIndex].poly.length; justIterate += 1) {
+                //                         //     up.tops[topsIndex].poly.points[justIterate].X += 2000000;
+                //                         //     up.tops[topsIndex].poly.points[justIterate].x += 20;
+                //                         // }
+                //                         // for (let justIterate = 0; justIterate < up.tops[topsIndex2].poly.length; justIterate += 1) {
+                //                         //     up.tops[topsIndex2].poly.points[justIterate].X += 2000000;
+                //                         //     up.tops[topsIndex2].poly.points[justIterate].x += 20;
+                //                         // }
+                //                         if (!up.tops[0].fill_sparse) up.tops[0].fill_sparse = [];
+                //                         // up.tops[0].fill_sparse.push(up.tops[topsIndex].poly);
+                //                         // up.tops[0].fill_sparse.push(up.tops[topsIndex2].poly);
+                //                         if (!up.supports) up.supports = [];
+                //                         // up.supports.push(up.tops[topsIndex].poly);
+                //                         // up.supports.push(up.tops[topsIndex2].poly);
+                //                         overlap_found = true;
+                //                     }
+
+
+                //                 }
+                //             }
+                //         }
+
+                //     }
+                //     if (overlap_found == false) {
+                //         // up.tops = [];
+                //     }
+                // }
+
+
+                // Clone and simplify tops
+                up.topsSaved = up.tops.clone(true); // Clone tops
+                for (let topsIndex = 0; topsIndex < up.topsSaved.length; topsIndex+=1) {
+                    // The original top remains mostly intact, only the poly is changed
+                    // Clone the poly
+                    let originalPoly = up.tops[topsIndex].poly;
+                    let inputPoly = originalPoly.clone(true);
+                    up.topsSaved[topsIndex].poly = originalPoly; // Put original poly into cloned top.
+
+                    // const perimeterLength = originalPoly.perim;
+                    let outputPoly = adaptivePolySimplify(surrogate_settings.simplification_factor, surrogate_settings.simplification_factor+0.5, inputPoly, originalPoly.perim, originalPoly.area2, zed, mina, coff);
+
+                    up.tops[topsIndex].poly = outputPoly;
+                    // if (outputPoly.checkOut) {
+                    // // if (true) {
+                    //     console.log({Note:"Found Warning"});
+                    //     if (!up.tops[0].fill_sparse) up.tops[0].fill_sparse = [];
+                    //     up.tops[0].fill_sparse.push(outputPoly);
+                    // }
+                }
+
+                // Removing polygons that are too small, breaking when using subtract and thus causing false positives during search
+                if (up.tops) {
+                    let newTops = [];
+                    for (let topsIndex = 0; topsIndex < up.tops.length; topsIndex+=1) {
+                        let primedPoly = []
+                        POLY.subtract([up.tops[topsIndex].poly], [unreachable_poly], primedPoly, null, up.z, 0.05);
+                        if (primedPoly.length == 1) {
+                            if (Math.abs(primedPoly[0].area(true)) < 0.1) {
+                                console.log({primedPoly:primedPoly});
+                                console.log({inPoly:up.tops[topsIndex].poly});
+                            }
+                            // up.tops[topsIndex].poly = primedPoly[0];
+                            newTops.push(up.tops[topsIndex]);
+                            
+                        }
+                        // } else {    
+                        //     console.log({WARNING:"Subtract with nothing changed number of polys"});
+                        //     if (up.tops[topsIndex].poly.area2 > 0.01) console.log({WARNING:"AND area was not insignificant."});
+                        //     console.log({inPoly:up.tops[topsIndex].poly});
+                        //     console.log({primedPoly:primedPoly});
+                        //     console.log({inArea2:up.tops[topsIndex].poly.area2});
+                        //     if (primedPoly.length > 1) console.log({WARNING:"More than one out poly!!!!!"});
+                        // }
+                    }
+                    up.tops = newTops;
+                }
+
+
+                // In case simplification led to overlaps
+                if (up.tops) {
+                    if (up.tops.length > 1) {
+                        for (let topsIndex = 0; topsIndex < up.tops.length; topsIndex+=1) {
+                            for (let topsIndex2 = 0; topsIndex2 < up.tops.length; topsIndex2+=1) {
+                                if (topsIndex != topsIndex2) {
+                                    let outs = [];
+                                    let overlapA = -1*Math.abs(up.tops[topsIndex].poly.areaDeep());
+                                    POLY.subtract([up.tops[topsIndex].poly], [up.tops[topsIndex2].poly], outs, null, up.z, 0.05);
+                                    outs.forEach(function(outP) {
+                                        overlapA += Math.abs(outP.areaDeep());
+                                    });
+
+                                    if (Math.abs(overlapA) > 0.00001)  {
+                                        // console.log(up.tops[topsIndex].poly);
+                                        // console.log(up.tops[topsIndex].poly.area2);
+                                        // console.log(outs);
+                                        if (outs && outs.length > 0) { // TODO Investigate how 0 can happen
+                                            up.tops[topsIndex].poly = outs[0];
+                                            up.tops[topsIndex].poly.area2 = up.tops[topsIndex].poly.area(true);
+                                        }
+                                        // console.log(up.tops[topsIndex].poly.area2);
+                                        // console.log({overlapA_After:overlapA});
+                                        // if (!up.tops[0].fill_sparse) up.tops[0].fill_sparse = [];
+                                        //     // up.tops[0].fill_sparse.push(up.tops[topsIndex].poly);
+                                        //     // up.tops[0].fill_sparse.push(up.tops[topsIndex2].poly);
+                                        // if (!up.supports) up.supports = [];
+                                        // // up.supports.push(up.tops[topsIndex].poly);
+                                        // // up.supports.push(up.tops[topsIndex2].poly);
+                                        // overlap_found2 = true;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+
+                if (up.tops) {
+                    if (up.tops.length > 1) {
+                        let collDet = [];
+                        POLY.subtract(up.topPolys(), [unreachable_poly], collDet, null, up.z, 0.05);
+                        let post_collision_area = 0, pre_collision_area = 0;
+                        up.topPolys().forEach(function(top_poly) {
+                            pre_collision_area += Math.abs(top_poly.areaDeep());
+                        });
+                        collDet.forEach(function(top_poly) {
+                            post_collision_area += Math.abs(top_poly.areaDeep());
+                        });
+
+                        const collision_area = pre_collision_area - post_collision_area;
+                        if (collision_area > 0.00001) {
+                            console.log({THISSLICE:up});
+                            console.log({pre_collision_area:pre_collision_area});
+                            console.log({post_collision_area:post_collision_area});
+                            console.log({InPolys:up.topPolys()});
+                            console.log({AfterNoSubtract:collDet});
+                        }
+                    }
+                }
+
+                // Get manual supports from other widget
+                // if (otherWidget) { 
+                //     if (otherWidget.slices) {
+                //         if (otherWidget.slices.length >= up.index+1) {
+                //             if (otherWidget.slices[up.index].tops) {
+                //                 if (!up.supports) up.supports = [];
+                //                 for (let otherSupportsInd = 0; otherSupportsInd < otherWidget.slices[up.index].tops.length; otherSupportsInd += 1) {
+                //                     up.supports.push(otherWidget.slices[up.index].tops[otherSupportsInd].poly);
+                //                 }
+                //                 otherWidget.slices[up.index].tops = []; // Remove manual supports reference from other widget after moving them to this one
+                //             }
+                //         }
+                //     }
+                // }
+
+                if (up.supports) {
+                    let unionized_supports = POLY.union(up.supports, min, true);
+                    // console.log({unionized_supports:unionized_supports});
+                    
+                    for (let supportsIndex = 0; supportsIndex < unionized_supports.length; supportsIndex+=1) {
+                        unionized_supports[supportsIndex].perim = unionized_supports[supportsIndex].perimeter();
+                    }
+                    up.supports = unionized_supports;
+                }
+
+                // if (up.supports) {
+                //     for (let supportsIndex = 0; supportsIndex < up.supports.length; supportsIndex+=1) {
+                //         up.supports[supportsIndex].area2 = up.supports[supportsIndex].area(true);
+                //     }
+                // }
+
+                up.supportsSaved = []; // Make array for cloned supports
+                if (up.supports) {
+                    for (let supportsIndex = 0; supportsIndex < up.supports.length; supportsIndex+=1) { // Save a copy, then simplify the supports
+                        // Clone the poly
+                        let originalPoly = up.supports[supportsIndex];
+                        let inputPoly = originalPoly.clone(true);
+                        inputPoly.area2 = originalPoly.area2;
+                        up.supportsSaved.push(originalPoly);
+
+                        // const perimeterLength = originalPoly.perim;
+                        let outputPoly = adaptivePolySimplify(surrogate_settings.simplification_factor, surrogate_settings.simplification_factor, inputPoly, originalPoly.perim, originalPoly.area2, zed, mina, coff);
+
+                        up.supports[supportsIndex] = outputPoly;
+                        // console.log({outputPoly:outputPoly});
+                        // if (outputPoly.checkOut) {
+                        // // if (true) {
+                        //     console.log({Hint:"Occured"});
+                        //     if (!up.tops[0].fill_sparse) up.tops[0].fill_sparse = [];
+                        //     up.tops[0].fill_sparse.push(outputPoly);
+                        // }
+                    }
+                }
+
+                // console.log({up:up});
+            }
+
+            all_slices.push(up);
+            const stopAbove = up.z - surrogate_settings.min_squish_height;
+            const skipBelow = up.z;
+            surrogate_settings.precomputed_slice_heights.push({stopAbove:stopAbove, skipBelow:skipBelow});
+            up = up.up;   
+        }
+
+        up = bottom_slice;
+
+        let pre_surrogate_support_amounts = getTotalSupportVolume(bottom_slice);
+        // console.log({pre_surrogate_support_amounts:pre_surrogate_support_amounts});
+
+        surrogate_settings.total_surrogate_volume = pre_surrogate_support_amounts[0];
+        surrogate_settings.total_surrogate_area = pre_surrogate_support_amounts[1];
+
+        console.log({min_x:min_x});
+        console.log({max_x:max_x});
+        console.log({min_y:min_y});
+        console.log({max_y:max_y});
+
+        return all_slices, surrogate_settings;
+    }
+
+    function doSurrogates(library_in, suse, slice, proc, shadow, settings, view, prisms) {
         if (true)
         {
             console.log({status:"Surrogates handling starts"});
         }
 
         let surros = library_in;
+        let surrogate_settings = suse;
 
         var startTime = new Date().getTime();
 
@@ -3336,7 +3987,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
 
 
-        let surrogate_settings = {};
+        // let surrogate_settings = {};
 
         let searchType = "PSO";
         let surrogate_number_goal;
@@ -3507,6 +4158,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
         
         while (up) {
+            if (true)
             if (proc.surrogateInteraction != "off") {
                 let zed = up.z || 0;
 
@@ -6494,7 +7146,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
         console.log({surrogate_all_slices:all_out_slices});
 
-        return all_out_slices, surrogate_settings;
+        return all_out_slices;
     }
 
     function doMaterialEstimation(bottom_slice) {
