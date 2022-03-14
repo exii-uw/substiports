@@ -15,10 +15,11 @@
 // use: kiri.kmeans
 // use: kiri.hull
 // use: kiri.pso
+// use: kiri.codec
 gapp.register("kiri-mode.fdm.slice", [], (root, exports) => {
 
 const { base, kiri, noop } = root;
-const { consts, driver, fill, fill_fixed, newSlice, utils, newKMeans, KMeans, Optimizer, hull, parallelenv} = kiri;
+const { consts, driver, fill, fill_fixed, newSlice, utils, newKMeans, KMeans, Optimizer, hull, codec, parallelenv} = kiri;
 const { config, polygons, util, newPoint } = base;
 const { fillArea } = polygons;
 const { beltfact } = consts;
@@ -961,6 +962,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
             profileStart("surrogates"); // TODO check if this inserted profile works with data logging
             let highest_slice = slices[slices.length-1];
+            let bottom_slice = slices[0];
             // doupdate(0, 0.71, 0.8, "surrogating2");
             console.log({status:"doing surrogates"});
             console.log({loadedDatanow:loadedData2});
@@ -973,21 +975,46 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             // prisms_obj.push({geometry_points:parseSVGFromText(val[1]), name:"blue_jack", ini_height:48.9, extension_range:35})
             let view = null; // TODO
 
-            let support_points = getSupportPoints(highest_slice, process, settings);
+            let support_points, support_points_simple = getSupportPoints(bottom_slice, process, settings); 
 
+            console.log({support_points_simple:support_points_simple});
 
+            let sliceStackData = getEncodedData(bottom_slice);
+            console.log({sliceStackData:sliceStackData});
+
+            let surrogate_library = getSurrogateLibrary();
             let test_promises = [];
 
             let test_array = [5, 8, 10, 3, 7, 29, 1, 15, 88, 6];
             let test_out = [];
+            
     
+            let test_poly_list = bottom_slice.topPolys();
+            console.log({bottom_slice:bottom_slice});
+            console.log({test_poly_list:test_poly_list});
+
+            let encodedTop = kiri.codec.encode(test_poly_list, {full: true});
+            let decodedTop = kiri.codec.decode(encodedTop, {full: true});
+            console.log({decodedTop:decodedTop});
+
+
+            let test_test_array = [encodedTop,[2,3,4,[11,12]],[5,6,7]];
+
+            let encoded_kiri_tops = []
+            for (let oneTop of test_poly_list) {
+                encoded_kiri_tops.push(kiri.codec.encode(oneTop, {full: true}));
+            }
+
 
             console.log({top_kiri:kiri});
             console.log({aSlice:highest_slice.down});
 
             for (let integr of test_array) {
-                test_promises.push(kiri.minions.test(integr, highest_slice, highest_slice.down.tops[0]));
+                test_promises.push(kiri.minions.test(integr, highest_slice, test_poly_list, encoded_kiri_tops, test_test_array));
             }
+            test_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple));
+            test_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple));
+
     
             // if (test_promises) {
             //     await Promise.all(test_promises);
@@ -1030,8 +1057,34 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
     
 
 
-            let surrogated_slices = doSurrogates(highest_slice, process, widget.shadow, settings, view, prisms_obj);
+            let surrogated_slices, surro_settings = doSurrogates(surrogate_library, highest_slice, process, widget.shadow, settings, view, prisms_obj);
+            surro_settings.start_slice = null;
+            surro_settings.all_slices = null;
+            console.log({surro_settings:surro_settings}); 
             widget.slices = surrogated_slices;
+
+
+            let search_promises = [];
+
+            search_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surro_settings));
+
+            if (search_promises) {
+                console.log(test_out.length);
+                for (let p of search_promises) {
+                    p.then(data => {
+                        // tracker(count++, promises.length, data);
+                        console.log({data:data});
+                        console.log({p:p});
+                        test_out.push(data[0]);
+                        let numberBig = false;
+                        if (data.output[0] > 200) numberBig = true;
+                        // if (p[0][0] > 200) numberBig = true;
+                        console.log({numberBig:numberBig});
+
+                    });
+                }
+                await Promise.all(search_promises);
+            }
 
             profileEnd();
             
@@ -1086,16 +1139,41 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         return simplePointsArray;
     }
 
+    function getEncodedData(bottom_slice) {
+        let encodedData = [];
+        let current_slice = bottom_slice;
+        while (current_slice) {
+            let encodedSlice = kiri.codec.encode(current_slice);
+            let encodedTops = [];
+            let encodedSupports = [];
+
+            for (let oneTop of current_slice.topPolys()) {
+                encodedTops.push(kiri.codec.encode(oneTop), {full: true});
+            }
+            if (current_slice.supports) {
+                for (let oneSupport of current_slice.supports) {
+                    encodedSupports.push(kiri.codec.encode(oneSupport), {full: true});
+                }
+            }
+
+            let sliceDetailList = [encodedSlice, encodedTops, encodedSupports];
+            encodedData.push(sliceDetailList);
+            // sliceDetailList.push([current_slice.index, current_slice.z]);
+            current_slice = current_slice.up;
+        }
+        return (encodedData);
+    }
+
     function getSupportPoints(slice, proc, settings) {
 
-        let bottom_slice = slice.down;
-        let last_bottom_slice;
-        while (bottom_slice) {
-            last_bottom_slice = bottom_slice;
-            bottom_slice = bottom_slice.down;
-        }
+        let bottom_slice = slice;
+        // let last_bottom_slice;
+        // while (bottom_slice) {
+        //     last_bottom_slice = bottom_slice;
+        //     bottom_slice = bottom_slice.down;
+        // }
 
-        bottom_slice = last_bottom_slice;
+        // bottom_slice = last_bottom_slice;
         console.log({bottom_slice: bottom_slice});
 
         let search_density = 1;
@@ -1146,49 +1224,46 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             let height_points = [...valid_points];
             // let height_points_outline = [...supp_outline_points]; // TODO: Faster to handle outline points differently? Compare points to all outline points directly?
             let next_slice = bottom_slice.up;
-            let skip_counter = 0;
             while (next_slice) {
-                let points_slice_copy = [...height_points];
-                next_slice.support_points = points_slice_copy;
-                skip_counter += 1;
-                if (skip_counter == 1) {
-                    skip_counter = 0;
-                    let height_points_i = height_points.length;
-                    while(height_points_i--) {
-                        if (next_slice.supports) {
-                            let point_valid = false;
-                            for (let support_poly of next_slice.supports)  {
-                                if (height_points[height_points_i].isInPolygon(support_poly)) { // TODO: inPolygon vs. isInPolygon checks for holes(children)
-                                    point_valid = true;
-                                    break;
-                                }
-                            }
-                            if (point_valid) {
-                                height_points[height_points_i].z = next_slice.z;
-                            } else {
-                                height_points.splice(height_points_i, 1);
+                let height_points_i = height_points.length;
+                while(height_points_i--) {
+                    if (next_slice.supports) {
+                        let point_valid = false;
+                        for (let support_poly of next_slice.supports)  {
+                            if (height_points[height_points_i].isInPolygon(support_poly)) { // TODO: inPolygon vs. isInPolygon checks for holes(children)
+                                point_valid = true;
+                                break;
                             }
                         }
+                        if (point_valid) {
+                            height_points[height_points_i].z = next_slice.z;
+                        } else {
+                            height_points.splice(height_points_i, 1);
+                        }
                     }
-
-                    // height_points_i = height_points_outline.length;
-                    // while(height_points_i--) {
-                    //     if (next_slice.supports) {
-                    //         let point_valid = false;
-                    //         for (let support_poly of next_slice.supports)  {
-                    //             if (height_points_outline[height_points_i].nearPolygon(support_poly, 0.1, true)) { // check if point still on polygon outline (within distance), including inner polys
-                    //                 point_valid = true;
-                    //                 break;
-                    //             }
-                    //         }
-                    //         if (point_valid) {
-                    //             height_points_outline[height_points_i].z = next_slice.z;
-                    //         } else {
-                    //             height_points_outline.splice(height_points_i, 1);
-                    //         }
-                    //     }
-                    // }
                 }
+
+                // height_points_i = height_points_outline.length;
+                // while(height_points_i--) {
+                //     if (next_slice.supports) {
+                //         let point_valid = false;
+                //         for (let support_poly of next_slice.supports)  {
+                //             if (height_points_outline[height_points_i].nearPolygon(support_poly, 0.1, true)) { // check if point still on polygon outline (within distance), including inner polys
+                //                 point_valid = true;
+                //                 break;
+                //             }
+                //         }
+                //         if (point_valid) {
+                //             height_points_outline[height_points_i].z = next_slice.z;
+                //         } else {
+                //             height_points_outline.splice(height_points_i, 1);
+                //         }
+                //     }
+                // }
+                
+                let points_slice_copy = [...height_points]; // Save remaining support points to slice
+                next_slice.support_points = points_slice_copy;
+
                 next_slice = next_slice.up;
             }
         }
@@ -1202,6 +1277,8 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         // var clusters = kmeans.cluster(colors, 3);
 
         let simple_valid_p = getSimplePointsArray(valid_points, false);
+
+        
         var clusters = kmeans.cluster(simple_valid_p, 2);
 
         //  var hull = new HULL.hull();
@@ -1292,6 +1369,8 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         }
 
         console.log({support_points_save:a_slice.support_points});
+
+        return valid_points, simple_valid_p;
 
     }
 
@@ -1417,11 +1496,131 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         
     }
 
-    function doSurrogates(slice, proc, shadow, settings, view, prisms) {
+    function getSurrogateLibrary() {
+        let surrogates = [];
+        // surrogates.push({width:100.5, length:152.7, height:10.9});
+        // surrogates.push({width:136.8, length:190.1, height:24.1});
+
+
+        function addOption(listOfOptions, length, width, height, title) {
+            listOfOptions.push({width:width, length:length, height:height, minHeight:height, maxHeight:height, id:title, available:true, type:"simpleRectangle"});
+        }
+
+        function addStackableOptions(listOfOptions, initialHeight, addHeight, available, length, width, title) {
+            const maxHeight = initialHeight + (addHeight*available);
+            listOfOptions.push({width:width, length:length, height:initialHeight, minHeight:initialHeight, maxHeight:maxHeight, addHeight:addHeight, addMaxNumber:available, id:title, available:true, type:"stackable"});
+            
+            // while (stackHeight < settings.device.maxHeight && stackedSoFar < available) { 
+            //     addOption(listOfOptions, length, width, stackHeight, title);
+            //     stackHeight = stackHeight + addHeight;
+            //     stackedSoFar++;
+            // }
+        }
+
+        function addPrism(listOfOptions, prism_bottom_obj, prism_obj) {
+            const getPrismSize = generatePrismPolygon(0, 0, 0, prism_obj.geometry_points, 0, 0.1);
+            const PrismWidth = getPrismSize.bounds.maxy - getPrismSize.bounds.miny;
+            const PrismLength = getPrismSize.bounds.maxx - getPrismSize.bounds.minx;
+
+            listOfOptions.push({width:PrismWidth, length:PrismLength, height:prism_obj.ini_height, minHeight:prism_obj.ini_height, maxHeight:prism_obj.ini_height+prism_obj.extension_range, id:prism_obj.name, available:true, type:"prism", prism_geometry:prism_obj.geometry_points, bottom_geometry:prism_bottom_obj.geometry_points});
+            // debug
+            // listOfOptions.push({width:PrismWidth, length:PrismLength, height:minimum_prism_height, minHeight:minimum_prism_height, maxHeight:minimum_prism_height+prism_obj.extension_range, id:".", available:true, type:"prism", prism_geometry:prism_obj.geometry_points});
+    
+        }
+        
+        // Autosort this and use old automated stackable add method...
+
+        // addOption(surrogates, 93.8, 89.9, 3.33, "floppyx1");
+        // addOption(surrogates, 154.3, 105, 5.35, "saw plate");
+        // addOption(surrogates, 137.5, 55.57, 6.62, "wood plate");
+        // addOption(surrogates, 208.8, 164, 6.66, "wood plate large");
+        // addOption(surrogates, 93.8, 89.9, 6.66, "floppyx2");
+        // addOption(surrogates, 128.52, 68.25, 8.75, "medium dense foam plate");
+
+        // addOption(surrogates, 73, 10.43, 9.5, "support bar");
+        // // addOption(surrogates, 93.8, 89.9, 9.99, "floppyx3");
+        // addOption(surrogates, 44.35, 18.33, 10.16, "wood bar4"); // addOption(surrogates, 44.35, 18.33, 10.16, "wood bar dirty");
+        // addOption(surrogates, 49.8, 47.4, 10.5, "blue support");
+        // addOption(surrogates, 27.31, 23.75, 10.55, "support flat");
+        // addOption(surrogates, 97, 18.35, 11.18, "wood bar3"); //addOption(surrogates, 97, 18.35, 11.18, "wood bar two holes");
+        // addOption(surrogates, 100.75, 18.52, 12.2, "wood bar2"); // addOption(surrogates, 100.75, 18.52, 12.2, "wood bar math");
+
+        addOption(surrogates, 31.85, 15.9, 12.75, "Lego 4x2x1");
+
+        // // addOption(surrogates, 31.85, 31.85, 12.75, "Lego 4x4x1");
+        // // addOption(surrogates, 63.77, 31.85, 12.75, "Lego 8x4x1");
+        // // addOption(surrogates, 93.8, 89.9, 13.32, "floppyx4");
+        // // addOption(surrogates, 31.85, 15.9, 15.9, "Lego 4x2x1.3");
+        // // addOption(surrogates, 31.85, 31.85, 15.9, "Lego 4x4x1.3");
+        // // addOption(surrogates, 63.77, 31.85, 15.9, "Lego 8x4x1.3");
+        // addOption(surrogates, 68.26, 50.46, 13.1, "wood flat");
+        // // addOption(surrogates, 183.5, 80.1, 14.7, "foam plate");
+        // addOption(surrogates, 45.15, 23.35, 14.82, "dark wood");
+        // // addOption(surrogates, 93.8, 89.9, 16.65, "floppyx5");
+        // addOption(surrogates, 51, 25, 18.55, "wood offcut1"); // addOption(surrogates, 51, 25, 18.55, "wood man hair");
+        // addOption(surrogates, 52.22, 24.9, 18.6, "wood bar");
+        // addOption(surrogates, 50.4, 24.95, 18.62, "wood offcut2"); // addOption(surrogates, 50.4, 24.95, 18.62, "wood man");
+        // addOption(surrogates, 25.05, 25.05, 18.8, "wood cube"); // addOption(surrogates, 25.05, 25.05, 18.8, "cube with dent");
+        // // addOption(surrogates, 93.8, 89.9, 19.98, "floppyx6");
+        // // addOption(surrogates, 31.85, 15.9, 22.3, "Lego 4x2x2");
+        // // addOption(surrogates, 31.85, 31.85, 22.3, "Lego 4x4x2");
+        // // addOption(surrogates, 63.77, 31.85, 22.3, "Lego 8x4x2");
+        // // addOption(surrogates, 93.8, 89.9, 23.31, "floppyx7");
+        // // addOption(surrogates, 24.4, 24.4, 24.4, "XYZ cube filled");
+        // // addOption(surrogates, 31.85, 15.9, 25.45, "Lego 4x2x2.3");
+        // // addOption(surrogates, 31.85, 31.85, 25.45, "Lego 4x4x2.3");
+        // // addOption(surrogates, 63.77, 31.85, 25.45, "Lego 8x4x2.3");
+        // // addOption(surrogates, 93.8, 89.9, 26.64, "floppyx8");
+        // // addOption(surrogates, 93.8, 89.9, 29.97, "floppyx9");
+        // addOption(surrogates, 49.8, 47.4, 30.5, "blue support big");
+        // addOption(surrogates, 80.0, 70.0, 50.5, "cardboard box 1");
+        // // addOption(surrogates, 31.85, 15.9, 31.85, "Lego 4x2x3");
+        // // addOption(surrogates, 31.85, 31.85, 31.85, "Lego 4x4x3");
+        // // addOption(surrogates, 63.77, 31.85, 31.85, "Lego 8x4x3");
+        // // addOption(surrogates, 31.85, 15.9, 35, "Lego 4x2x3.3");
+        // // addOption(surrogates, 31.85, 31.85, 35, "Lego 4x4x3.3");
+        // // addOption(surrogates, 63.77, 31.85, 35, "Lego 8x4x3.3");
+        // // addOption(surrogates, 110.1, 101.75, 37.15, "mpow box");
+        // // addOption(surrogates, 172.5, 144.6, 37.3, "scale box");
+        // // addOption(surrogates, 31.85, 15.9, 41.4, "Lego 4x2x4");
+        // // addOption(surrogates, 31.85, 31.85, 41.4, "Lego 4x4x4");
+        // // addOption(surrogates, 63.77, 31.85, 41.4, "Lego 8x4x4");
+        // // addOption(surrogates, 31.85, 15.9, 44.55, "Lego 4x2x4.3");
+        // // addOption(surrogates, 31.85, 31.85, 44.55, "Lego 4x4x4.3");
+        // // addOption(surrogates, 63.77, 31.85, 44.55, "Lego 8x4x4.3");
+
+        addOption(surrogates, 63.77, 31.85, 63.65, "Lego 8x4x6.3");
+        // addPrism(surrogates, prisms[0], prisms[1]);
+        // addPrism(surrogates, prisms[0], prisms[1]);
+
+        // addStackableOptions(surrogates, 12.75, 9.55, 4, 31.85, 15.9, "Lego 4x2");
+        // addOption(surrogates, 126.35, 125.6, 52.32, "leap box");
+        // addPrism(surrogates, prisms[0], prisms[2]);
+        // addPrism(surrogates, prisms[0], prisms[2]);
+        // addPrism(surrogates, prisms[0], prisms[2]);
+        
+        // addStackableOptions(surrogates, 15.9, 9.55, 4, 31.85, 15.9, "Lego+4x2");
+        // addStackableOptions(surrogates, 12.75, 9.55, 5, 31.85, 31.85, "Lego 4x4");
+        // addStackableOptions(surrogates, 15.9, 9.55, 5, 31.85, 31.85, "Lego+4x4");
+        // addStackableOptions(surrogates, 12.75, 9.55, 6, 63.77, 31.85, "Lego 4x8");
+        // addStackableOptions(surrogates, 15.9, 9.55, 6, 63.77, 31.85, "Lego+4x8");
+        // for (let i = 1; i < prisms.length; i++){
+        //     addPrism(surrogates, prisms[0], prisms[i]);
+        // }
+        // addStackableOptions(surrogates, 9.99, 3.33, 6, 93.8, 89.9, "FloppyDisc");
+        // for (let i = 1; i < prisms.length; i++){
+        //     addPrism(surrogates, prisms[0], prisms[i]);
+        // }
+        return surrogates;
+    }
+
+    function doSurrogates(library_in, slice, proc, shadow, settings, view, prisms) {
         if (true)
         {
             console.log({status:"Surrogates handling starts"});
         }
+
+        let surros = library_in;
 
         var startTime = new Date().getTime();
 
@@ -1881,18 +2080,18 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             return [total_support_volume, total_support_area];
         }
 
-        function checkVolumeAndCollisions(surrogate_library, surrogate_settings, bottom_slice, try_book_index, try_book_polygons_list, try_z, books_placed) {
-            console.log({try_book_polygons_list:try_book_polygons_list});
+        function checkVolumeAndCollisions(surrogate_library, surrogate_settings, bottom_slice, try_surro_index, try_surro_polygons_list, try_z, surrogates_placed) {
+            console.log({try_surro_polygons_list:try_surro_polygons_list});
             let collision = false;
             let overextended = false;
             let iterate_layers_VandC = bottom_slice;
-            let try_book = surrogate_library[try_book_index];
+            let try_surro = surrogate_library[try_surro_index];
             let new_volume = 0;
             let old_volume = 0;
 
             let last_collision_area = 0;
             let max_surrogated_area = 0;
-            // TODO: Make try_book_polygons_list here, or generate only once and translate+rotate instead
+            // TODO: Make try_surro_polygons_list here, or generate only once and translate+rotate instead
 
             // Check for collision for the whole surrogate height
             while (iterate_layers_VandC && overextended === false) { // && collision === false ) { // Stop after first collision found, or end of widget reached
@@ -1901,7 +2100,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                 // Approximation: If more than half of the slice height is surrogated, we count it fully (for volume) #TODO: for collisions we might want to check for ANY overlap
                 if (iterate_layers_VandC.z < try_z) { // LWW TODO: Check at what height we actually want to start checking for collisions
                     iterate_layers_VandC = iterate_layers_VandC.up;
-                    // console.log({going_up: "Going up because book is not on buildplate my DUDE!!!!!!!"});
+                    // console.log({going_up: "Going up because surro is not on buildplate!"});
                     continue;
                 }
 
@@ -1927,14 +2126,14 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                 }
                 // Stop counting volume once surrogate height has passed AND
                 // stop checking collisions when surrogate top is higher than slice bottom + min squish height 
-                // else if ((slice_height_range.bottom_height + surrogate_settings.min_squish_height) >= (try_book.maxHeight + try_z)){
-                else if ((iterate_layers_VandC.z - surrogate_settings.min_squish_height) >= (try_book.maxHeight + try_z)){    
+                // else if ((slice_height_range.bottom_height + surrogate_settings.min_squish_height) >= (try_surro.maxHeight + try_z)){
+                else if ((iterate_layers_VandC.z - surrogate_settings.min_squish_height) >= (try_surro.maxHeight + try_z)){    
                     calculating_volume = false;
                     check_collisions = false;
                 }
                 
-                // if ((slice_height_range.bottom_height + surrogate_settings.min_squish_height) >= (try_book.maxHeight + try_z)) { 
-                // if ((iterate_layers_VandC.z - surrogate_settings.min_squish_height) >= (try_book.maxHeight + try_z)) {
+                // if ((slice_height_range.bottom_height + surrogate_settings.min_squish_height) >= (try_surro.maxHeight + try_z)) { 
+                // if ((iterate_layers_VandC.z - surrogate_settings.min_squish_height) >= (try_surro.maxHeight + try_z)) {
                 //     check_collisions = false;
                 // }
 
@@ -1942,7 +2141,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                 if (collision) check_collisions = false;
                 
                 if (calculating_volume) {
-                    const volumes = getSurrogateReplacedVolumes(old_volume, new_volume, iterate_layers_VandC, try_book_polygons_list);
+                    const volumes = getSurrogateReplacedVolumes(old_volume, new_volume, iterate_layers_VandC, try_surro_polygons_list);
                     old_volume = volumes[0];
                     new_volume = volumes[1];
                     if (max_surrogated_area < volumes[2]) max_surrogated_area = volumes[2];
@@ -1951,8 +2150,8 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                 if (check_collisions) {
                     console.log(iterate_layers_VandC.index);
                     let collision_detection = [];
-                    POLY.subtract(iterate_layers_VandC.topPolys(), try_book_polygons_list, collision_detection, null, iterate_layers_VandC.z, min);
-                    // console.log({try_book_polygons_list:try_book_polygons_list});
+                    POLY.subtract(iterate_layers_VandC.topPolys(), try_surro_polygons_list, collision_detection, null, iterate_layers_VandC.z, min);
+                    // console.log({try_surro_polygons_list:try_surro_polygons_list});
                     
                     let post_collision_area = 0, pre_collision_area = 0;
                     iterate_layers_VandC.topPolys().forEach(function(top_poly) {
@@ -1963,14 +2162,14 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                     });
                     
                     if ((pre_collision_area - post_collision_area) > 0.00001) { // rounded the same // TODO: Currently testing whether we need Math abs with switched subtraction order
-                        // if ((slice_height_range.bottom_height + surrogate_settings.min_squish_height) < (try_book.minHeight + try_z)) {
-                        if ((iterate_layers_VandC.z - surrogate_settings.min_squish_height) < (try_book.minHeight + try_z)) {
+                        // if ((slice_height_range.bottom_height + surrogate_settings.min_squish_height) < (try_surro.minHeight + try_z)) {
+                        if ((iterate_layers_VandC.z - surrogate_settings.min_squish_height) < (try_surro.minHeight + try_z)) {
                             collision = true;
                             last_collision_area = pre_collision_area - post_collision_area;
                             continue;
                         }
                         else {
-                            try_book.height = iterate_layers_VandC.down.z; // TODO: Test whether this is the best previous height
+                            try_surro.height = iterate_layers_VandC.down.z; // TODO: Test whether this is the best previous height
                             overextended = true;
                             continue;
                         }
@@ -1979,21 +2178,21 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
                     // Check collision with already placed surrogates as well
                     
-                    if (books_placed.length >= 1) {
+                    if (surrogates_placed.length >= 1) {
                         
-                        for (let books_placed_idx = 0; books_placed_idx < books_placed.length; books_placed_idx++) {
-                            let previous_surrogate = books_placed[books_placed_idx];
+                        for (let surrogates_placed_idx = 0; surrogates_placed_idx < surrogates_placed.length; surrogates_placed_idx++) {
+                            let previous_surrogate = surrogates_placed[surrogates_placed_idx];
 
-                            // (previous_surrogate.book.height + previous_surrogate.starting_height)
+                            // (previous_surrogate.surro.height + previous_surrogate.starting_height)
                             if (iterate_layers_VandC.z <= (previous_surrogate.end_height) && iterate_layers_VandC.z >= previous_surrogate.starting_height) {
 
                                 collision_detection = [];
                                 
-                                POLY.subtract(try_book_polygons_list, previous_surrogate.geometry, collision_detection, null, iterate_layers_VandC.z, min); // TODO: Check if Z matters
+                                POLY.subtract(try_surro_polygons_list, previous_surrogate.geometry, collision_detection, null, iterate_layers_VandC.z, min); // TODO: Check if Z matters
                                 
                                 post_collision_area = 0;
                                 pre_collision_area = 0;
-                                try_book_polygons_list.forEach(function(top_poly) {
+                                try_surro_polygons_list.forEach(function(top_poly) {
                                     pre_collision_area += Math.abs(top_poly.areaDeep());
                                 });
                                 collision_detection.forEach(function(top_poly) {
@@ -2001,14 +2200,14 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                                 });
                                 
                                 if ((pre_collision_area - post_collision_area) > 0.00001) {
-                                    // if ((slice_height_range.bottom_height + surrogate_settings.min_squish_height) < (try_book.minHeight + try_z)) {
-                                    if ((iterate_layers_VandC.z - surrogate_settings.min_squish_height) < (try_book.minHeight + try_z)) {
+                                    // if ((slice_height_range.bottom_height + surrogate_settings.min_squish_height) < (try_surro.minHeight + try_z)) {
+                                    if ((iterate_layers_VandC.z - surrogate_settings.min_squish_height) < (try_surro.minHeight + try_z)) {
                                         collision = true;
                                         last_collision_area = pre_collision_area - post_collision_area;
                                         continue;
                                     }
                                     else {
-                                        try_book.height = iterate_layers_VandC.down.z; // TODO: Test whether this is the best previous height
+                                        try_surro.height = iterate_layers_VandC.down.z; // TODO: Test whether this is the best previous height
                                         overextended = true;
                                         continue;
                                     }
@@ -2043,7 +2242,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             return [collision, old_volume, new_volume, last_collision_area, max_surrogated_area];//overlap_factor]
         }
 
-        function checkVolumeAndCollisionsListQuick(all_slices, sliceIndexList, numberOfTotalSlices, try_book_polygons_list, books_placed) {
+        function checkVolumeAndCollisionsListQuick(all_slices, sliceIndexList, numberOfTotalSlices, try_surro_polygons_list, surrogates_placed) {
             let collision = false;
 
             let new_volume = 0;
@@ -2056,7 +2255,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             let max_surrogated_area = 0;
             // let collisions_found = 0;
 
-            // TODO: Make try_book_polygons_list here, or generate only once and translate+rotate instead
+            // TODO: Make try_surro_polygons_list here, or generate only once and translate+rotate instead
 
             for (let indexIndex = 0; indexIndex < sliceIndexList.length; indexIndex++) {
                 let current_slice = all_slices[sliceIndexList[indexIndex]];
@@ -2069,17 +2268,16 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                 }
 
                 if (calculating_volume) {
-                    const volumes = getSurrogateReplacedVolumes(old_volume, new_volume, current_slice, try_book_polygons_list);
+                    const volumes = getSurrogateReplacedVolumes(old_volume, new_volume, current_slice, try_surro_polygons_list);
                     old_volume = volumes[0];
                     new_volume = volumes[1];
                     if (max_surrogated_area < volumes[2]) max_surrogated_area = volumes[2];
                 }
 
-
                 // console.log(current_slice.index);
                 let collision_detection = [];
-                POLY.subtract(current_slice.topPolys(), try_book_polygons_list, collision_detection, null, current_slice.z, 0.05);
-                // console.log({try_book_polygons_list:try_book_polygons_list});
+                POLY.subtract(current_slice.topPolys(), try_surro_polygons_list, collision_detection, null, current_slice.z, 0.05);
+                // console.log({try_surro_polygons_list:try_surro_polygons_list});
                 
                 let post_collision_area = 0, pre_collision_area = 0;
                 current_slice.topPolys().forEach(function(top_poly) {
@@ -2096,7 +2294,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                 // }
                 
                 if (collision_area > 0.00001) { // rounded the same // TODO: Currently testing whether we need Math abs with switched subtraction order
-                    // if ((slice_height_range.bottom_height + surrogate_settings.min_squish_height) < (try_book.minHeight + try_z)) {
+                    // if ((slice_height_range.bottom_height + surrogate_settings.min_squish_height) < (try_surro.minHeight + try_z)) {
                     // total_collision_area += collision_area;
                     collision = true;
                     // collisions_found += 1;
@@ -2105,21 +2303,21 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
                 // Check collision with already placed surrogates as well
                 
-                if (books_placed.length >= 1) {
+                if (surrogates_placed.length >= 1) {
                     
-                    for (let books_placed_idx = 0; books_placed_idx < books_placed.length; books_placed_idx++) {
-                        let previous_surrogate = books_placed[books_placed_idx];
+                    for (let surrogates_placed_idx = 0; surrogates_placed_idx < surrogates_placed.length; surrogates_placed_idx++) {
+                        let previous_surrogate = surrogates_placed[surrogates_placed_idx];
 
-                        // (previous_surrogate.book.height + previous_surrogate.starting_height)
+                        // (previous_surrogate.surro.height + previous_surrogate.starting_height)
                         if (current_slice.z <= (previous_surrogate.end_height) && current_slice.z >= previous_surrogate.starting_height) {
 
                             collision_detection = [];
                             
-                            POLY.subtract(try_book_polygons_list, previous_surrogate.geometry, collision_detection, null, current_slice.z, 0.05); // TODO: Check if Z matters
+                            POLY.subtract(try_surro_polygons_list, previous_surrogate.geometry, collision_detection, null, current_slice.z, 0.05); // TODO: Check if Z matters
                             
                             post_collision_area = 0;
                             pre_collision_area = 0;
-                            try_book_polygons_list.forEach(function(top_poly) {
+                            try_surro_polygons_list.forEach(function(top_poly) {
                                 pre_collision_area += Math.abs(top_poly.areaDeep());
                             });
                             collision_detection.forEach(function(top_poly) {
@@ -2154,7 +2352,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             return [collision, delta_volume_estimate, max_collision_area, delta_volume, max_surrogated_area, collisions_found];
         }
 
-        function checkVolumeAndCollisionsRemaining(all_slices, sliceIndexList, try_book_polygons_list, books_placed) {
+        function checkVolumeAndCollisionsRemaining(all_slices, sliceIndexList, try_surro_polygons_list, surrogates_placed) {
             let collision = false;
 
             let new_volume = 0;
@@ -2167,7 +2365,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             let max_surrogated_area = 0;
             // let collisions_found = 0;
 
-            // TODO: Make try_book_polygons_list here, or generate only once and translate+rotate instead
+            // TODO: Make try_surro_polygons_list here, or generate only once and translate+rotate instead
 
             for (let indexIndex = 0; indexIndex < sliceIndexList.length; indexIndex++) {
 
@@ -2182,7 +2380,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                 }
              
                 if (calculating_volume) {
-                    const volumes = getSurrogateReplacedVolumes(old_volume, new_volume, current_slice, try_book_polygons_list);
+                    const volumes = getSurrogateReplacedVolumes(old_volume, new_volume, current_slice, try_surro_polygons_list);
                     old_volume = volumes[0];
                     new_volume = volumes[1];
                     if (max_surrogated_area < volumes[2]) max_surrogated_area = volumes[2];
@@ -2190,8 +2388,8 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
                 // console.log(current_slice.index);
                 let collision_detection = [];
-                POLY.subtract(current_slice.topPolys(), try_book_polygons_list, collision_detection, null, current_slice.z, 0.05);
-                // console.log({try_book_polygons_list:try_book_polygons_list});
+                POLY.subtract(current_slice.topPolys(), try_surro_polygons_list, collision_detection, null, current_slice.z, 0.05);
+                // console.log({try_surro_polygons_list:try_surro_polygons_list});
                 
                 let post_collision_area = 0, pre_collision_area = 0;
                 current_slice.topPolys().forEach(function(top_poly) {
@@ -2218,22 +2416,22 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                 // The quick check SHOULD find all collision with already placed surrogates already
                 // ------
 
-                // if (books_placed.length >= 1) {
+                // if (surrogates_placed.length >= 1) {
                     
-                //     for (let books_placed_idx = 0; books_placed_idx < books_placed.length; books_placed_idx++) {
+                //     for (let surrogates_placed_idx = 0; surrogates_placed_idx < surrogates_placed.length; surrogates_placed_idx++) {
 
-                //         let previous_surrogate = books_placed[books_placed_idx];
+                //         let previous_surrogate = surrogates_placed[surrogates_placed_idx];
 
-                //         // (previous_surrogate.book.height + previous_surrogate.starting_height)
+                //         // (previous_surrogate.surro.height + previous_surrogate.starting_height)
                 //         if (current_slice.z <= (previous_surrogate.end_height) && current_slice.z >= previous_surrogate.starting_height) {
 
                 //             collision_detection = [];
                             
-                //             POLY.subtract(try_book_polygons_list, previous_surrogate.geometry, collision_detection, null, current_slice.z, 0.05); // TODO: Check if Z matters
+                //             POLY.subtract(try_surro_polygons_list, previous_surrogate.geometry, collision_detection, null, current_slice.z, 0.05); // TODO: Check if Z matters
                             
                 //             post_collision_area = 0;
                 //             pre_collision_area = 0;
-                //             try_book_polygons_list.forEach(function(top_poly) {
+                //             try_surro_polygons_list.forEach(function(top_poly) {
                 //                 pre_collision_area += Math.abs(top_poly.areaDeep());
                 //             });
                 //             collision_detection.forEach(function(top_poly) {
@@ -2270,7 +2468,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             return [collision, 0, max_collision_area, delta_volume, max_surrogated_area, collisions_found, checked_layers];
         }
 
-        function checkVolumeAndCollisionsExtend(all_slices, sliceIndexList, try_book_polygons_list, defaultHeight) {
+        function checkVolumeAndCollisionsExtend(all_slices, sliceIndexList, try_surro_polygons_list, defaultHeight) {
             let new_volume = 0;
             let old_volume = 0;
 
@@ -2288,14 +2486,14 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                     break;
                 }
              
-                const volumes = getSurrogateReplacedVolumes(old_volume, new_volume, current_slice, try_book_polygons_list);
+                const volumes = getSurrogateReplacedVolumes(old_volume, new_volume, current_slice, try_surro_polygons_list);
                 old_volume = volumes[0];
                 new_volume = volumes[1];
 
                 // console.log(current_slice.index);
                 let collision_detection = [];
-                POLY.subtract(current_slice.topPolys(), try_book_polygons_list, collision_detection, null, current_slice.z, 0.05);
-                // console.log({try_book_polygons_list:try_book_polygons_list});
+                POLY.subtract(current_slice.topPolys(), try_surro_polygons_list, collision_detection, null, current_slice.z, 0.05);
+                // console.log({try_surro_polygons_list:try_surro_polygons_list});
                 
                 let post_collision_area = 0, pre_collision_area = 0;
                 current_slice.topPolys().forEach(function(top_poly) {
@@ -2319,21 +2517,21 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                 // The quick check SHOULD find all collision with already placed surrogates already
                 // ------
 
-                // if (books_placed.length >= 1) {
+                // if (surrogates_placed.length >= 1) {
                     
-                //     for (let books_placed_idx = 0; books_placed_idx < books_placed.length; books_placed_idx++) {
+                //     for (let surrogates_placed_idx = 0; surrogates_placed_idx < surrogates_placed.length; surrogates_placed_idx++) {
 
-                //         let previous_surrogate = books_placed[books_placed_idx];
+                //         let previous_surrogate = surrogates_placed[surrogates_placed_idx];
 
-                //         if (current_slice.z <= (previous_surrogate.book.height + previous_surrogate.starting_height) && current_slice.z >= previous_surrogate.starting_height) {
+                //         if (current_slice.z <= (previous_surrogate.surro.height + previous_surrogate.starting_height) && current_slice.z >= previous_surrogate.starting_height) {
 
                 //             collision_detection = [];
                             
-                //             POLY.subtract(try_book_polygons_list, previous_surrogate.geometry, collision_detection, null, current_slice.z, 0.05); // TODO: Check if Z matters
+                //             POLY.subtract(try_surro_polygons_list, previous_surrogate.geometry, collision_detection, null, current_slice.z, 0.05); // TODO: Check if Z matters
                             
                 //             post_collision_area = 0;
                 //             pre_collision_area = 0;
-                //             try_book_polygons_list.forEach(function(top_poly) {
+                //             try_surro_polygons_list.forEach(function(top_poly) {
                 //                 pre_collision_area += Math.abs(top_poly.areaDeep());
                 //             });
                 //             collision_detection.forEach(function(top_poly) {
@@ -2371,7 +2569,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             return [foundMaxHeight, delta_volume];
         }
 
-        function checkVolumeAndCollisionsStack(all_slices, sliceIndexListList, try_book_polygons_list, defaultHeight, addHeight) {
+        function checkVolumeAndCollisionsStack(all_slices, sliceIndexListList, try_surro_polygons_list, defaultHeight, addHeight) {
             let new_volume = 0;
             let old_volume = 0;
 
@@ -2392,14 +2590,14 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                         break;
                     }
                 
-                    const volumes = getSurrogateReplacedVolumes(extraVolOld, extraVolNew, current_slice, try_book_polygons_list);
+                    const volumes = getSurrogateReplacedVolumes(extraVolOld, extraVolNew, current_slice, try_surro_polygons_list);
                     extraVolOld = volumes[0];
                     extraVolNew = volumes[1];
 
                     // console.log(current_slice.index);
                     let collision_detection = [];
-                    POLY.subtract(current_slice.topPolys(), try_book_polygons_list, collision_detection, null, current_slice.z, 0.05);
-                    // console.log({try_book_polygons_list:try_book_polygons_list});
+                    POLY.subtract(current_slice.topPolys(), try_surro_polygons_list, collision_detection, null, current_slice.z, 0.05);
+                    // console.log({try_surro_polygons_list:try_surro_polygons_list});
                     
                     let post_collision_area = 0, pre_collision_area = 0;
                     current_slice.topPolys().forEach(function(top_poly) {
@@ -2424,21 +2622,21 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                     // The quick check SHOULD find all collision with already placed surrogates already
                     // ------
 
-                    // if (books_placed.length >= 1) {
+                    // if (surrogates_placed.length >= 1) {
                         
-                    //     for (let books_placed_idx = 0; books_placed_idx < books_placed.length; books_placed_idx++) {
+                    //     for (let surrogates_placed_idx = 0; surrogates_placed_idx < surrogates_placed.length; surrogates_placed_idx++) {
 
-                    //         let previous_surrogate = books_placed[books_placed_idx];
+                    //         let previous_surrogate = surrogates_placed[surrogates_placed_idx];
 
-                    //         if (current_slice.z <= (previous_surrogate.book.height + previous_surrogate.starting_height) && current_slice.z >= previous_surrogate.starting_height) {
+                    //         if (current_slice.z <= (previous_surrogate.surro.height + previous_surrogate.starting_height) && current_slice.z >= previous_surrogate.starting_height) {
 
                     //             collision_detection = [];
                                 
-                    //             POLY.subtract(try_book_polygons_list, previous_surrogate.geometry, collision_detection, null, current_slice.z, 0.05); // TODO: Check if Z matters
+                    //             POLY.subtract(try_surro_polygons_list, previous_surrogate.geometry, collision_detection, null, current_slice.z, 0.05); // TODO: Check if Z matters
                                 
                     //             post_collision_area = 0;
                     //             pre_collision_area = 0;
-                    //             try_book_polygons_list.forEach(function(top_poly) {
+                    //             try_surro_polygons_list.forEach(function(top_poly) {
                     //                 pre_collision_area += Math.abs(top_poly.areaDeep());
                     //             });
                     //             collision_detection.forEach(function(top_poly) {
@@ -2482,11 +2680,11 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             return [foundMaxHeight, delta_volume, counter];
         }
 
-        function checkVolumeAndCollisionsList(stopEarly, surrogate_library, surrogate_settings, all_slices, sliceIndexList, try_book_index, try_book_polygons_list, books_placed) {
+        function checkVolumeAndCollisionsList(stopEarly, surrogate_library, surrogate_settings, all_slices, sliceIndexList, try_surro_index, try_surro_polygons_list, surrogates_placed) {
             let collision = false;
             let overextended = false;
 
-            let try_book = surrogate_library[try_book_index];
+            let try_surro = surrogate_library[try_surro_index];
             let new_volume = 0;
             let old_volume = 0;
 
@@ -2494,7 +2692,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             let max_surrogated_area = 0;
 
             let check_collisions = true;
-            // TODO: Make try_book_polygons_list here, or generate only once and translate+rotate instead
+            // TODO: Make try_surro_polygons_list here, or generate only once and translate+rotate instead
 
             for (let indexIndex = 0; indexIndex < sliceIndexList.length; indexIndex++) {
                 let current_slice = all_slices[sliceIndexList[indexIndex]];
@@ -2520,7 +2718,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                 if (collision) check_collisions = false;
                 
                 if (calculating_volume) {
-                    const volumes = getSurrogateReplacedVolumes(old_volume, new_volume, current_slice, try_book_polygons_list);
+                    const volumes = getSurrogateReplacedVolumes(old_volume, new_volume, current_slice, try_surro_polygons_list);
                     old_volume = volumes[0];
                     new_volume = volumes[1];
                     if (max_surrogated_area < volumes[2]) max_surrogated_area = volumes[2];
@@ -2529,8 +2727,8 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                 if (check_collisions) {
                     // console.log(current_slice.index);
                     let collision_detection = [];
-                    POLY.subtract(current_slice.topPolys(), try_book_polygons_list, collision_detection, null, current_slice.z, min);
-                    // console.log({try_book_polygons_list:try_book_polygons_list});
+                    POLY.subtract(current_slice.topPolys(), try_surro_polygons_list, collision_detection, null, current_slice.z, min);
+                    // console.log({try_surro_polygons_list:try_surro_polygons_list});
                     
                     let post_collision_area = 0, pre_collision_area = 0;
                     current_slice.topPolys().forEach(function(top_poly) {
@@ -2541,14 +2739,14 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                     });
                     
                     if ((pre_collision_area - post_collision_area) > 0.00001) { // rounded the same // TODO: Currently testing whether we need Math abs with switched subtraction order
-                        // if ((slice_height_range.bottom_height + surrogate_settings.min_squish_height) < (try_book.minHeight + try_z)) {
-                        if ((current_slice.z - surrogate_settings.min_squish_height) < (try_book.minHeight + try_z)) {
+                        // if ((slice_height_range.bottom_height + surrogate_settings.min_squish_height) < (try_surro.minHeight + try_z)) {
+                        if ((current_slice.z - surrogate_settings.min_squish_height) < (try_surro.minHeight + try_z)) {
                             collision = true;
                             last_collision_area = pre_collision_area - post_collision_area;
                             continue;
                         }
                         else {
-                            try_book.height = current_slice.down.z; // TODO: Test whether this is the best previous height
+                            try_surro.height = current_slice.down.z; // TODO: Test whether this is the best previous height
                             overextended = true;
                             continue;
                         }
@@ -2557,21 +2755,21 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
                     // Check collision with already placed surrogates as well
                     
-                    if (books_placed.length >= 1) {
+                    if (surrogates_placed.length >= 1) {
                         
-                        for (let books_placed_idx = 0; books_placed_idx < books_placed.length; books_placed_idx++) {
-                            let previous_surrogate = books_placed[books_placed_idx];
+                        for (let surrogates_placed_idx = 0; surrogates_placed_idx < surrogates_placed.length; surrogates_placed_idx++) {
+                            let previous_surrogate = surrogates_placed[surrogates_placed_idx];
 
-                            // (previous_surrogate.book.height + previous_surrogate.starting_height)
+                            // (previous_surrogate.surro.height + previous_surrogate.starting_height)
                             if (current_slice.z <= (previous_surrogate.end_height) && current_slice.z >= previous_surrogate.starting_height) {
 
                                 collision_detection = [];
                                 
-                                POLY.subtract(try_book_polygons_list, previous_surrogate.geometry, collision_detection, null, current_slice.z, min); // TODO: Check if Z matters
+                                POLY.subtract(try_surro_polygons_list, previous_surrogate.geometry, collision_detection, null, current_slice.z, min); // TODO: Check if Z matters
                                 
                                 post_collision_area = 0;
                                 pre_collision_area = 0;
-                                try_book_polygons_list.forEach(function(top_poly) {
+                                try_surro_polygons_list.forEach(function(top_poly) {
                                     pre_collision_area += Math.abs(top_poly.areaDeep());
                                 });
                                 collision_detection.forEach(function(top_poly) {
@@ -2579,14 +2777,14 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                                 });
                                 
                                 if ((pre_collision_area - post_collision_area) > 0.00001) {
-                                    // if ((slice_height_range.bottom_height + surrogate_settings.min_squish_height) < (try_book.minHeight + try_z)) {
-                                    if ((current_slice.z - surrogate_settings.min_squish_height) < (try_book.minHeight + try_z)) {
+                                    // if ((slice_height_range.bottom_height + surrogate_settings.min_squish_height) < (try_surro.minHeight + try_z)) {
+                                    if ((current_slice.z - surrogate_settings.min_squish_height) < (try_surro.minHeight + try_z)) {
                                         collision = true;
                                         last_collision_area = pre_collision_area - post_collision_area;
                                         continue;
                                     }
                                     else {
-                                        try_book.height = current_slice.down.z; // TODO: Test whether this is the best previous height
+                                        try_surro.height = current_slice.down.z; // TODO: Test whether this is the best previous height
                                         overextended = true;
                                         continue;
                                     }
@@ -2621,7 +2819,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         //     let new_surrogates = [];
         //     let results_array = [];
 
-        //     // let pso_collision_and_volumes = checkVolumeAndCollisions(books, optimizer.surrogate_settings, bottom_slice, try_book_index, try_book_polygons_list, try_z, books_placed);
+        //     // let pso_collision_and_volumes = checkVolumeAndCollisions(surros, optimizer.surrogate_settings, bottom_slice, try_surro_index, try_surro_polygons_list, try_z, surrogates_placed);
 
         //     for (let iteration_number = 0; iteration_number < var_and_settings[1].searchspace_max_number_of_surrogates; iteration_number++) {
 
@@ -2650,7 +2848,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         //             else tower_library_index = var_and_settings[0][iteration_number*var_and_settings[1].number_of_vars + 3];
         //             tower_library_index = Math.floor(tower_library_index * (all_surrogates.length+1)); // #previous surrogates + 1 for on-baseplate
         //             tower_library_index = tower_library_index - 1; 
-        //             if (tower_library_index > 0) pso_z = all_surrogates[tower_library_index].starting_height + all_surrogates[tower_library_index].book.height;
+        //             if (tower_library_index > 0) pso_z = all_surrogates[tower_library_index].starting_height + all_surrogates[tower_library_index].surro.height;
                     
 
                     
@@ -2684,7 +2882,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         //                     full_area += Math.abs(full.areaDeep());
         //                 });
 
-        //                 // If less than half the area of the new book is supported by the book below, surrogate is unstable
+        //                 // If less than half the area of the new surro is supported by the surro below, surrogate is unstable
         //                 //if ((unsupp_area * 2) > full_area) {
         //                 // For now, use 100% support instead
         //                 if (unsupp_area > 0) {
@@ -2706,13 +2904,13 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         //                     let lower_surrogate = [];
         //                     let empty_array = [];
         //                     let data_array = {insertion_case:"unknown"};
-        //                     if (stack_on_book_index >= 0) {
+        //                     if (stack_on_surro_index >= 0) {
         //                         lower_surrogate.push(all_surrogates[tower_library_index]);
         //                     }
         //                     let end_height = pso_z + pso_surrogate.height;
         //                     let candidate = {
         //                         geometry:pso_polygons_list, 
-        //                         book:pso_surrogate, starting_height:pso_z, 
+        //                         surro:pso_surrogate, starting_height:pso_z, 
         //                         end_height:end_height, 
         //                         down_surrogate:lower_surrogate, 
         //                         up_surrogate:empty_array, 
@@ -2997,134 +3195,12 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         }
         //console.log({support_area: support_area});
 
-
-        
-
-        let books = [];
-        // books.push({width:100.5, length:152.7, height:10.9});
-        // books.push({width:136.8, length:190.1, height:24.1});
-
-
-        function addOption(listOfOptions, length, width, height, title) {
-            listOfOptions.push({width:width, length:length, height:height, minHeight:height, maxHeight:height, id:title, available:true, type:"simpleRectangle"});
-        }
-
-        function addStackableOptions(listOfOptions, initialHeight, addHeight, available, length, width, title) {
-            const maxHeight = initialHeight + (addHeight*available);
-            listOfOptions.push({width:width, length:length, height:initialHeight, minHeight:initialHeight, maxHeight:maxHeight, addHeight:addHeight, addMaxNumber:available, id:title, available:true, type:"stackable"});
-            
-            // while (stackHeight < settings.device.maxHeight && stackedSoFar < available) { 
-            //     addOption(listOfOptions, length, width, stackHeight, title);
-            //     stackHeight = stackHeight + addHeight;
-            //     stackedSoFar++;
-            // }
-        }
-
-        function addPrism(listOfOptions, prism_bottom_obj, prism_obj) {
-            const getPrismSize = generatePrismPolygon(0, 0, 0, prism_obj.geometry_points, 0, 0.1);
-            const PrismWidth = getPrismSize.bounds.maxy - getPrismSize.bounds.miny;
-            const PrismLength = getPrismSize.bounds.maxx - getPrismSize.bounds.minx;
-
-            listOfOptions.push({width:PrismWidth, length:PrismLength, height:prism_obj.ini_height, minHeight:prism_obj.ini_height, maxHeight:prism_obj.ini_height+prism_obj.extension_range, id:prism_obj.name, available:true, type:"prism", prism_geometry:prism_obj.geometry_points, bottom_geometry:prism_bottom_obj.geometry_points});
-            // debug
-            // listOfOptions.push({width:PrismWidth, length:PrismLength, height:minimum_prism_height, minHeight:minimum_prism_height, maxHeight:minimum_prism_height+prism_obj.extension_range, id:".", available:true, type:"prism", prism_geometry:prism_obj.geometry_points});
-    
-        }
-
-
-        // Autosort this and use old automated stackable add method...
-
-        // addOption(books, 93.8, 89.9, 3.33, "floppyx1");
-        // addOption(books, 154.3, 105, 5.35, "saw plate");
-        // addOption(books, 137.5, 55.57, 6.62, "wood plate");
-        // addOption(books, 208.8, 164, 6.66, "wood plate large");
-        // addOption(books, 93.8, 89.9, 6.66, "floppyx2");
-        // addOption(books, 128.52, 68.25, 8.75, "medium dense foam plate");
-
-        // addOption(books, 73, 10.43, 9.5, "support bar");
-        // // addOption(books, 93.8, 89.9, 9.99, "floppyx3");
-        // addOption(books, 44.35, 18.33, 10.16, "wood bar4"); // addOption(books, 44.35, 18.33, 10.16, "wood bar dirty");
-        // addOption(books, 49.8, 47.4, 10.5, "blue support");
-        // addOption(books, 27.31, 23.75, 10.55, "support flat");
-        // addOption(books, 97, 18.35, 11.18, "wood bar3"); //addOption(books, 97, 18.35, 11.18, "wood bar two holes");
-        // addOption(books, 100.75, 18.52, 12.2, "wood bar2"); // addOption(books, 100.75, 18.52, 12.2, "wood bar math");
-
-        addOption(books, 31.85, 15.9, 12.75, "Lego 4x2x1");
-
-        // // addOption(books, 31.85, 31.85, 12.75, "Lego 4x4x1");
-        // // addOption(books, 63.77, 31.85, 12.75, "Lego 8x4x1");
-        // // addOption(books, 93.8, 89.9, 13.32, "floppyx4");
-        // // addOption(books, 31.85, 15.9, 15.9, "Lego 4x2x1.3");
-        // // addOption(books, 31.85, 31.85, 15.9, "Lego 4x4x1.3");
-        // // addOption(books, 63.77, 31.85, 15.9, "Lego 8x4x1.3");
-        // addOption(books, 68.26, 50.46, 13.1, "wood flat");
-        // // addOption(books, 183.5, 80.1, 14.7, "foam plate");
-        // addOption(books, 45.15, 23.35, 14.82, "dark wood");
-        // // addOption(books, 93.8, 89.9, 16.65, "floppyx5");
-        // addOption(books, 51, 25, 18.55, "wood offcut1"); // addOption(books, 51, 25, 18.55, "wood man hair");
-        // addOption(books, 52.22, 24.9, 18.6, "wood bar");
-        // addOption(books, 50.4, 24.95, 18.62, "wood offcut2"); // addOption(books, 50.4, 24.95, 18.62, "wood man");
-        // addOption(books, 25.05, 25.05, 18.8, "wood cube"); // addOption(books, 25.05, 25.05, 18.8, "cube with dent");
-        // // addOption(books, 93.8, 89.9, 19.98, "floppyx6");
-        // // addOption(books, 31.85, 15.9, 22.3, "Lego 4x2x2");
-        // // addOption(books, 31.85, 31.85, 22.3, "Lego 4x4x2");
-        // // addOption(books, 63.77, 31.85, 22.3, "Lego 8x4x2");
-        // // addOption(books, 93.8, 89.9, 23.31, "floppyx7");
-        // // addOption(books, 24.4, 24.4, 24.4, "XYZ cube filled");
-        // // addOption(books, 31.85, 15.9, 25.45, "Lego 4x2x2.3");
-        // // addOption(books, 31.85, 31.85, 25.45, "Lego 4x4x2.3");
-        // // addOption(books, 63.77, 31.85, 25.45, "Lego 8x4x2.3");
-        // // addOption(books, 93.8, 89.9, 26.64, "floppyx8");
-        // // addOption(books, 93.8, 89.9, 29.97, "floppyx9");
-        // addOption(books, 49.8, 47.4, 30.5, "blue support big");
-        // addOption(books, 80.0, 70.0, 50.5, "cardboard box 1");
-        // // addOption(books, 31.85, 15.9, 31.85, "Lego 4x2x3");
-        // // addOption(books, 31.85, 31.85, 31.85, "Lego 4x4x3");
-        // // addOption(books, 63.77, 31.85, 31.85, "Lego 8x4x3");
-        // // addOption(books, 31.85, 15.9, 35, "Lego 4x2x3.3");
-        // // addOption(books, 31.85, 31.85, 35, "Lego 4x4x3.3");
-        // // addOption(books, 63.77, 31.85, 35, "Lego 8x4x3.3");
-        // // addOption(books, 110.1, 101.75, 37.15, "mpow box");
-        // // addOption(books, 172.5, 144.6, 37.3, "scale box");
-        // // addOption(books, 31.85, 15.9, 41.4, "Lego 4x2x4");
-        // // addOption(books, 31.85, 31.85, 41.4, "Lego 4x4x4");
-        // // addOption(books, 63.77, 31.85, 41.4, "Lego 8x4x4");
-        // // addOption(books, 31.85, 15.9, 44.55, "Lego 4x2x4.3");
-        // // addOption(books, 31.85, 31.85, 44.55, "Lego 4x4x4.3");
-        // // addOption(books, 63.77, 31.85, 44.55, "Lego 8x4x4.3");
-
-        addOption(books, 63.77, 31.85, 63.65, "Lego 8x4x6.3");
-        // addPrism(books, prisms[0], prisms[1]);
-        // addPrism(books, prisms[0], prisms[1]);
-
-        // addStackableOptions(books, 12.75, 9.55, 4, 31.85, 15.9, "Lego 4x2");
-        // addOption(books, 126.35, 125.6, 52.32, "leap box");
-        // addPrism(books, prisms[0], prisms[2]);
-        // addPrism(books, prisms[0], prisms[2]);
-        // addPrism(books, prisms[0], prisms[2]);
-        
-        // addStackableOptions(books, 15.9, 9.55, 4, 31.85, 15.9, "Lego+4x2");
-        // addStackableOptions(books, 12.75, 9.55, 5, 31.85, 31.85, "Lego 4x4");
-        // addStackableOptions(books, 15.9, 9.55, 5, 31.85, 31.85, "Lego+4x4");
-        // addStackableOptions(books, 12.75, 9.55, 6, 63.77, 31.85, "Lego 4x8");
-        // addStackableOptions(books, 15.9, 9.55, 6, 63.77, 31.85, "Lego+4x8");
-        // for (let i = 1; i < prisms.length; i++){
-        //     addPrism(books, prisms[0], prisms[i]);
-        // }
-        // addStackableOptions(books, 9.99, 3.33, 6, 93.8, 89.9, "FloppyDisc");
-        // for (let i = 1; i < prisms.length; i++){
-        //     addPrism(books, prisms[0], prisms[i]);
-        // }
-        
-        
-
-
-        
-        // let test_books_rectangle_list = [generateRectanglePolygonCentered(0, -20, slice.z, 5, 30, 0.0)];
-        // test_books_rectangle_list.push(generateRectanglePolygonCentered(0, 10, slice.z, 2, 2, 0));
-        // test_books_rectangle_list.push(generateRectanglePolygonCentered(0, 15, slice.z, 2, 2, 0));
-        // test_books_rectangle_list.push(generateRectanglePolygonCentered(0, 20, slice.z, 2, 2, 0));
-        let test_books_rectangle_list = [];
+  
+        // let test_surro_rectangle_list = [generateRectanglePolygonCentered(0, -20, slice.z, 5, 30, 0.0)];
+        // test_surro_rectangle_list.push(generateRectanglePolygonCentered(0, 10, slice.z, 2, 2, 0));
+        // test_surro_rectangle_list.push(generateRectanglePolygonCentered(0, 15, slice.z, 2, 2, 0));
+        // test_surro_rectangle_list.push(generateRectanglePolygonCentered(0, 20, slice.z, 2, 2, 0));
+        let test_surro_rectangle_list = [];
         let support_area = 0;
         let otherWidget;
         
@@ -3346,13 +3422,13 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         console.log({shift_y:shift_y});
         
         let repetition_goal = 10000;
-        let books_placed = [];
+        let surrogates_placed = [];
         let try_x = 0;
         let try_y = 0;
         let try_z = 0;
         let try_rotation = 0;
-        let try_book = 0;
-        let try_book_index = 0;
+        let try_surro = 0;
+        let try_surro_index = 0;
         let rotations = [0,45,90,135,180,225,270,315];
         let layer_height_fudge = settings.process.sliceHeight/1.75;
         let print_on_surrogate_extra_height_for_extrusion = 0;
@@ -3395,24 +3471,24 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         surrogate_settings.biggest_width = 0;
         surrogate_settings.biggest_height = 0;
 
-        for (let book of books) {
-            if (surrogate_settings.smallest_length > book.length) {
-                surrogate_settings.smallest_length = book.length;
+        for (let surro of surros) {
+            if (surrogate_settings.smallest_length > surro.length) {
+                surrogate_settings.smallest_length = surro.length;
             }
-            if (surrogate_settings.smallest_width > book.width) {
-                surrogate_settings.smallest_width = book.width;
+            if (surrogate_settings.smallest_width > surro.width) {
+                surrogate_settings.smallest_width = surro.width;
             }
-            if (surrogate_settings.smallest_height > book.minHeight) {
-                surrogate_settings.smallest_height = book.minHeight;
+            if (surrogate_settings.smallest_height > surro.minHeight) {
+                surrogate_settings.smallest_height = surro.minHeight;
             }
-            if (surrogate_settings.biggest_length < book.length) {
-                surrogate_settings.biggest_length = book.length;
+            if (surrogate_settings.biggest_length < surro.length) {
+                surrogate_settings.biggest_length = surro.length;
             }
-            if (surrogate_settings.biggest_width < book.width) {
-                surrogate_settings.biggest_width = book.width;
+            if (surrogate_settings.biggest_width < surro.width) {
+                surrogate_settings.biggest_width = surro.width;
             }
-            if (surrogate_settings.biggest_height < book.maxHeight) {
-                surrogate_settings.biggest_height = book.maxHeight;
+            if (surrogate_settings.biggest_height < surro.maxHeight) {
+                surrogate_settings.biggest_height = surro.maxHeight;
             }
         }
 
@@ -3704,10 +3780,10 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
         // Greedy search
 
-        // Iterate, placing a book in every iteration
+        // Iterate, placing a surro in every iteration
         if (searchType == "Greedy") {
-            for (let books_to_place = 0; books_to_place < surrogate_number_goal; books_to_place++) {
-                let place_one_book = {};
+            for (let surros_to_place = 0; surros_to_place < surrogate_number_goal; surros_to_place++) {
+                let place_one_surro = {};
 
                 
                 let sufficient = false; // TODO: Define what is sufficient to stop searching for better solutions
@@ -3719,7 +3795,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                 // Start at bottom
                 up = bottom_slice;
 
-                // Try out random options to place books
+                // Try out random options to place surros
                 while (sufficient === false && repetition_counter < (Math.floor(repetition_goal / surrogate_number_goal))) { // Loop mostly deprecated with using PSO, but we could run the optimization multiple times with it
                     let good = true;
                     
@@ -3735,25 +3811,25 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                         continue;
                     }
 
-                    let stack_on_book_index = Math.floor(Math.random() * (books_placed.length + 1)) - 1; // -1 to try to place it on buildplate
+                    let stack_on_surro_index = Math.floor(Math.random() * (surrogates_placed.length + 1)) - 1; // -1 to try to place it on buildplate
                     try_x = Math.random() * (max_x - min_x) + min_x;
                     try_y = Math.random() * (max_y - min_y) + min_y;
                     try_z = 0; // TODO: Convert height to slice number???
                     
-                    if (stack_on_book_index >= 0) {
-                        // console.log({books_placed:books_placed});
-                        // console.log({stack_on_book_index:stack_on_book_index});
-                        try_z = books_placed[stack_on_book_index].starting_height + books_placed[stack_on_book_index].book.height;// + layer_height_fudge;
+                    if (stack_on_surro_index >= 0) {
+                        // console.log({surrogates_placed:surrogates_placed});
+                        // console.log({stack_on_surro_index:stack_on_surro_index});
+                        try_z = surrogates_placed[stack_on_surro_index].starting_height + surrogates_placed[stack_on_surro_index].surro.height;// + layer_height_fudge;
                     }
                     try_rotation = rotations[Math.floor(Math.random() * rotations.length)];
-                    try_book_index = Math.floor(Math.random() * books.length)
-                    try_book = books[try_book_index];
-                    let try_book_polygons_list = []
-                    if (try_book.type == "simpleRectangle") {
-                        try_book_polygons_list = [generateRectanglePolygonCentered(try_x, try_y, up.z, try_book.length, try_book.width, try_rotation, surrogate_settings.surrogate_padding, bottom_slice)];
+                    try_surro_index = Math.floor(Math.random() * surros.length)
+                    try_surro = surros[try_surro_index];
+                    let try_surro_polygons_list = []
+                    if (try_surro.type == "simpleRectangle") {
+                        try_surro_polygons_list = [generateRectanglePolygonCentered(try_x, try_y, up.z, try_surro.length, try_surro.width, try_rotation, surrogate_settings.surrogate_padding, bottom_slice)];
                     }
-                    else if (try_book.type == "prism") {
-                        try_book_polygons_list = [generatePrismPolygon(try_x, try_y, up.z, try_book.prism_geometry, try_rotation, surrogate_settings.surrogate_padding, bottom_slice)];
+                    else if (try_surro.type == "prism") {
+                        try_surro_polygons_list = [generatePrismPolygon(try_x, try_y, up.z, try_surro.prism_geometry, try_rotation, surrogate_settings.surrogate_padding, bottom_slice)];
                     }
                     let collision = false;
                     let overextended = false;
@@ -3761,38 +3837,33 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                     let delta_volume = 0;
                     let insertion_layer_number_guess = 0;
 
-
-
-
-
-
                     // Single surrogate handling
                     // try_x = pso_position_vars[1];
                     // try_y = pso_position_vars[2];
 
-                    // let pso_chosen_book = Math.floor(pso_position_vars[5]);
-                    // if (pso_chosen_book >= books.length) {
-                    //     pso_chosen_book = books.length-1;
+                    // let pso_chosen_surro = Math.floor(pso_position_vars[5]);
+                    // if (pso_chosen_surro >= surros.length) {
+                    //     pso_chosen_surro = surros.length-1;
                     // }
-                    // else if (pso_chosen_book < 0) {
-                    //     pso_chosen_book = 0;
+                    // else if (pso_chosen_surro < 0) {
+                    //     pso_chosen_surro = 0;
                     // }
-                    // // let pso_chosen_book = pso_position_vars[5];
-                    // // if (pso_chosen_book < 0) pso_chosen_book = 0;
-                    // // else if (pso_chosen_book >= books.length) pso_chosen_book = books.length-1;
-                    // // try_book = books[Math.floor(pso_chosen_book)];
+                    // // let pso_chosen_surro = pso_position_vars[5];
+                    // // if (pso_chosen_surro < 0) pso_chosen_surro = 0;
+                    // // else if (pso_chosen_surro >= surros.length) pso_chosen_surro = surros.length-1;
+                    // // try_surro = surros[Math.floor(pso_chosen_surro)];
                     // try_rotation = pso_position_vars[4];
 
-                    // if (try_book.type == "simpleRectangle") {
-                    //     try_book_polygons_list = [generateRectanglePolygonCentered(try_x, try_y, up.z, try_book.length, try_book.width, try_rotation, surrogate_settings.surrogate_padding, bottom_slice)];
+                    // if (try_surro.type == "simpleRectangle") {
+                    //     try_surro_polygons_list = [generateRectanglePolygonCentered(try_x, try_y, up.z, try_surro.length, try_surro.width, try_rotation, surrogate_settings.surrogate_padding, bottom_slice)];
                     // }
-                    // else if (try_book.type == "prism") {
-                    //     try_book_polygons_list = [generatePrismPolygon(try_x, try_y, up.z, try_book.prism_geometry, try_rotation, surrogate_settings.surrogate_padding, bottom_slice)];
+                    // else if (try_surro.type == "prism") {
+                    //     try_surro_polygons_list = [generatePrismPolygon(try_x, try_y, up.z, try_surro.prism_geometry, try_rotation, surrogate_settings.surrogate_padding, bottom_slice)];
                     // }
 
 
                     // // Check if surrogate is available
-                    if (try_book.available === false) {
+                    if (try_surro.available === false) {
                         repetition_counter++;
                         good = false;
                         continue;
@@ -3804,7 +3875,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                     //         if (rotation < 130) {
                     //             console.log({rotation:rotation});
                     //             // let rot_test_geometry_list = [generateRectanglePolygonCentered(try_x, try_y, 0, 50, 100, rotation, surrogate_settings.surrogate_padding, bottom_slice)];
-                    //             let rot_test_geometry_list = [generatePrismPolygon(try_x, try_y, up.z, try_book.prism_geometry, rotation, surrogate_settings.surrogate_padding, bottom_slice)];
+                    //             let rot_test_geometry_list = [generatePrismPolygon(try_x, try_y, up.z, try_surro.prism_geometry, rotation, surrogate_settings.surrogate_padding, bottom_slice)];
                     //             bottom_slice.tops[0].shells.push(rot_test_geometry_list[0]);
                     //         }
 
@@ -3818,13 +3889,13 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                     
 
                     // // Out of build-area check
-                    for (let book_poly of try_book_polygons_list) {
+                    for (let surro_poly of try_surro_polygons_list) {
                         // translate widget coordinate system to build plate coordinate system and compare with build plate size (center is at 0|0, bottom left is at -Width/2<|-Depth/2)
-                        if (book_poly.bounds.maxx + shift_x > bedWidthArea || book_poly.bounds.minx + shift_x < -bedWidthArea || book_poly.bounds.maxy + shift_y > bedDepthArea || book_poly.bounds.miny + shift_y < -bedDepthArea || try_z + try_book.minHeight > settings.device.bedDepth) {
+                        if (surro_poly.bounds.maxx + shift_x > bedWidthArea || surro_poly.bounds.minx + shift_x < -bedWidthArea || surro_poly.bounds.maxy + shift_y > bedDepthArea || surro_poly.bounds.miny + shift_y < -bedDepthArea || try_z + try_surro.minHeight > settings.device.bedDepth) {
                             // console.log({text:"Out of build area"});
-                            // console.log({book_poly_bounds:book_poly.bounds})
-                            // console.log({y_max:book_poly.bounds.maxy + shift_y})
-                            // console.log({y_min:book_poly.bounds.miny + shift_y})
+                            // console.log({surro_poly_bounds:surro_poly.bounds})
+                            // console.log({y_max:surro_poly.bounds.maxy + shift_y})
+                            // console.log({y_min:surro_poly.bounds.miny + shift_y})
                             // console.log({max_area:bedDepthArea})
                             // console.log({min_area:-bedDepthArea})
                             repetition_counter++;
@@ -3834,18 +3905,18 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                     }
 
                     // Stability check
-                    if (stack_on_book_index >= 0) {
+                    if (stack_on_surro_index >= 0) {
                         let unsupported_polygons = [];
                         let unsupp_area = 0, full_area = 0;
-                        POLY.subtract(try_book_polygons_list, books_placed[stack_on_book_index].geometry, unsupported_polygons, null, up.z, min);
+                        POLY.subtract(try_surro_polygons_list, surrogates_placed[stack_on_surro_index].geometry, unsupported_polygons, null, up.z, min);
                         unsupported_polygons.forEach(function(unsupp) {
                             unsupp_area += Math.abs(unsupp.areaDeep());
                         });
-                        try_book_polygons_list.forEach(function(full) {
+                        try_surro_polygons_list.forEach(function(full) {
                             full_area += Math.abs(full.areaDeep());
                         });
 
-                        // If less than half the area of the new book is supported by the book below, surrogate is unstable
+                        // If less than half the area of the new surro is supported by the surro below, surrogate is unstable
                         //if ((unsupp_area * 2) > full_area) {
                         // For now, use 100% support instead
                         if (unsupp_area > 0) {
@@ -3860,7 +3931,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                     // Check collisions and calculate volume
                     if (true) {
 
-                        collision_and_volumes = checkVolumeAndCollisions(books, surrogate_settings, bottom_slice, try_book_index, try_book_polygons_list, try_z, books_placed);
+                        collision_and_volumes = checkVolumeAndCollisions(surros, surrogate_settings, bottom_slice, try_surro_index, try_surro_polygons_list, try_z, surrogates_placed);
 
                         // console.log({collision_and_volumes:collision_and_volumes});
                         if (false) {
@@ -3873,7 +3944,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                                 // Approximation: If more than half of the slice height is surrogated, we count it fully (for volume) #TODO: for collisions we might want to check for ANY overlap
                                 if (iterate_layers_VandC.z < try_z) { // LWW TODO: Check at what height we actually want to start checking for collisions
                                     iterate_layers_VandC = iterate_layers_VandC.up;
-                                    // console.log({going_up: "Going up because book is not on buildplate my DUDE!!!!!!!"});
+                                    // console.log({going_up: "Going up because surro is not on buildplate my DUDE!!!!!!!"});
                                     continue;
                                 }
 
@@ -3895,25 +3966,25 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                                     calculating_volume = false;
                                 }
                                 // Stop counting volume once surrogate height has passed 
-                                else if ((slice_height_range.bottom_height + surrogate_settings.min_squish_height) >= (try_book.maxHeight + try_z)){
+                                else if ((slice_height_range.bottom_height + surrogate_settings.min_squish_height) >= (try_surro.maxHeight + try_z)){
                                     calculating_volume = false;
                                 }
 
                                 // stop checking collisions when surrogate top is higher than slice bottom + min squish height 
-                                if ((slice_height_range.bottom_height + surrogate_settings.min_squish_height) >= (try_book.maxHeight + try_z)) { 
+                                if ((slice_height_range.bottom_height + surrogate_settings.min_squish_height) >= (try_surro.maxHeight + try_z)) { 
                                     check_collisions = false;
                                 }
                                 
                                 if (calculating_volume) {
-                                    const volumes = getSurrogateReplacedVolumes(old_volume, new_volume, iterate_layers_VandC, try_book_polygons_list);
+                                    const volumes = getSurrogateReplacedVolumes(old_volume, new_volume, iterate_layers_VandC, try_surro_polygons_list);
                                     old_volume = volumes[0];
                                     new_volume = volumes[1];
                                 }
 
                                 if (check_collisions) {
                                     let collision_detection = [];
-                                    POLY.subtract(iterate_layers_VandC.topPolys(), try_book_polygons_list, collision_detection, null, iterate_layers_VandC.z, min);
-                                    // console.log({try_book_polygons_list:try_book_polygons_list});
+                                    POLY.subtract(iterate_layers_VandC.topPolys(), try_surro_polygons_list, collision_detection, null, iterate_layers_VandC.z, min);
+                                    // console.log({try_surro_polygons_list:try_surro_polygons_list});
                                     
                                     let post_collision_area = 0, pre_collision_area = 0;
                                     iterate_layers_VandC.topPolys().forEach(function(top_poly) {
@@ -3924,13 +3995,13 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                                     });
                                     
                                     if (Math.abs(post_collision_area - pre_collision_area) > 0.00001) { // rounded the same
-                                        if ((slice_height_range.bottom_height + surrogate_settings.min_squish_height) < (try_book.minHeight + try_z)) {
+                                        if ((slice_height_range.bottom_height + surrogate_settings.min_squish_height) < (try_surro.minHeight + try_z)) {
                                             collision = true;
                                             console.log(Math.abs(post_collision_area - pre_collision_area));
                                             continue;
                                         }
                                         else {
-                                            try_book.height = iterate_layers_VandC.down.z; // TODO: Test whether this is the best previous height
+                                            try_surro.height = iterate_layers_VandC.down.z; // TODO: Test whether this is the best previous height
                                             overextended = true;
                                             continue;
                                         }
@@ -3939,20 +4010,20 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
                                     // Check collision with already placed surrogates as well
                                     
-                                    if (books_placed.length >= 1) {
+                                    if (surrogates_placed.length >= 1) {
                                         
-                                        for (let books_placed_idx = 0; books_placed_idx < books_placed.length; books_placed_idx++) {
-                                            let previous_surrogate = books_placed[books_placed_idx];
+                                        for (let surrogates_placed_idx = 0; surrogates_placed_idx < surrogates_placed.length; surrogates_placed_idx++) {
+                                            let previous_surrogate = surrogates_placed[surrogates_placed_idx];
 
-                                            if (iterate_layers_VandC.z <= (previous_surrogate.book.height + previous_surrogate.starting_height) && iterate_layers_VandC.z >= previous_surrogate.starting_height) {
+                                            if (iterate_layers_VandC.z <= (previous_surrogate.surro.height + previous_surrogate.starting_height) && iterate_layers_VandC.z >= previous_surrogate.starting_height) {
 
                                                 collision_detection = [];
                                                 
-                                                POLY.subtract(try_book_polygons_list, previous_surrogate.geometry, collision_detection, null, iterate_layers_VandC.z, min); // TODO: Check if Z matters
+                                                POLY.subtract(try_surro_polygons_list, previous_surrogate.geometry, collision_detection, null, iterate_layers_VandC.z, min); // TODO: Check if Z matters
                                                 
                                                 post_collision_area = 0;
                                                 pre_collision_area = 0;
-                                                try_book_polygons_list.forEach(function(top_poly) {
+                                                try_surro_polygons_list.forEach(function(top_poly) {
                                                     pre_collision_area += Math.abs(top_poly.areaDeep());
                                                 });
                                                 collision_detection.forEach(function(top_poly) {
@@ -3960,13 +4031,13 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                                                 });
                                                 
                                                 if (Math.abs(post_collision_area - pre_collision_area) > 0.00001) {
-                                                    if ((slice_height_range.bottom_height + surrogate_settings.min_squish_height) < (try_book.minHeight + try_z)) {
+                                                    if ((slice_height_range.bottom_height + surrogate_settings.min_squish_height) < (try_surro.minHeight + try_z)) {
                                                         collision = true;
                                                         console.log(Math.abs(post_collision_area - pre_collision_area));
                                                         continue;
                                                     }
                                                     else {
-                                                        try_book.height = iterate_layers_VandC.down.z; // TODO: Test whether this is the best previous height
+                                                        try_surro.height = iterate_layers_VandC.down.z; // TODO: Test whether this is the best previous height
                                                         overextended = true;
                                                         continue;
                                                     }
@@ -4011,19 +4082,19 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
 
                     // generate candidate and validation insertion case and layer
-                    let lower_book = [];
+                    let lower_surro = [];
                     let empty_array = [];
                     let data_array = {insertion_case:"unknown"};
-                    if (stack_on_book_index >= 0) {
-                        lower_book.push(books_placed[stack_on_book_index]);
+                    if (stack_on_surro_index >= 0) {
+                        lower_surro.push(surrogates_placed[stack_on_surro_index]);
                     }
-                    let end_height = try_z + try_book.height;
+                    let end_height = try_z + try_surro.height;
                     let candidate = {
-                        geometry:try_book_polygons_list, 
+                        geometry:try_surro_polygons_list, 
                         rotation:try_rotation,
-                        book:try_book, starting_height:try_z, 
+                        surro:try_surro, starting_height:try_z, 
                         end_height:end_height, 
-                        down_surrogate:lower_book, 
+                        down_surrogate:lower_surro, 
                         up_surrogate:empty_array, 
                         outlines_drawn:0, 
                         insertion_data:data_array
@@ -4034,7 +4105,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
                     // Check if it is on a consecutive layer from a previous surrogate
                     let consecutive = false;
-                    books_placed.forEach(function(surrogate) {
+                    surrogates_placed.forEach(function(surrogate) {
                         if (Math.abs(candidate.insertion_data.index - surrogate.insertion_data.index) === 1) {
                             consecutive = true;
                         }
@@ -4048,14 +4119,14 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                     // Check if better valid position was found
                     if (good === true && delta_volume > best_delta_volume) {
                         best_delta_volume = delta_volume;
-                        place_one_book = candidate;
+                        place_one_surro = candidate;
                     }
                     // If it is just as good --> choose the bigger one
                     else if (good === true && delta_volume === best_delta_volume && delta_volume > 0) {
                         // Check if the new surrogate is bigger
-                        if (!(Object.keys(place_one_book).length === 0) && place_one_book.geometry[0].area > try_book_polygons_list[0].area) { // LWW TODO: Adjust for more complicated geometry
+                        if (!(Object.keys(place_one_surro).length === 0) && place_one_surro.geometry[0].area > try_surro_polygons_list[0].area) { // LWW TODO: Adjust for more complicated geometry
                             console.log({Notification:"A surrogate replaced the same amount of support, but was bigger"});
-                            place_one_book = candidate;
+                            place_one_surro = candidate;
                         }
                         else {
                             epsilon_0_counter++;
@@ -4068,14 +4139,14 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                 }
                 console.log({best_delta_volume:best_delta_volume});
                 console.log({epsilon_0_counter:epsilon_0_counter});
-                //test_books_rectangle_list.push(place_one_book.geometry[0])
+                //test_surro_rectangle_list.push(place_one_surro.geometry[0])
                 if (best_delta_volume > 1) { // TODO
-                    books_placed.push(place_one_book);
-                    place_one_book.book.available = false; // Mark book as used
+                    surrogates_placed.push(place_one_surro);
+                    place_one_surro.surro.available = false; // Mark surro as used
 
-                    console.log({placed_book_name:place_one_book.book.id});
-                    // console.log({the_book:place_one_book.book});
-                    // console.log({the_book2:books[try_book_index]});
+                    console.log({placed_surro_name:place_one_surro.surro.id});
+                    // console.log({the_surro:place_one_surro.surro});
+                    // console.log({the_surro2:surros[try_surro_index]});
                 }
             }
         }
@@ -4089,7 +4160,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             let valid_answers = [];
             var optimizer = new kiri.Optimizer();
             // var optimizer = new PSO.Optimizer(); // TODO: Add min and max values for particle variable ranges
-            optimizer.surrogate_library = books;
+            optimizer.surrogate_library = surros;
             optimizer.surrogate_settings = surrogate_settings;
             optimizer.valid_answers = [];
             // set the objective function
@@ -4101,8 +4172,8 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                 // let test_z = 0; // TODO: Convert height to slice number???
                 
                 // try_rotation = rotations[Math.floor(Math.random() * rotations.length)];
-                // try_book_index = Math.floor(Math.random() * books.length);
-                // try_book = books[try_book_index];
+                // try_surro_index = Math.floor(Math.random() * surros.length);
+                // try_surro = surros[try_surro_index];
                 //let test_poly = generateRectanglePolygonCentered(test_x, test_y, 0, 100, 50, 0, 0.1);
                 // console.log({this:this});
 
@@ -4171,7 +4242,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                 //     let new_surrogates = [];
                 //     let results_array = [];
 
-                //     // let pso_collision_and_volumes = checkVolumeAndCollisions(books, optimizer.surrogate_settings, bottom_slice, try_book_index, try_book_polygons_list, try_z, books_placed);
+                //     // let pso_collision_and_volumes = checkVolumeAndCollisions(surros, optimizer.surrogate_settings, bottom_slice, try_surro_index, try_surro_polygons_list, try_z, surrogates_placed);
 
                 //     // for (let iteration_number = 0; iteration_number < this.surrogate_settings.searchspace_max_number_of_surrogates; iteration_number++) {
                 //     for (let iteration_number = 0; iteration_number < 6; iteration_number++) {
@@ -4202,7 +4273,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                 //             else tower_library_index = var_list[iteration_number*this.surrogate_settings.number_of_vars + 3];
                 //             tower_library_index = Math.floor(tower_library_index * (all_surrogates.length+1)); // #previous surrogates + 1 for on-baseplate
                 //             tower_library_index = tower_library_index - 1; 
-                //             if (tower_library_index > 0) pso_z = all_surrogates[tower_library_index].starting_height + all_surrogates[tower_library_index].book.height;
+                //             if (tower_library_index > 0) pso_z = all_surrogates[tower_library_index].starting_height + all_surrogates[tower_library_index].surro.height;
                             
 
                             
@@ -4236,7 +4307,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                 //                     full_area += Math.abs(full.areaDeep());
                 //                 });
 
-                //                 // If less than half the area of the new book is supported by the book below, surrogate is unstable
+                //                 // If less than half the area of the new surro is supported by the surro below, surrogate is unstable
                 //                 //if ((unsupp_area * 2) > full_area) {
                 //                 // For now, use 100% support instead
                 //                 if (unsupp_area > 0) {
@@ -4258,13 +4329,13 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                 //                     let lower_surrogate = [];
                 //                     let empty_array = [];
                 //                     let data_array = {insertion_case:"unknown"};
-                //                     if (stack_on_book_index >= 0) {
+                //                     if (stack_on_surro_index >= 0) {
                 //                         lower_surrogate.push(all_surrogates[tower_library_index]);
                 //                     }
                 //                     let end_height = pso_z + pso_surrogate.height;
                 //                     let candidate = {
                 //                         geometry:pso_polygons_list, 
-                //                         book:pso_surrogate, starting_height:pso_z, 
+                //                         surro:pso_surrogate, starting_height:pso_z, 
                 //                         end_height:end_height, 
                 //                         down_surrogate:lower_surrogate, 
                 //                         up_surrogate:empty_array, 
@@ -4426,7 +4497,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
                     let results_meta_data = {valid:false, candidate_details:[], fitness:Number.NEGATIVE_INFINITY};
 
-                    // let pso_collision_and_volumes = checkVolumeAndCollisions(books, optimizer.surrogate_settings, bottom_slice, try_book_index, try_book_polygons_list, try_z, books_placed);
+                    // let pso_collision_and_volumes = checkVolumeAndCollisions(surros, optimizer.surrogate_settings, bottom_slice, try_surro_index, try_surro_polygons_list, try_z, surrogates_placed);
 
                     if (var_list[0] < this.surrogate_settings.searchspace_min_number_of_surrogates) var_list[0] = this.surrogate_settings.searchspace_min_number_of_surrogates;
                     const max_tries = var_list[0];
@@ -4491,14 +4562,14 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                                 //     console.log({pso_tower_index:pso_tower_index});
                                 // }
 
-                                // if (tower_library_index >= 0) pso_z = all_surrogates[tower_library_index].starting_height + all_surrogates[tower_library_index].book.height;
+                                // if (tower_library_index >= 0) pso_z = all_surrogates[tower_library_index].starting_height + all_surrogates[tower_library_index].surro.height;
                                 if (tower_library_index >= 0) pso_z = all_surrogates[tower_library_index].end_height;
 
                                 // if (tower_library_index >= 0)
-                                // if (all_surrogates[tower_library_index].starting_height + all_surrogates[tower_library_index].book.height != all_surrogates[tower_library_index].end_height) {
-                                //     if (all_surrogates[tower_library_index].book.type == "simpleRectangle") {
+                                // if (all_surrogates[tower_library_index].starting_height + all_surrogates[tower_library_index].surro.height != all_surrogates[tower_library_index].end_height) {
+                                //     if (all_surrogates[tower_library_index].surro.type == "simpleRectangle") {
                                 //         console.log({WARNING:"End height not equal height + starting height"});
-                                //         console.log({addedHeight:all_surrogates[tower_library_index].starting_height + all_surrogates[tower_library_index].book.height});
+                                //         console.log({addedHeight:all_surrogates[tower_library_index].starting_height + all_surrogates[tower_library_index].surro.height});
                                 //         console.log({end_height:all_surrogates[tower_library_index].end_height});
                                 //     }
                                 // }
@@ -4510,8 +4581,8 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                         
                             // Stability check V2 // TODO: Allow altering rotations
                             if (tower_library_index >= 0) {
-                                let x_space = (all_surrogates[tower_library_index].book.length - pso_surrogate.length - 2.4) * 0.5; // TODO: Set to four times nozzle (+ two times padding size?)
-                                let y_space = (all_surrogates[tower_library_index].book.width - pso_surrogate.width - 2.4) * 0.5;
+                                let x_space = (all_surrogates[tower_library_index].surro.length - pso_surrogate.length - 2.4) * 0.5; // TODO: Set to four times nozzle (+ two times padding size?)
+                                let y_space = (all_surrogates[tower_library_index].surro.width - pso_surrogate.width - 2.4) * 0.5;
                                 if (x_space > 0 && y_space > 0) {
 
                                     // Handling without rotation :/
@@ -4565,7 +4636,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                                     }
 
 
-                                    if (all_surrogates[tower_library_index].book.type == "prism") { // In case of prism underneath, check for unsupported area
+                                    if (all_surrogates[tower_library_index].surro.type == "prism") { // In case of prism underneath, check for unsupported area
                                         let unsupported_polygons = [];
                                         let unsupp_area = 0;
 
@@ -4641,7 +4712,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                             //         full_area += Math.abs(full.areaDeep());
                             //     });
 
-                            //     // If less than half the area of the new book is supported by the book below, surrogate is unstable
+                            //     // If less than half the area of the new surro is supported by the surro below, surrogate is unstable
                             //     //if ((unsupp_area * 2) > full_area) {
                             //     // For now, use 100% supported instead
                             //     if (unsupp_area > 0) {
@@ -4775,7 +4846,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                                             let candidate = {
                                                 geometry:pso_polygons_list, 
                                                 rotation:rotation,
-                                                book:pso_surrogate, starting_height:pso_z, 
+                                                surro:pso_surrogate, starting_height:pso_z, 
                                                 end_height:end_height, 
                                                 down_surrogate:lower_surrogate, 
                                                 up_surrogate:empty_array, 
@@ -4890,21 +4961,21 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                     // console.log({surrogate_area_estimate:surrogate_area_estimate});
 
 
-                    let surrogates_placed = 0;
+                    let surrogates_placed_pso = 0;
                     for (let candidate_detail of results_meta_data.candidate_details) {
                     // for (let iteration_number = 0; iteration_number < this.surrogate_settings.searchspace_max_number_of_surrogates; iteration_number++) {
                         // if (var_list[iteration_number * this.surrogate_settings.number_of_vars + 7] > 0.999999 && var_list[iteration_number * this.surrogate_settings.number_of_vars + 7] < 1.000001) {// If surrogate was placed without problem by PSO
                         if (candidate_detail.use_me) { 
-                            surrogates_placed += 1;
+                            surrogates_placed_pso += 1;
                         }
                         // if (pso_use_this_surrogate == 1) {
-                        //     surrogates_placed += 1;
+                        //     surrogates_placed_pso += 1;
                         // }
                     }
 
 
 
-                    if (valid_combination && surrogates_placed > 0) {
+                    if (valid_combination && surrogates_placed_pso > 0) {
                         // let current_answer = [...var_list];
                         // this.valid_answers.push(current_answer);
                         // valid_answers.push(current_answer);
@@ -5009,11 +5080,11 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                
             }
 
-            // TODO: Sort surrogate library by ??? surface area? height? volume?
 
             // set an initial population of 20 particles spread across the search space *[-10, 10] x [-10, 10]*
             optimizer.init(surrogate_settings.numberOfParticles, pso_variable_list);
 
+            console.log({optimizer_after_init2:optimizer._particles});
             // run the optimizer 40 iterations
             let improvement_Decay = 0;
             let last_Best = 0;
@@ -5141,20 +5212,20 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                         // let pso_desired_height = pso_position_vars[pso_result_surrogate_index * surrogate_settings.number_of_vars + 11];
                         let pso_desired_height = candidate_detail.pso_details[6];
 
-                        try_book = getBestFittingSurrogateL2(books, pso_desired_length, pso_desired_width, pso_desired_height);
+                        try_surro = getBestFittingSurrogateL2(surros, pso_desired_length, pso_desired_width, pso_desired_height);
 
                         // // Select chosen surrogate
-                        // let pso_chosen_book = Math.floor(pso_position_vars[pso_result_surrogate_index * surrogate_settings.number_of_vars + 5]);
-                        // if (pso_chosen_book >= books.length) {
-                        //     pso_chosen_book = books.length-1; // Probably unnecessary with bounce
+                        // let pso_chosen_surro = Math.floor(pso_position_vars[pso_result_surrogate_index * surrogate_settings.number_of_vars + 5]);
+                        // if (pso_chosen_surro >= surros.length) {
+                        //     pso_chosen_surro = surros.length-1; // Probably unnecessary with bounce
                         //     console.log({WARNING:"outside (above) of bounce range"});
                         // }
-                        // else if (pso_chosen_book < 0) {
-                        //     pso_chosen_book = 0;
+                        // else if (pso_chosen_surro < 0) {
+                        //     pso_chosen_surro = 0;
                         //     console.log({WARNING:"outside (below) of bounce range"});
                         // }
 
-                        // try_book = books[pso_chosen_book];
+                        // try_surro = surros[pso_chosen_surro];
 
                         // Select test tower position/on baseplate
                         let tower_library_float = candidate_detail.pso_details[2];
@@ -5168,25 +5239,25 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                                 tower_library_index = 0;
                             } else tower_library_index = tower_library_float;
 
-                            tower_library_index = Math.floor(tower_library_index * (books_placed.length+1)); // #previous surrogates + 1 for on-baseplate
+                            tower_library_index = Math.floor(tower_library_index * (surrogates_placed.length+1)); // #previous surrogates + 1 for on-baseplate
                             tower_library_index = tower_library_index - 1; 
 
-                            // if (tower_library_index >= 0) try_z = books_placed[tower_library_index].starting_height + books_placed[tower_library_index].book.height;
-                            if (tower_library_index >= 0) try_z = books_placed[tower_library_index].end_height;
+                            // if (tower_library_index >= 0) try_z = surrogates_placed[tower_library_index].starting_height + surrogates_placed[tower_library_index].surro.height;
+                            if (tower_library_index >= 0) try_z = surrogates_placed[tower_library_index].end_height;
                         }
         
 
                         // Adjust position/rotation to lower surrogate in tower
                         if (tower_library_index >= 0) {
-                            // let x_space = (books_placed[tower_library_index].book.length - try_book.length - 1.6) * 0.5; // TODO: Set to two times nozzle size
-                            // let y_space = (books_placed[tower_library_index].book.width - try_book.width - 1.6) * 0.5;
-                            try_rotation = books_placed[tower_library_index].rotation;
+                            // let x_space = (surrogates_placed[tower_library_index].surro.length - try_surro.length - 1.6) * 0.5; // TODO: Set to two times nozzle size
+                            // let y_space = (surrogates_placed[tower_library_index].surro.width - try_surro.width - 1.6) * 0.5;
+                            try_rotation = surrogates_placed[tower_library_index].rotation;
                             // try_x = pso_position_vars[pso_result_surrogate_index * surrogate_settings.number_of_vars + 8];
                             // try_y = pso_position_vars[pso_result_surrogate_index * surrogate_settings.number_of_vars + 9];
                             try_x = TODOobject.tower_details.tower_x;
                             try_y = TODOobject.tower_details.tower_y;
-                            // let mid_x = (books_placed[tower_library_index].geometry[0].bounds.maxx + books_placed[tower_library_index].geometry[0].bounds.minx)*0.5;
-                            // let mid_y = (books_placed[tower_library_index].geometry[0].bounds.maxy + books_placed[tower_library_index].geometry[0].bounds.miny)*0.5
+                            // let mid_x = (surrogates_placed[tower_library_index].geometry[0].bounds.maxx + surrogates_placed[tower_library_index].geometry[0].bounds.minx)*0.5;
+                            // let mid_y = (surrogates_placed[tower_library_index].geometry[0].bounds.maxy + surrogates_placed[tower_library_index].geometry[0].bounds.miny)*0.5
                             // if (try_x > mid_x + x_space) try_x = mid_x + x_space;
                             // else if (try_x < mid_x - x_space) try_x = mid_x - x_space;
                             // if (try_y > mid_y + y_space) try_y = mid_y + y_space;
@@ -5195,41 +5266,41 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
 
                         // Check if surrogate is available
-                        if (try_book.available === false) {
-                            console.log({Warning_note:"A book has been chosen that was not available."});
+                        if (try_surro.available === false) {
+                            console.log({Warning_note:"A surro has been chosen that was not available."});
                         }
 
                         let pso_polygons_list = [];
                         let prism_bottoms = [];
-                        let finalHeight = try_z + try_book.height;
+                        let finalHeight = try_z + try_surro.height;
                         let id_extension;
-                        if (try_book.type == "simpleRectangle") {
-                            pso_polygons_list = [generateRectanglePolygonCentered(try_x, try_y, try_z, try_book.length, try_book.width, try_rotation, surrogate_settings.surrogate_padding, bottom_slice)];
+                        if (try_surro.type == "simpleRectangle") {
+                            pso_polygons_list = [generateRectanglePolygonCentered(try_x, try_y, try_z, try_surro.length, try_surro.width, try_rotation, surrogate_settings.surrogate_padding, bottom_slice)];
                         }
-                        else if (try_book.type == "prism") {
-                            pso_polygons_list = [generatePrismPolygon(try_x, try_y, try_z, try_book.prism_geometry, try_rotation, surrogate_settings.surrogate_padding, bottom_slice)];
+                        else if (try_surro.type == "prism") {
+                            pso_polygons_list = [generatePrismPolygon(try_x, try_y, try_z, try_surro.prism_geometry, try_rotation, surrogate_settings.surrogate_padding, bottom_slice)];
                             // const deg = try_rotation * Math.PI / 180;
                             // const alignX = Math.cos(deg)*5 - Math.sin(deg)*5;
                             // const alignY = Math.sin(deg)*5 + Math.cos(deg)*5;
                             // const alignX = 0; const alignY = 0;
-                            prism_bottoms = [generatePrismPolygon(try_x, try_y, try_z, try_book.bottom_geometry, try_rotation, surrogate_settings.surrogate_padding, bottom_slice)]; // TODO align these using SVG viewbox
-                            const extensionIndexList = getSliceIndexList(surrogate_settings.precomputed_slice_heights, try_z + try_book.minHeight, try_z + try_book.maxHeight);
+                            prism_bottoms = [generatePrismPolygon(try_x, try_y, try_z, try_surro.bottom_geometry, try_rotation, surrogate_settings.surrogate_padding, bottom_slice)]; // TODO align these using SVG viewbox
+                            const extensionIndexList = getSliceIndexList(surrogate_settings.precomputed_slice_heights, try_z + try_surro.minHeight, try_z + try_surro.maxHeight);
                             const extensionData = checkVolumeAndCollisionsExtend(surrogate_settings.all_slices, extensionIndexList, pso_polygons_list, finalHeight);
                             finalHeight = extensionData[0];
                         } else {
-                            pso_polygons_list = [generateRectanglePolygonCentered(try_x, try_y, try_z, try_book.length, try_book.width, try_rotation, surrogate_settings.surrogate_padding, bottom_slice)];
-                            const stackIndexList = getStackableIndexList(surrogate_settings.precomputed_slice_heights, try_z + try_book.minHeight, try_book.addMaxNumber, try_book.addHeight);
-                            const stackingData = checkVolumeAndCollisionsStack(surrogate_settings.all_slices, stackIndexList, pso_polygons_list, finalHeight, try_book.addHeight);
+                            pso_polygons_list = [generateRectanglePolygonCentered(try_x, try_y, try_z, try_surro.length, try_surro.width, try_rotation, surrogate_settings.surrogate_padding, bottom_slice)];
+                            const stackIndexList = getStackableIndexList(surrogate_settings.precomputed_slice_heights, try_z + try_surro.minHeight, try_surro.addMaxNumber, try_surro.addHeight);
+                            const stackingData = checkVolumeAndCollisionsStack(surrogate_settings.all_slices, stackIndexList, pso_polygons_list, finalHeight, try_surro.addHeight);
                             finalHeight = stackingData[0];
                             id_extension = stackingData[2];
                         }
 
                         // generate candidate and validation insertion case and layer
-                        let lower_book = [];
+                        let lower_surro = [];
                         let empty_array = [];
                         let data_array = {insertion_case:"unknown"};
                         if (tower_library_index >= 0) {
-                            lower_book.push(books_placed[tower_library_index]);
+                            lower_surro.push(surrogates_placed[tower_library_index]);
                         }
                         let end_height = finalHeight;
                         console.log({try_z:try_z});
@@ -5237,9 +5308,9 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                         let candidate = {
                             geometry:pso_polygons_list, 
                             rotation:try_rotation,
-                            book:try_book, starting_height:try_z, 
+                            surro:try_surro, starting_height:try_z, 
                             end_height:end_height, 
-                            down_surrogate:lower_book, 
+                            down_surrogate:lower_surro, 
                             up_surrogate:empty_array, 
                             outlines_drawn:0, 
                             insertion_data:data_array,
@@ -5248,17 +5319,17 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                         };
 
                         if (tower_library_index >= 0) {
-                            books_placed[tower_library_index].up_surrogate.push(candidate); // Add backwards reference for tower
+                            surrogates_placed[tower_library_index].up_surrogate.push(candidate); // Add backwards reference for tower
                         }
 
 
                         // Rotation debug testing
                         for (let debugint = 1; debugint < 2; debugint = debugint + 85) {
                             continue;
-                            // let trybookrandom = books[Math.floor(Math.random() * books.length)];
-                            // console.log({trybookrandom:trybookrandom});
-                            // let pso_polygons_listDB = [generateRectanglePolygonCentered(try_x, try_y, up.z, trybookrandom.length, trybookrandom.width, debugint, surrogate_settings.surrogate_padding, bottom_slice)];
-                            // let pso_polygons_listDB = [generateRectanglePolygonCentered(try_x, try_y, up.z, try_book.length, try_book.width, debugint, surrogate_settings.surrogate_padding, bottom_slice)];
+                            // let trysurrorandom = surros[Math.floor(Math.random() * surros.length)];
+                            // console.log({trysurrorandom:trysurrorandom});
+                            // let pso_polygons_listDB = [generateRectanglePolygonCentered(try_x, try_y, up.z, trysurrorandom.length, trysurrorandom.width, debugint, surrogate_settings.surrogate_padding, bottom_slice)];
+                            // let pso_polygons_listDB = [generateRectanglePolygonCentered(try_x, try_y, up.z, try_surro.length, try_surro.width, debugint, surrogate_settings.surrogate_padding, bottom_slice)];
 
                             // console.log({try_x:try_x});
                             // console.log({boundmid:(candidate.geometry[0].bounds.maxx + candidate.geometry[0].bounds.minx)*0.5});
@@ -5266,8 +5337,8 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                             // let testLength = 10;
                             // let testWidth = 5;
 
-                            // let x_space = (try_book.length - testLength)*0.5;
-                            // let y_space = (try_book.width - testWidth)*0.5;
+                            // let x_space = (try_surro.length - testLength)*0.5;
+                            // let y_space = (try_surro.width - testWidth)*0.5;
 
                             // let targetX = Math.random()*200-100;
                             // let targetY = Math.random()*200-100;
@@ -5307,39 +5378,39 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                             // let candidateDB2 = {
                             //     geometry:pso_polygons_listDB2, 
                             //     rotation:try_rotation,
-                            //     book:try_book, 
-                            //     // book:trybookrandom, 
+                            //     surro:try_surro, 
+                            //     // surro:trysurrorandom, 
                             //     starting_height:try_z, 
                             //     end_height:end_height, 
-                            //     down_surrogate:lower_book, 
+                            //     down_surrogate:lower_surro, 
                             //     up_surrogate:empty_array, 
                             //     outlines_drawn:0, 
                             //     insertion_data:data_array
                             // };
 
-                            // books_placed.push(candidateDB2);
+                            // surrogates_placed.push(candidateDB2);
                             
-                            // let pso_polygons_listDB = [generatePrismPolygon(try_x+debugint*3, try_y, up.z, try_book.geometry, debugint, surrogate_settings.surrogate_padding, bottom_slice)];
+                            // let pso_polygons_listDB = [generatePrismPolygon(try_x+debugint*3, try_y, up.z, try_surro.geometry, debugint, surrogate_settings.surrogate_padding, bottom_slice)];
                             let pso_polygons_listDB = [generateRectanglePolygonCentered(0, 0, up.z, bedWidthArea*2, bedDepthArea*2, 0, surrogate_settings.surrogate_padding, bottom_slice)];
 
                             // const alignX = 0; const alignY = 0;
-                            // prism_bottoms = [generatePrismPolygon(try_x+debugint*3, try_y, try_z, try_book.bottom_geometry, debugint, surrogate_settings.surrogate_padding, bottom_slice)]; // TODO align these using SVG viewbox
+                            // prism_bottoms = [generatePrismPolygon(try_x+debugint*3, try_y, try_z, try_surro.bottom_geometry, debugint, surrogate_settings.surrogate_padding, bottom_slice)]; // TODO align these using SVG viewbox
 
                             let candidateDB = {
                                 geometry:pso_polygons_listDB, 
                                 rotation:debugint,
-                                book:try_book, 
-                                // book:trybookrandom, 
+                                surro:try_surro, 
+                                // surro:trysurrorandom, 
                                 starting_height:try_z, 
                                 end_height:end_height, 
-                                down_surrogate:lower_book, 
+                                down_surrogate:lower_surro, 
                                 up_surrogate:empty_array, 
                                 outlines_drawn:0, 
                                 insertion_data:data_array,
                                 bottom_geometry:prism_bottoms
                             };
 
-                            books_placed.push(candidateDB);
+                            surrogates_placed.push(candidateDB);
                         }
 
 
@@ -5349,7 +5420,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
                         // Check if it is on a consecutive layer from a previous surrogate
                         let consecutive = false;
-                        books_placed.forEach(function(surrogate) {
+                        surrogates_placed.forEach(function(surrogate) {
                             if (Math.abs(candidate.insertion_data.index - surrogate.insertion_data.index) === 1) {
                                 consecutive = true;
                             }
@@ -5361,16 +5432,16 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                             console.log({Warning_note:"Two surrogates placed on conecutive layers."})
                         }
 
-                        books_placed.push(candidate);
-                        candidate.book.available = false; // Mark book as used
+                        surrogates_placed.push(candidate);
+                        candidate.surro.available = false; // Mark surro as used
         
-                        console.log({placed_book_name:candidate.book.id});
+                        console.log({placed_surro_name:candidate.surro.id});
 
                     }
                 }
                 
-                if (books_placed.length > 0) {
-                    // TODO: Error handling for no books?
+                if (surrogates_placed.length > 0) {
+                    // TODO: Error handling for no surros?
                 }
 
             }
@@ -5383,7 +5454,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
 
 
-        console.log({books_placed:books_placed});
+        console.log({surrogates_placed:surrogates_placed});
 
 
 
@@ -5403,24 +5474,24 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                     // let rand_supp = up.supports[Math.floor(Math.random() * up.supports.length)];
                     // up.tops[0].fill_sparse.push(rand_supp);
 
-                    // For every book, surrogate the support
-                    for (let idx = 0; idx < books_placed.length; idx++) {
-                        let surrogate = books_placed[idx];
+                    // For every surro, surrogate the support
+                    for (let idx = 0; idx < surrogates_placed.length; idx++) {
+                        let surrogate = surrogates_placed[idx];
                         
                         if (surrogate.insertion_data.insertion_case === "Insert_new_support_layer") {
                             let up_height_range = get_height_range(up);
-                            // (surrogate.book.height + surrogate.starting_height)
+                            // (surrogate.surro.height + surrogate.starting_height)
                             if (up_height_range.bottom_height < (surrogate.end_height) && up.z >= surrogate.starting_height) {
                                 let surrogated_supports = [];
-                                POLY.subtract(up.supports, surrogate.geometry, surrogated_supports, null, up.z, min); // TODO: Collect book polygons and do it only once
+                                POLY.subtract(up.supports, surrogate.geometry, surrogated_supports, null, up.z, min); // TODO: Collect surro polygons and do it only once
                                 up.supports = surrogated_supports;
                             }
                         }
-                        // If the book is at this height
-                        // (surrogate.book.height + surrogate.starting_height)
+                        // If the surro is at this height
+                        // (surrogate.surro.height + surrogate.starting_height)
                         else if (up.z < (surrogate.end_height) && up.z >= surrogate.starting_height) {
                             let surrogated_supports = [];
-                            POLY.subtract(up.supports, surrogate.geometry, surrogated_supports, null, up.z, min); // TODO: Collect book polygons and do it only once
+                            POLY.subtract(up.supports, surrogate.geometry, surrogated_supports, null, up.z, min); // TODO: Collect surro polygons and do it only once
                             up.supports = surrogated_supports;
                         }
                     }
@@ -5429,14 +5500,14 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                 }
 
                 // After surrogating all supports, draw their outlines
-                for (let draw_outline_idx = 0; draw_outline_idx < books_placed.length; draw_outline_idx++) {
-                    let surrogate = books_placed[draw_outline_idx];
-                    // If the book is at this height
+                for (let draw_outline_idx = 0; draw_outline_idx < surrogates_placed.length; draw_outline_idx++) {
+                    let surrogate = surrogates_placed[draw_outline_idx];
+                    // If the surro is at this height
                     if (up.z < (surrogate.end_height) && up.z >= surrogate.starting_height) {
                         if (surrogate.outlines_drawn < 5) {
 
                             let geometry_to_use;
-                            if (surrogate.book.type == "prism") geometry_to_use = surrogate.bottom_geometry;
+                            if (surrogate.surro.type == "prism") geometry_to_use = surrogate.bottom_geometry;
                             else geometry_to_use = surrogate.geometry;
 
                             // make surrogate bigger
@@ -5482,7 +5553,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                                 
                                 let supp_minus_outlines = [];
 
-                                if (surrogate.outlines_drawn < 1 && surrogate.book.type == "prism") {
+                                if (surrogate.outlines_drawn < 1 && surrogate.surro.type == "prism") {
                                     let surrogate_enlarged2 = [];
                                     let surrogate_double_enlarged2 = [];
                                     surrogate_enlarged2 = POLY.expand(surrogate.geometry, 0.4, up.z, surrogate_enlarged2, 1);
@@ -5520,7 +5591,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                                     // let text_posX = surrogate.geometry[0].points[0].x;
                                     // let text_posY = surrogate.geometry[0].points[0].y;
                                     
-                                    if (surrogate.book.type == "prismNOO") {
+                                    if (surrogate.surro.type == "prismNOO") {
                                         console.log({surrogate_enlarged_bounds:surrogate_outline_area_only[0].bounds});
                                         console.log({outline_points:surrogate_outline_area_only[0]});
                                         // text_posX = surrogate_outline_area_only[0].bounds.minx;
@@ -5544,22 +5615,22 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                                     let topOrBottom = true;
 
                                     
-                                    if (surrogate.book.type != "prism") { 
+                                    if (surrogate.surro.type != "prism") { 
                                         // if (text_rotation > 0 && text_rotation <= 90) { // Top-right
                                         //     out_rotation = text_rotation;
                                         //     text_rot_ang = text_rotation * Math.PI / 180;
-                                        //     // text_posX = text_posX - Math.cos(text_rot_ang)*surrogate.book.length - Math.sin(-text_rot_ang)*(surrogate.book.width+3)*-1;
-                                        //     // text_posY = text_posY - Math.sin(text_rot_ang)*surrogate.book.length - Math.cos(text_rot_ang)*(surrogate.book.width+3)*-1;
-                                        //     // text_posX = text_posX - Math.cos(text_rot_ang)*surrogate.book.length*0.5 - Math.sin(-text_rot_ang)*(-surrogate.book.width*0.5-2);
-                                        //     // text_posY = text_posY - Math.sin(text_rot_ang)*surrogate.book.length*0.5 - Math.cos(text_rot_ang)*(-surrogate.book.width*0.5-2);
+                                        //     // text_posX = text_posX - Math.cos(text_rot_ang)*surrogate.surro.length - Math.sin(-text_rot_ang)*(surrogate.surro.width+3)*-1;
+                                        //     // text_posY = text_posY - Math.sin(text_rot_ang)*surrogate.surro.length - Math.cos(text_rot_ang)*(surrogate.surro.width+3)*-1;
+                                        //     // text_posX = text_posX - Math.cos(text_rot_ang)*surrogate.surro.length*0.5 - Math.sin(-text_rot_ang)*(-surrogate.surro.width*0.5-2);
+                                        //     // text_posY = text_posY - Math.sin(text_rot_ang)*surrogate.surro.length*0.5 - Math.cos(text_rot_ang)*(-surrogate.surro.width*0.5-2);
                                         //     // text_posX = text_posX - Math.sin(text_rot_ang)*0 - Math.sin(-text_rot_ang)*(0);
                                         //     // text_posY = text_posY - Math.sin(text_rot_ang)*0 - Math.cos(text_rot_ang)*(0);
                                         // }
                                         if (text_rotation > 90 && text_rotation <= 270) { // Top-left + Bottom Left --> Flip text
                                             out_rotation = text_rotation + 180;
                                             // text_rot_ang = out_rotation * Math.PI / 180;
-                                            // text_posX = text_posX - Math.cos(text_rot_ang)*surrogate.book.length*0.5 - Math.sin(-text_rot_ang)*(-surrogate.book.width*0.5-2);
-                                            // text_posY = text_posY - Math.sin(text_rot_ang)*surrogate.book.length*0.5 - Math.cos(text_rot_ang)*(-surrogate.book.width*0.5-2);
+                                            // text_posX = text_posX - Math.cos(text_rot_ang)*surrogate.surro.length*0.5 - Math.sin(-text_rot_ang)*(-surrogate.surro.width*0.5-2);
+                                            // text_posY = text_posY - Math.sin(text_rot_ang)*surrogate.surro.length*0.5 - Math.cos(text_rot_ang)*(-surrogate.surro.width*0.5-2);
                                         } else {
                                             // out_rotation = text_rotation;
                                             
@@ -5567,29 +5638,29 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                                         // else if (text_rotation > 180 && text_rotation <= 270) { // Bottom-left
                                         //     out_rotation = text_rotation + 180;
                                         //     text_rot_ang = out_rotation * Math.PI / 180;
-                                        //     // text_posX = text_posX - Math.cos(text_rot_ang)*(surrogate.book.id.length*char_size) - Math.sin(-text_rot_ang)*(7);
-                                        //     // text_posY = text_posY - Math.sin(text_rot_ang)*(surrogate.book.id.length*char_size) - Math.cos(text_rot_ang)*(7);
-                                        //     // text_posX = text_posX - Math.cos(text_rot_ang)*(surrogate.book.length*0.5) - Math.sin(-text_rot_ang)*(-surrogate.book.width*0.5-2);
-                                        //     // text_posY = text_posY - Math.sin(text_rot_ang)*(surrogate.book.length*0.5) - Math.cos(text_rot_ang)*(-surrogate.book.width*0.5-2);
+                                        //     // text_posX = text_posX - Math.cos(text_rot_ang)*(surrogate.surro.id.length*char_size) - Math.sin(-text_rot_ang)*(7);
+                                        //     // text_posY = text_posY - Math.sin(text_rot_ang)*(surrogate.surro.id.length*char_size) - Math.cos(text_rot_ang)*(7);
+                                        //     // text_posX = text_posX - Math.cos(text_rot_ang)*(surrogate.surro.length*0.5) - Math.sin(-text_rot_ang)*(-surrogate.surro.width*0.5-2);
+                                        //     // text_posY = text_posY - Math.sin(text_rot_ang)*(surrogate.surro.length*0.5) - Math.cos(text_rot_ang)*(-surrogate.surro.width*0.5-2);
                                         // }
                                         // else if (text_rotation > 270 && text_rotation <= 360) { // Bottom-right
                                         //     out_rotation = text_rotation;
                                         //     text_rot_ang = out_rotation * Math.PI / 180;
-                                        //     // text_posX = text_posX - Math.cos(text_rot_ang)*(surrogate.book.length*0.5) - Math.sin(-text_rot_ang)*(-surrogate.book.width*0.5-2);
-                                        //     // text_posY = text_posY - Math.sin(text_rot_ang)*(surrogate.book.length*0.5) - Math.cos(text_rot_ang)*(-surrogate.book.width*0.5-2);
-                                        //     // text_posX = text_posX - Math.cos(text_rot_ang)*(surrogate.book.length) - Math.sin(-text_rot_ang)*(-2);
-                                        //     // text_posY = text_posY - Math.sin(text_rot_ang)*(surrogate.book.length) - Math.cos(text_rot_ang)*(-2);
+                                        //     // text_posX = text_posX - Math.cos(text_rot_ang)*(surrogate.surro.length*0.5) - Math.sin(-text_rot_ang)*(-surrogate.surro.width*0.5-2);
+                                        //     // text_posY = text_posY - Math.sin(text_rot_ang)*(surrogate.surro.length*0.5) - Math.cos(text_rot_ang)*(-surrogate.surro.width*0.5-2);
+                                        //     // text_posX = text_posX - Math.cos(text_rot_ang)*(surrogate.surro.length) - Math.sin(-text_rot_ang)*(-2);
+                                        //     // text_posY = text_posY - Math.sin(text_rot_ang)*(surrogate.surro.length) - Math.cos(text_rot_ang)*(-2);
                                         // } else {
                                         //     console.log({WARNING:"Warning: text rotation out of handled range"});
                                         // }
                                         text_rot_ang = out_rotation * Math.PI / 180;
-                                        text_posX = text_posX - Math.cos(text_rot_ang)*surrogate.book.length*0.5 + Math.sin(text_rot_ang)*(-surrogate.book.width*0.5-3); // sin angle was minus, but also minus the whole term
-                                        text_posY = text_posY - Math.sin(text_rot_ang)*surrogate.book.length*0.5 - Math.cos(text_rot_ang)*(-surrogate.book.width*0.5-3);
+                                        text_posX = text_posX - Math.cos(text_rot_ang)*surrogate.surro.length*0.5 + Math.sin(text_rot_ang)*(-surrogate.surro.width*0.5-3); // sin angle was minus, but also minus the whole term
+                                        text_posY = text_posY - Math.sin(text_rot_ang)*surrogate.surro.length*0.5 - Math.cos(text_rot_ang)*(-surrogate.surro.width*0.5-3);
 
-                                        // text_posX_alt = text_posX_alt - Math.cos(text_rot_ang)*(-surrogate.book.length*0.5+(surrogate.book.id.length*char_size*1.1)) + Math.sin(text_rot_ang)*(surrogate.book.width*0.5+char_size+3);
-                                        // text_posY_alt = text_posY_alt - Math.sin(text_rot_ang)*(-surrogate.book.length*0.5+(surrogate.book.id.length*char_size*1.1)) - Math.cos(text_rot_ang)*(surrogate.book.width*0.5+char_size+3);
-                                        text_posX_alt = text_posX_alt - Math.cos(text_rot_ang)*(surrogate.book.length*0.5) + Math.sin(text_rot_ang)*(surrogate.book.width*0.5+char_size+3);
-                                        text_posY_alt = text_posY_alt - Math.sin(text_rot_ang)*(surrogate.book.length*0.5) - Math.cos(text_rot_ang)*(surrogate.book.width*0.5+char_size+3);
+                                        // text_posX_alt = text_posX_alt - Math.cos(text_rot_ang)*(-surrogate.surro.length*0.5+(surrogate.surro.id.length*char_size*1.1)) + Math.sin(text_rot_ang)*(surrogate.surro.width*0.5+char_size+3);
+                                        // text_posY_alt = text_posY_alt - Math.sin(text_rot_ang)*(-surrogate.surro.length*0.5+(surrogate.surro.id.length*char_size*1.1)) - Math.cos(text_rot_ang)*(surrogate.surro.width*0.5+char_size+3);
+                                        text_posX_alt = text_posX_alt - Math.cos(text_rot_ang)*(surrogate.surro.length*0.5) + Math.sin(text_rot_ang)*(surrogate.surro.width*0.5+char_size+3);
+                                        text_posY_alt = text_posY_alt - Math.sin(text_rot_ang)*(surrogate.surro.length*0.5) - Math.cos(text_rot_ang)*(surrogate.surro.width*0.5+char_size+3);
 
 
                                         let textOption1 = newPoint(text_posX, text_posY, 0.0);
@@ -5612,8 +5683,8 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                                     else {
                                         const length = surrogate.geometry[0].bounds.maxx - surrogate.geometry[0].bounds.minx;
                                         const width = surrogate.geometry[0].bounds.maxy - surrogate.geometry[0].bounds.miny;
-                                        // const length = surrogate.book.length;
-                                        // const width = surrogate.book.width;
+                                        // const length = surrogate.surro.length;
+                                        // const width = surrogate.surro.width;
                                         if (text_rotation > 0 && text_rotation <= 90) { // Top-right
                                             text_rot_ang = text_rotation * Math.PI / 180;
                                             out_rotation = text_rotation;
@@ -5656,7 +5727,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                                         
                                     }
 
-                                    // if (surrogate.book.type == "prism") {
+                                    // if (surrogate.surro.type == "prism") {
                                     //     if (text_rotation > 0 && text_rotation <= 90) {
                                     //         text_posX = text_posX - Math.sin(-text_rot_ang)*-3;
                                     //         text_posY = text_posY - Math.cos(text_rot_ang)*-3;
@@ -5678,9 +5749,9 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                                     // console.log({surrogate_posY:surrogate.text_posY});
 
 
-                                    // let ascii_poly_list = generateAsciiPolygons(surrogate.book.id, surrogate_outline_area_only[0].points[0].x, surrogate_outline_area_only[0].points[0].y, surrogate.rotation);
-                                    let ascii_poly_list2 = generateAsciiPolygons(surrogate.book.id, text_posX, text_posY, out_rotation, surrogate_settings.text_size);
-                                    // let ascii_poly_list3 = generateAsciiPolygons(surrogate.book.id, text_posX_alt, text_posY_alt, out_rotation, surrogate_settings.text_size);
+                                    // let ascii_poly_list = generateAsciiPolygons(surrogate.surro.id, surrogate_outline_area_only[0].points[0].x, surrogate_outline_area_only[0].points[0].y, surrogate.rotation);
+                                    let ascii_poly_list2 = generateAsciiPolygons(surrogate.surro.id, text_posX, text_posY, out_rotation, surrogate_settings.text_size);
+                                    // let ascii_poly_list3 = generateAsciiPolygons(surrogate.surro.id, text_posX_alt, text_posY_alt, out_rotation, surrogate_settings.text_size);
 
                                     
                                     
@@ -5702,7 +5773,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                                             text_posX = text_posX + Math.sin(text_rot_ang)*(-char_size*2);
                                             text_posY = text_posY - Math.cos(text_rot_ang)*(-char_size*2);
                                         }
-                                        let ascii_poly_l = generateAsciiPolygons(surrogate.book.id, text_posX, text_posY, out_rotation, surrogate_settings.text_size);
+                                        let ascii_poly_l = generateAsciiPolygons(surrogate.surro.id, text_posX, text_posY, out_rotation, surrogate_settings.text_size);
                                         for (let ascii_poly of ascii_poly_l)  {
                                             up.tops[0].fill_sparse.push(ascii_poly);
                                             up.virtual_support.push(ascii_poly);
@@ -5774,9 +5845,9 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
             // LWW TODO: Remove this warning check if insertion layers are too close
             let iterating_down = top_slice;
-            books_placed.sort((a, b) => (a.insertion_data.new_layer_index > b.insertion_data.new_layer_index) ? 1 : -1);
+            surrogates_placed.sort((a, b) => (a.insertion_data.new_layer_index > b.insertion_data.new_layer_index) ? 1 : -1);
             let last_surrogate;
-            books_placed.forEach(function(surrogate) {
+            surrogates_placed.forEach(function(surrogate) {
                 if (last_surrogate && Math.abs(surrogate.insertion_data.new_layer_index - last_surrogate.insertion_data.new_layer_index) === 1) {
                     console.log({WARNING:"Surrogates are on consecutive layers!"});
                 }
@@ -5788,7 +5859,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             while (iterating_down) {
                 let surrogates_at_this_index = [];
                 let all_other_surrogates = [];
-                books_placed.forEach(function(surrogate) {
+                surrogates_placed.forEach(function(surrogate) {
                     if (surrogate.insertion_data.new_layer_index === iterating_down.index) {
                         surrogates_at_this_index.push(surrogate);
                     }
@@ -5984,9 +6055,9 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
             // Add pauses text and ID
 
-            for (let draw_pause_text_idx = 0; draw_pause_text_idx < books_placed.length; draw_pause_text_idx++) {
-                let currentSurrogate = books_placed[draw_pause_text_idx];
-                // let iterateSurrogate = books_placed[draw_pause_text_idx];
+            for (let draw_pause_text_idx = 0; draw_pause_text_idx < surrogates_placed.length; draw_pause_text_idx++) {
+                let currentSurrogate = surrogates_placed[draw_pause_text_idx];
+                // let iterateSurrogate = surrogates_placed[draw_pause_text_idx];
                 console.log({insertData:currentSurrogate});
                 if (currentSurrogate.starting_height > 0) continue;
 
@@ -5999,7 +6070,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                 let text_posX_alt = currentSurrogate.text_posX;
                 let text_posY_alt = currentSurrogate.text_posY;
                 
-                if (currentSurrogate.book.type == "prismNOO") {
+                if (currentSurrogate.surro.type == "prismNOO") {
                     console.log({surrogate_enlarged_bounds:surrogate_outline_area_only[0].bounds});
                     console.log({outline_points:surrogate_outline_area_only[0]});
                     text_posX = surrogate_outline_area_only[0].points[0].x;
@@ -6014,7 +6085,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
                 let topOrBottom = true;
                 
-                // if (currentSurrogate.book.type != "prism") { 
+                // if (currentSurrogate.surro.type != "prism") { 
                 if (true) { 
 
                     if (text_rotation > 90 && text_rotation <= 270) { // Top-left + Bottom Left --> Flip text
@@ -6024,11 +6095,11 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                     }
 
                     text_rot_ang = out_rotation * Math.PI / 180;
-                    text_posX = text_posX - Math.cos(text_rot_ang)*currentSurrogate.book.length*0.5 + Math.sin(text_rot_ang)*(-currentSurrogate.book.width*0.5-3); // sin angle was minus, but also minus the whole term
-                    text_posY = text_posY - Math.sin(text_rot_ang)*currentSurrogate.book.length*0.5 - Math.cos(text_rot_ang)*(-currentSurrogate.book.width*0.5-3);
+                    text_posX = text_posX - Math.cos(text_rot_ang)*currentSurrogate.surro.length*0.5 + Math.sin(text_rot_ang)*(-currentSurrogate.surro.width*0.5-3); // sin angle was minus, but also minus the whole term
+                    text_posY = text_posY - Math.sin(text_rot_ang)*currentSurrogate.surro.length*0.5 - Math.cos(text_rot_ang)*(-currentSurrogate.surro.width*0.5-3);
 
-                    text_posX_alt = text_posX_alt - Math.cos(text_rot_ang)*(currentSurrogate.book.length*0.5) + Math.sin(text_rot_ang)*(currentSurrogate.book.width*0.5+char_size+3.5);
-                    text_posY_alt = text_posY_alt - Math.sin(text_rot_ang)*(currentSurrogate.book.length*0.5) - Math.cos(text_rot_ang)*(currentSurrogate.book.width*0.5+char_size+3.5);
+                    text_posX_alt = text_posX_alt - Math.cos(text_rot_ang)*(currentSurrogate.surro.length*0.5) + Math.sin(text_rot_ang)*(currentSurrogate.surro.width*0.5+char_size+3.5);
+                    text_posY_alt = text_posY_alt - Math.sin(text_rot_ang)*(currentSurrogate.surro.length*0.5) - Math.cos(text_rot_ang)*(currentSurrogate.surro.width*0.5+char_size+3.5);
 
                     let textOption1 = newPoint(text_posX, text_posY, 0.0);
                     let textOption2 = newPoint(text_posX_alt, text_posY_alt, 0.0);
@@ -6049,8 +6120,8 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                 else {
                     const length = currentSurrogate.geometry[0].bounds.maxx - currentSurrogate.geometry[0].bounds.minx;
                     const width = currentSurrogate.geometry[0].bounds.maxy - currentSurrogate.geometry[0].bounds.miny;
-                    // const length = currentSurrogate.book.length;
-                    // const width = currentSurrogate.book.width;
+                    // const length = currentSurrogate.surro.length;
+                    // const width = currentSurrogate.surro.width;
                     if (text_rotation > 0 && text_rotation <= 90) { // Top-right
                         text_rot_ang = text_rotation * Math.PI / 180;
                         out_rotation = text_rotation;
@@ -6101,7 +6172,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                     text_posY = text_posY - Math.cos(text_rot_ang)*(char_size*2)*(tower_surrogates.length);
                 }
 
-                const firstString = "P" + (surrogate_settings.pauseLayers.indexOf(currentSurrogate.insertion_data.printed_layer_index) + 1).toString() + " " +currentSurrogate.book.id;
+                const firstString = "P" + (surrogate_settings.pauseLayers.indexOf(currentSurrogate.insertion_data.printed_layer_index) + 1).toString() + " " +currentSurrogate.surro.id;
 
                 let ascii_poly_list2 = generateAsciiPolygons(firstString, text_posX, text_posY, out_rotation, surrogate_settings.text_size);
 
@@ -6142,7 +6213,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                         text_posX = text_posX + Math.sin(text_rot_ang)*(-char_size*2);
                         text_posY = text_posY - Math.cos(text_rot_ang)*(-char_size*2);
                     }
-                    const additionalString = "P" + (surrogate_settings.pauseLayers.indexOf(upSupp.insertion_data.printed_layer_index) + 1).toString() + " " +upSupp.book.id;
+                    const additionalString = "P" + (surrogate_settings.pauseLayers.indexOf(upSupp.insertion_data.printed_layer_index) + 1).toString() + " " +upSupp.surro.id;
                     let ascii_poly_l = generateAsciiPolygons(additionalString, text_posX, text_posY, out_rotation, surrogate_settings.text_size);
                     for (let ascii_poly of ascii_poly_l)  {
                         bottom_slice.tops[0].fill_sparse.push(ascii_poly);
@@ -6176,7 +6247,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                     }
                     
 
-                    if (currentSurrogate.book.type != "prism") {
+                    if (currentSurrogate.surro.type != "prism") {
                         if (text_rotation > 0 && text_rotation <= 90) { // Top-right
                             text_rot_ang = text_rotation * Math.PI / 180;
                             // text_posX = text_posX - Math.cos(text_rot_ang)*(pausesString.length*char_size) - Math.sin(-text_rot_ang)*(7);
@@ -6186,32 +6257,32 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                         else if (text_rotation > 90 && text_rotation <= 180) { // Top-left
                             out_rotation = text_rotation + 180;
                             text_rot_ang = out_rotation * Math.PI / 180;
-                            // text_posX = text_posX - Math.cos(text_rot_ang)*(currentSurrogate.book.length) - Math.sin(-text_rot_ang)*(-1.5);
-                            // text_posY = text_posY - Math.sin(text_rot_ang)*(currentSurrogate.book.length) - Math.cos(text_rot_ang)*(-1.5);
+                            // text_posX = text_posX - Math.cos(text_rot_ang)*(currentSurrogate.surro.length) - Math.sin(-text_rot_ang)*(-1.5);
+                            // text_posY = text_posY - Math.sin(text_rot_ang)*(currentSurrogate.surro.length) - Math.cos(text_rot_ang)*(-1.5);
                         }
                         else if (text_rotation > 180 && text_rotation <= 270) { // Bottom-left
                             out_rotation = text_rotation + 180;
                             text_rot_ang = out_rotation * Math.PI / 180;
-                            // text_posX = text_posX - Math.cos(text_rot_ang)*(currentSurrogate.book.length) - Math.sin(-text_rot_ang)*(-2-currentSurrogate.book.width);
-                            // text_posY = text_posY - Math.sin(text_rot_ang)*(currentSurrogate.book.length) - Math.cos(text_rot_ang)*(-2-currentSurrogate.book.width);
+                            // text_posX = text_posX - Math.cos(text_rot_ang)*(currentSurrogate.surro.length) - Math.sin(-text_rot_ang)*(-2-currentSurrogate.surro.width);
+                            // text_posY = text_posY - Math.sin(text_rot_ang)*(currentSurrogate.surro.length) - Math.cos(text_rot_ang)*(-2-currentSurrogate.surro.width);
                         }
                         else if (text_rotation > 270 && text_rotation <= 360) { // Bottom-right
                             out_rotation = text_rotation;
                             text_rot_ang = out_rotation * Math.PI / 180;
-                            // text_posX = text_posX - Math.cos(text_rot_ang)*(pausesString.length*char_size) - Math.sin(-text_rot_ang)*(8+currentSurrogate.book.width);
-                            // text_posY = text_posY - Math.sin(text_rot_ang)*(pausesString.length*char_size) - Math.cos(text_rot_ang)*(8+currentSurrogate.book.width);
+                            // text_posX = text_posX - Math.cos(text_rot_ang)*(pausesString.length*char_size) - Math.sin(-text_rot_ang)*(8+currentSurrogate.surro.width);
+                            // text_posY = text_posY - Math.sin(text_rot_ang)*(pausesString.length*char_size) - Math.cos(text_rot_ang)*(8+currentSurrogate.surro.width);
                         } else {
                             console.log({WARNING:"Warning: text rotation out of handled range"});
                         }
 
-                        text_posX = text_posX - Math.cos(text_rot_ang)*(-currentSurrogate.book.length*0.5+(pausesString.length*char_size)) - Math.sin(-text_rot_ang)*(currentSurrogate.book.width*0.5+7.5);
-                        text_posY = text_posY - Math.sin(text_rot_ang)*(-currentSurrogate.book.length*0.5+(pausesString.length*char_size)) - Math.cos(text_rot_ang)*(currentSurrogate.book.width*0.5+7.5);
+                        text_posX = text_posX - Math.cos(text_rot_ang)*(-currentSurrogate.surro.length*0.5+(pausesString.length*char_size)) - Math.sin(-text_rot_ang)*(currentSurrogate.surro.width*0.5+7.5);
+                        text_posY = text_posY - Math.sin(text_rot_ang)*(-currentSurrogate.surro.length*0.5+(pausesString.length*char_size)) - Math.cos(text_rot_ang)*(currentSurrogate.surro.width*0.5+7.5);
                     }
                     else {
                         const length = currentSurrogate.geometry[0].bounds.maxx - currentSurrogate.geometry[0].bounds.minx;
                         const width = currentSurrogate.geometry[0].bounds.maxy - currentSurrogate.geometry[0].bounds.miny;
-                        // const length = surrogate.book.length;
-                        // const width = surrogate.book.width;
+                        // const length = surrogate.surro.length;
+                        // const width = surrogate.surro.width;
                         if (text_rotation > 0 && text_rotation <= 90) { // Top-right
                             text_rot_ang = text_rotation * Math.PI / 180;
                             out_rotation = text_rotation;
@@ -6323,9 +6394,9 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                 heighest_surrogate_top = -1;
 
                 // Find heighest surrogate that ends in the range of this layers thickness
-                for (let heigh_surrogate_idx = 0; heigh_surrogate_idx < books_placed.length; heigh_surrogate_idx++) {
-                    let surrogate = books_placed[heigh_surrogate_idx];
-                    let end_height = surrogate.book.height + surrogate.starting_height;
+                for (let heigh_surrogate_idx = 0; heigh_surrogate_idx < surrogates_placed.length; heigh_surrogate_idx++) {
+                    let surrogate = surrogates_placed[heigh_surrogate_idx];
+                    let end_height = surrogate.surro.height + surrogate.starting_height;
                     if (end_height > up.z && end_height < up.z + up.height && end_height > heighest_surrogate_top) {
                         heighest_surrogate_top = end_height;
                     }
@@ -6389,7 +6460,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
         // More logging for research purposes
 
-        const efficiencyData = {numberPauses: surrogate_settings.pauseLayers.length, numberSurrogates: books_placed.length, materialWeightEstimateTube: 0, materialWeightEstimateBar: 0, materialWeightEstimateEllipse: 0, timestamp:bottom_slice.widget.surrogate_data.timestamp, id:bottom_slice.widget.id, previous_volume:pre_surrogate_support_amounts[0], new_volume:post_surrogate_support_amounts[0], volume_percentage_saved:volume_percentage_saved, sTime:sTime};
+        const efficiencyData = {numberPauses: surrogate_settings.pauseLayers.length, numberSurrogates: surrogates_placed.length, materialWeightEstimateTube: 0, materialWeightEstimateBar: 0, materialWeightEstimateEllipse: 0, timestamp:bottom_slice.widget.surrogate_data.timestamp, id:bottom_slice.widget.id, previous_volume:pre_surrogate_support_amounts[0], new_volume:post_surrogate_support_amounts[0], volume_percentage_saved:volume_percentage_saved, sTime:sTime};
 
         console.log({efficiencyData:efficiencyData});
 
@@ -6423,7 +6494,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
         console.log({surrogate_all_slices:all_out_slices});
 
-        return all_out_slices;
+        return all_out_slices, surrogate_settings;
     }
 
     function doMaterialEstimation(bottom_slice) {
@@ -6777,7 +6848,6 @@ function doSparseLayerFill(slice, options = {}) {
 
     if (options.promises) {
         options.promises.push(kiri.minions.clip(slice, polys, lines));
-        console.log({clipping_promises:options.promises});
         return;
     }
 

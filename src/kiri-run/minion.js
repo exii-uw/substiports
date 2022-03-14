@@ -136,16 +136,57 @@ const funcs = {
     test: (data, seq) => {
         console.log({minion_data:data});
         console.log({minion_data:data});
-        var optimizer = new kiri.Optimizer();
-        console.log({minion_optimizer:optimizer});
-        let { number, coded_slice, slice2 } = data;
-        let slice3 = codec.decode(data.coded_slice);
+        let { number, coded_slice, slice2, two_list, topList } = data;
+        console.log({two_list:two_list});
+        let slice3 = codec.decode(data.coded_slice, {full: true});
         let slice4 = codec.encode(slice3);
         let out = [];
-        let outtop = codec.decode(data.coded_top, {full: true});
+        // let outtop = codec.decode(data.coded_tops[0], {full: true});
+        let topFromList = topList[0];
+        // console.log({outtop:outtop});
+        
+        let outkiritop = codec.decode(topFromList);
+        console.log({outkiritop:outkiritop});
+        let outtop = outkiritop;
         out.push(number*100);
         out.push(data.number*100);
         reply({ seq, output: out, coded_slice, slice2, slice3, slice4, outtop });
+    },
+
+    surrogateClusterSearch: (data, seq) => {
+        var optimizer = new kiri.Optimizer();
+        let { slice_stack_data, surrogate_library, support_points, susu_settings } = data;
+        console.log({slice_stack_data:slice_stack_data});
+        console.log({surrogate_library:surrogate_library});
+        console.log({support_points:support_points});
+        console.log({susu_settings:susu_settings});
+        let mock_slice_list = [];
+        for (let slice_data of slice_stack_data) {
+            let mock_slice = codec.decode(slice_data[0]);
+            mock_slice.supports = [];
+
+            for (let oneTop of slice_data[1]) {
+                mock_slice.tops.push(codec.decode(oneTop, {full: true}));
+            }
+            for (let oneSupport of slice_data[2]) {
+                mock_slice.supports.push(codec.decode(oneSupport, {full: true}));
+            }
+            mock_slice_list.push(mock_slice);
+        }
+
+        let last_mock_slice;
+        for (let mock_slice of mock_slice_list) {
+            if (last_mock_slice) {
+                mock_slice.down = last_mock_slice;
+                last_mock_slice.up = mock_slice;
+            }
+            last_mock_slice = mock_slice;
+
+        }
+        console.log({mock_slice_list:mock_slice_list});
+        let number_mock_slices = mock_slice_list.length;
+
+        reply({ seq, output:number_mock_slices });
     },
 
     bad: (data, seq) => {

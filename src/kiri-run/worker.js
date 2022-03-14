@@ -215,7 +215,7 @@ kiri.minions = {
         }
     },
 
-    test(numb, sl, top) { // Making preparations for the (equally named) minion function
+    test(numb, sl, top, kiriTops, two_list) { // Making preparations for the (equally named) minion function
         return new Promise((resolve, reject) => {
             if (concurrent < 2) {
                 reject("concurrent test unavaiable");
@@ -228,12 +228,18 @@ kiri.minions = {
             //     floatP[i++] = p.z;
             // }
             console.log({worker_top:top});
+            // let encoded_worker_tops = []
+            // for (let oneTop of top) {
+            //     encoded_worker_tops.push(codec.encode(oneTop, {full: true}));
+            // }
             minwork.queue({
                 cmd: "test",
                 number: numb,
+                two_list: two_list,
                 // test_slice: sl,
-                coded_slice: codec.encode(sl),
-                coded_top: codec.encode(top, {full: true})
+                coded_slice: codec.encode(sl, {full: true}),
+                // coded_tops: encoded_worker_tops,
+                topList: kiriTops
             }, data => { // This handles the data returned by the minion function 
                 // let polys = codec.decode(data.clips);
                 let result_number = data.output;
@@ -241,6 +247,26 @@ kiri.minions = {
             });
         });
     },
+
+    surrogateClusterSearch(slice_stack_data, surrogate_library, support_points, susu_settings) {
+        return new Promise((resolve, reject) => {
+            if (concurrent < 2) {
+                console.log("CLUSTER SEARCH FAILED!");
+                reject("cluster search failed");
+            }
+            minwork.queue({
+                cmd: "surrogateClusterSearch",
+                slice_stack_data: slice_stack_data,
+                surrogate_library: surrogate_library,
+                support_points: support_points, 
+                susu_settings: susu_settings
+            }, data => { // This handles the data returned by the minion function 
+                console.log({minion_output:data.output})
+                resolve(data);
+            });
+        });
+    },
+
 
     wasm(enable) {
         for (let minion of minions) {
