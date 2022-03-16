@@ -248,18 +248,22 @@ kiri.minions = {
         });
     },
 
-    surrogateClusterSearch(slice_stack_data, surrogate_library, support_points, susu_settings) {
+    surrogateClusterSearch(slice_stack_data, surrogate_library, support_points, susu_settings, device, widget) {
         return new Promise((resolve, reject) => {
             if (concurrent < 2) {
                 console.log("CLUSTER SEARCH FAILED!");
                 reject("cluster search failed");
             }
+            let mockDevice = {bedWidth: device.bedWidth, bedDepth:device.bedDepth};
+            let mockWidget = {bounds: widget.bounds, track:widget.track};
             minwork.queue({
                 cmd: "surrogateClusterSearch",
                 slice_stack_data: slice_stack_data,
                 surrogate_library: surrogate_library,
                 support_points: support_points, 
-                susu_settings: susu_settings
+                susu_settings: susu_settings,
+                device: mockDevice,
+                widget: mockWidget
             }, data => { // This handles the data returned by the minion function 
                 console.log({minion_output:data.output})
                 resolve(data);

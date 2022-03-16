@@ -975,19 +975,21 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             // prisms_obj.push({geometry_points:parseSVGFromText(val[1]), name:"blue_jack", ini_height:48.9, extension_range:35})
             let view = null; // TODO
 
-            let support_points, support_points_simple = getSupportPoints(bottom_slice, process, settings); 
+            let [ support_points, support_points_simple ] = getSupportPoints(bottom_slice, process, settings); 
 
             console.log({support_points_simple:support_points_simple});
+            console.log({support_points:support_points});
+
+
+            let surrogate_library = getSurrogateLibrary(prisms_obj);
+
+            let [ prepared_slices, surrogate_settings ] = prepareSurrogating(surrogate_library, highest_slice, process, settings);
+            // let surrogate_settings = {};
 
             let sliceStackData = getEncodedData(bottom_slice);
             console.log({sliceStackData:sliceStackData});
 
-            let surrogate_library = getSurrogateLibrary(prisms_obj);
-
-            let prepared_slices, surrogate_settings = prepareSurrogating(surrogate_library, highest_slice, process, settings);
-            // let surrogate_settings = {};
-
-            // widget.slices = prepared_slices;
+            widget.slices = prepared_slices;
             
             let test_promises = [];
 
@@ -1018,8 +1020,23 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             for (let integr of test_array) {
                 test_promises.push(kiri.minions.test(integr, highest_slice, test_poly_list, encoded_kiri_tops, test_test_array));
             }
-            test_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple));
-            test_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple));
+            surrogate_settings.start_slice = null;
+            surrogate_settings.all_slices = null;
+            test_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings, settings.device, bottom_slice.widget));
+            // test_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings, settings.device, bottom_slice.widget));
+            // test_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings, settings.device, bottom_slice.widget));
+            // test_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings, settings.device, bottom_slice.widget));
+            // test_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings, settings.device, bottom_slice.widget));
+            // test_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings, settings.device, bottom_slice.widget));
+            // test_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings, settings.device, bottom_slice.widget));
+            // test_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings, settings.device, bottom_slice.widget));
+            // test_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings, settings.device, bottom_slice.widget));
+            // test_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings, settings.device, bottom_slice.widget));
+            // test_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings, settings.device, bottom_slice.widget));
+            // test_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings, settings.device, bottom_slice.widget));
+            // test_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings, settings.device, bottom_slice.widget));
+            // test_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings, settings.device, bottom_slice.widget));
+            // test_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings, settings.device, bottom_slice.widget));
 
     
             // if (test_promises) {
@@ -1063,17 +1080,18 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
     
 
 
-            let surrogated_slices = doSurrogates(surrogate_library, surrogate_settings, highest_slice, process, widget.shadow, settings, view, prisms_obj);
+            
+            // let surrogated_slices = doSurrogates(surrogate_library, surrogate_settings, highest_slice, process, widget.shadow, settings, view, prisms_obj);
             surrogate_settings.start_slice = null;
             surrogate_settings.all_slices = null;
             console.log({surrogate_settings:surrogate_settings}); 
             // console.log({surro_settings:surro_settings}); 
-            widget.slices = surrogated_slices;
+            // widget.slices = surrogated_slices;
 
 
             let search_promises = [];
 
-            search_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings));
+            // search_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings));
 
             if (search_promises) {
                 console.log(test_out.length);
@@ -1154,13 +1172,40 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             let encodedTops = [];
             let encodedSupports = [];
 
-            for (let oneTop of current_slice.topPolys()) {
-                encodedTops.push(kiri.codec.encode(oneTop), {full: true});
+            for (let oneTop of current_slice.tops) {
+                encodedTops.push(kiri.codec.encode(oneTop, {full: false}));
+                // let encodededTop1 = kiri.codec.encode(oneTop, {full: true});
+                // let encodededTop3 = kiri.codec.encode(oneTop);
+                // let encodededTop2 = oneTop.encode({full: true});
+                // // let encodededTop4 = oneTop.encode(true);
+                // console.log({encodededTop1:encodededTop1});
+                // console.log({encodededTop2:encodededTop2});
+                // console.log({encodededTop3:encodededTop3});
+                // console.log({encodededTop4:encodededTop4});
             }
+            // for (let oneTop of current_slice.topPolys()) {
+            //     encodedTops.push(kiri.codec.encode(oneTop, {full: true}));
+            //     let encodededTop1 = kiri.codec.encode([oneTop], {full: true});
+            //     let encodededTop3 = kiri.codec.encode(oneTop);
+            //     let encodededTop2 = oneTop.encode({full: true});
+            //     // let encodededTop4 = oneTop.encode(true);
+            //     console.log({encodededTop1:encodededTop1});
+            //     console.log({encodededTop2:encodededTop2});
+            //     console.log({encodededTop3:encodededTop3});
+            //     // console.log({encodededTop4:encodededTop4});
+            // }
             if (current_slice.supports) {
-                for (let oneSupport of current_slice.supports) {
-                    encodedSupports.push(kiri.codec.encode(oneSupport), {full: true});
-                }
+                // for (let oneSupport of current_slice.supports) {
+                //     encodedSupports.push(kiri.codec.encode(oneSupport, {full: true}));
+                //     // let encodedSupport = kiri.codec.encode(oneSupport, {full: true});
+                //     // console.log({encodedSupport:encodedSupport});
+                //     // let encodedSupport2 = kiri.codec.encode(oneSupport);
+                //     // console.log({encodedSupport2:encodedSupport2});
+                // }
+                encodedSupports = kiri.codec.encode(current_slice.supports);
+                // console.log({encodedSupportList:encodedSupportList});
+                // let encodedSupportList2 = kiri.codec.encode(current_slice.supports);
+                // console.log({encodedSupportList2:encodedSupportList2});
             }
 
             let sliceDetailList = [encodedSlice, encodedTops, encodedSupports];
@@ -1377,7 +1422,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
         console.log({support_points_save:a_slice.support_points});
 
-        return valid_points, simple_valid_p;
+        return [ valid_points, simple_valid_p ];
 
     }
 
@@ -1883,6 +1928,8 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
         let surrogate_settings = {};
 
+        surrogate_settings.minSupportArea = proc.supportMinArea;
+
         if (proc.surrogateInteraction == "off") {
             surrogate_settings.minVolume = 10;
             surrogate_settings.interaction_N_penalty_factor = 0;
@@ -1970,7 +2017,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         surrogate_settings.layer_height_fudge = layer_height_fudge;
         surrogate_settings.start_slice = bottom_slice;
         surrogate_settings.existing_surrogates = [];
-        surrogate_settings.number_of_vars = 7; // Number of variables per surrogate PSO test
+        surrogate_settings.number_of_vars = 6; // Number of variables per surrogate PSO test
         surrogate_settings.average_so_far = 0;
 
         surrogate_settings.fitness_offset = 0;
@@ -2261,7 +2308,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         console.log({min_y:min_y});
         console.log({max_y:max_y});
 
-        return all_slices, surrogate_settings;
+        return [ all_slices, surrogate_settings ];
     }
 
     function doSurrogates(library_in, suse, slice, proc, shadow, settings, view, prisms) {
