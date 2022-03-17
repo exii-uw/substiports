@@ -989,6 +989,9 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             let sliceStackData = getEncodedData(bottom_slice);
             console.log({sliceStackData:sliceStackData});
 
+            console.log({bottomMock:sliceStackData[0]});
+            console.log({bottom_slice:bottom_slice});
+
             widget.slices = prepared_slices;
             
             let test_promises = [];
@@ -1171,6 +1174,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             let encodedSlice = kiri.codec.encode(current_slice);
             let encodedTops = [];
             let encodedSupports = [];
+            let sliceHeight = current_slice.height;
 
             for (let oneTop of current_slice.tops) {
                 encodedTops.push(kiri.codec.encode(oneTop, {full: false}));
@@ -1208,7 +1212,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                 // console.log({encodedSupportList2:encodedSupportList2});
             }
 
-            let sliceDetailList = [encodedSlice, encodedTops, encodedSupports];
+            let sliceDetailList = [encodedSlice, encodedTops, encodedSupports, sliceHeight];
             encodedData.push(sliceDetailList);
             // sliceDetailList.push([current_slice.index, current_slice.z]);
             current_slice = current_slice.up;
@@ -1982,7 +1986,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             surrogate_settings.search_persistance = 8;
             surrogate_settings.minImprovementPercentage = 0.01;
             surrogate_settings.numberOfParticles = 600;//275;
-            surrogate_settings.searchspace_max_number_of_surrogates = 2;
+            surrogate_settings.searchspace_max_number_of_surrogates = 7;
         }
 
         console.log({surrogateSearchQual:proc.surrogateSearchQual});
@@ -2072,6 +2076,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         let coff = new ClipperLib.ClipperOffset();
         const unreachable_poly = generateRectanglePolygonCentered(1000, 1000, 1000, 10, 10, 0, 0, bottom_slice);
             
+        // Simplification of polys
         while (up) {
             if (proc.surrogateInteraction != "off") {
                 let zed = up.z || 0;
@@ -4041,9 +4046,9 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
         if (proc.surrogateInteraction == "off") {
             surrogate_number_goal = 0;
-            surrogate_settings.minVolume = 10;
-            surrogate_settings.interaction_N_penalty_factor = 0;
-            surrogate_settings.surrogate_N_penalty_factor = 0;
+            surrogate_settings.minVolume = 100;
+            surrogate_settings.interaction_N_penalty_factor = 0.9;
+            surrogate_settings.surrogate_N_penalty_factor = 0.9;
             surrogate_settings.searchspace_min_number_of_surrogates = 0;
         } else if(proc.surrogateInteraction == "low") {
             surrogate_number_goal = 4;
@@ -4095,7 +4100,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             surrogate_settings.search_persistance = 8;
             surrogate_settings.minImprovementPercentage = 0.01;
             surrogate_settings.numberOfParticles = 600;//275;
-            surrogate_settings.searchspace_max_number_of_surrogates = 2;
+            surrogate_settings.searchspace_max_number_of_surrogates = 7;
         }
 
         console.log({surrogateSearchQual:proc.surrogateSearchQual});

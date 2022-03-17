@@ -216,16 +216,18 @@ const funcs = {
                 mock_slice.tops.push(oneDecodedTop);
             }
 
-            if (slice_data[2].length > 0) mock_slice.supports = [];
-            for (let oneSupport of slice_data[2]) {
-                
-                let decodedSupport = codec.decode(oneSupport, {full: true});
-                decodedSupport.area = copyArea;
-                decodedSupport.areaDeep = copyAreaDeep;
-                mock_slice.supports.push(decodedSupport);
+            // if (slice_data[2].length > 0) mock_slice.supports = [];
+            // for (let oneSupport of slice_data[2]) {
+            //     // let decodedSupport = codec.decode(oneSupport, {full: true});
+            //     let decodedSupport = codec.decode(oneSupport);
+            //     // decodedSupport.area = copyArea;
+            //     // decodedSupport.areaDeep = copyAreaDeep;
+            //     mock_slice.supports.push(decodedSupport);
+            // }
+            if (slice_data[2].length > 0) mock_slice.supports = codec.decode(slice_data[2]);
 
-            }
-            // if (slice_data[2].length > 0) mock_slice.supports = slice_data[2];
+            mock_slice.height = slice_data[3];
+
             // else mock_slice.supports = [];
             mock_slice_list.push(mock_slice);
         }
@@ -281,7 +283,6 @@ const funcs = {
                     }
                 }
             }
-            console.log({valid_PSO_combinations_found:good_counter});
             return chosen_result;
         }
 
@@ -306,7 +307,11 @@ const funcs = {
         function getSurrogateReplacedVolumes(old_volume, new_volume, current_slice, surrogate_rectangle_list) {
             let supports_after_surrogates = [];
             POLY.subtract(current_slice.supports, surrogate_rectangle_list, supports_after_surrogates, null, current_slice.z, 0);
-            // console.log({debugsupp:supports_after_surrogates[0]});
+            // if (supports_after_surrogates.length) {
+            //     console.log({debugsupp:supports_after_surrogates[0]});
+            //     console.log({debugsupp:supports_after_surrogates[0].areaDeep});
+            //     console.log({debugsupp:supports_after_surrogates[0].areaDeep()});
+            // }
             // console.log({surrogate_rectangle_list:surrogate_rectangle_list});
             // console.log({supports_after_surrogates:supports_after_surrogates});
             // console.log({current_slice:current_slice.supports});
@@ -1118,6 +1123,16 @@ const funcs = {
             return [foundMaxHeight, delta_volume, counter];
         }
 
+        function simple_insertion_case_check(surrogate, precomputed_slice_heights) {
+            for (let sliceIndex = 0; sliceIndex < precomputed_slice_heights.length-1; sliceIndex++){
+                if (precomputed_slice_heights[sliceIndex].stopAbove >= surrogate.end_height) {
+                    surrogate.insertion_data.new_layer_index = sliceIndex;
+                    break;
+                }
+            }
+        }
+    
+
         //console.log({support_area: support_area});
 
         // let test_surro_rectangle_list = [generateRectanglePolygonCentered(0, -20, slice.z, 5, 30, 0.0)];
@@ -1147,13 +1162,10 @@ const funcs = {
 
         // bottom_slice = last_bottom_slice;
         
-        let up = bottom_slice, up_collision_check = bottom_slice;
+        
 
         // let coff = new ClipperLib.ClipperOffset(opts.miter, opts.arc);
-        let coffTest = new ClipperLib.ClipperOffset(undefined, undefined);
-
-        if (!bottom_slice.tops[0].fill_sparse) bottom_slice.tops[0].fill_sparse = [];
-
+        // let coffTest = new ClipperLib.ClipperOffset(undefined, undefined);
  
         // let surrogate_settings = {};
 
@@ -1169,7 +1181,7 @@ const funcs = {
         //     surrogate_number_goal = 7;
         // }
 
-        surrogate_number_goal = 4;
+        surrogate_number_goal = 1;
 
         let search_padding = 50; // TODO: Adjust to size of surrogate/largest surrogate?
         // Search bounds
@@ -1195,17 +1207,7 @@ const funcs = {
         let try_rotation = 0;
         let try_surro = 0;
 
-        // let all_slices = [];
-        // surrogate_settings.all_slices = all_slices;
-
-        console.log({surrogate_settings:surrogate_settings});
-
-        up = bottom_slice;
-
-        // let first_placed = true;
-
         let pre_surrogate_support_amounts = getTotalSupportVolume(bottom_slice);
-        console.log({pre_surrogate_support_amounts:pre_surrogate_support_amounts});
 
         // console.log({pause_layers_start: settings.process.gcodePauseLayers});
 
@@ -1229,7 +1231,7 @@ const funcs = {
         optimizer.valid_answers = [];
         // set the objective function
         optimizer.setObjectiveFunction(function (var_list, done) { 
-            if (var_list[0] < 1) var_list[0] = 1.0;
+            // if (var_list[0] < 1) var_list[0] = 1.0;
 
             // placeAndEval function, original source
             let all_surrogates = [];
@@ -1239,261 +1241,274 @@ const funcs = {
             let new_surrogates = [];
             let results_array = [];
 
-            let average_overlap_factor = 0;
-            let overlap_counter = 0;
+            let overlap_factor = 0;
+            // let overlap_counter = 0;
 
 
-            let results_meta_data = {valid:false, candidate_details:[], fitness:Number.NEGATIVE_INFINITY};
+            let results_meta_data = {valid:false, candidate_details:null, fitness:Number.NEGATIVE_INFINITY};
 
             // let pso_collision_and_volumes = checkVolumeAndCollisions(surros, optimizer.surrogate_settings, bottom_slice, try_surro_index, try_surro_polygons_list, try_z, surrogates_placed);
 
-            if (var_list[0] < this.surrogate_settings.searchspace_min_number_of_surrogates) var_list[0] = this.surrogate_settings.searchspace_min_number_of_surrogates;
-            const max_tries = var_list[0];
+            // if (var_list[0] < this.surrogate_settings.searchspace_min_number_of_surrogates) var_list[0] = this.surrogate_settings.searchspace_min_number_of_surrogates;
+            // const max_tries = var_list[0];
             
 
-            for (let iteration_number = 0; iteration_number < this.surrogate_settings.searchspace_max_number_of_surrogates; iteration_number++) {
-                let pso_use_this_surrogate = 0;
-                let tower_details = {tower_x:null, tower_y:null};
-            if (max_tries >= iteration_number+1) {
+            // for (let iteration_number = 0; iteration_number < this.surrogate_settings.searchspace_max_number_of_surrogates; iteration_number++) {
+            let pso_use_this_surrogate = 0;
+            let tower_details = {tower_x:null, tower_y:null};
+            // if (max_tries >= iteration_number+1) {
 
-                // Name parameters for easy handling
-                let pso_x =  var_list[iteration_number*this.surrogate_settings.number_of_vars + 1];
-                let pso_y =  var_list[iteration_number*this.surrogate_settings.number_of_vars + 2];
-                // let pso_tower_index =  var_list[iteration_number*this.surrogate_settings.number_of_vars + 3];
-                let pso_rotation =  var_list[iteration_number*this.surrogate_settings.number_of_vars + 3];
-                // let pso_library_index =  var_list[iteration_number*this.surrogate_settings.number_of_vars + 5];
-
-                // let pso_use_this_surrogate =  var_list[iteration_number*this.surrogate_settings.number_of_vars + 7];
-
-                // if(true) {
-                // Select test surrogate // Old way letting PSO select library index
-                // if (pso_library_index >= this.surrogate_library.length) {
-                //     pso_library_index = this.surrogate_library.length - (pso_library_index - this.surrogate_library.length); // Bounce of max index of available surrogates
-                // }
-                // else if (pso_library_index < 0) {
-                //     pso_library_index = -pso_library_index; // Bounce of start of surrogate list index 
-                // }
-                //  var_list[iteration_number*this.surrogate_settings.number_of_vars + 5] = pso_library_index; // update PSO variable with bounced value
-                // const library_index = Math.floor(pso_library_index);
-                // let pso_surrogate = this.surrogate_library[library_index];
-
-                let pso_desired_length =  var_list[iteration_number*this.surrogate_settings.number_of_vars + 4];
-                let pso_desired_width =  var_list[iteration_number*this.surrogate_settings.number_of_vars + 5];
-                let pso_desired_height =  var_list[iteration_number*this.surrogate_settings.number_of_vars + 6];
-
-                let pso_surrogate = getBestFittingSurrogateL2(this.surrogate_library, pso_desired_length, pso_desired_width, pso_desired_height);
-
-                // Select test tower position/on baseplate
-                let pso_z = 0;
-                let tower_library_index = -1;
-                // if (this.surrogate_settings.allow_towers == true) {
-                //     if (pso_tower_index >= 1) {
-                //         tower_library_index = 0.99999;
-                //         pso_tower_index = 1 - (pso_tower_index - 1); // bounce
-                //          var_list[iteration_number*this.surrogate_settings.number_of_vars + 3] = pso_tower_index; // update PSO variable with bounced value
-                //     }
-                //     else if (pso_tower_index < 0) {
-                //         tower_library_index = 0;
-                //         if (pso_tower_index < -1) {
-                //             pso_tower_index = -1 - (pso_tower_index + 1); // bounce
-                //              var_list[iteration_number*this.surrogate_settings.number_of_vars + 3] = pso_tower_index; // update PSO variable with bounced value
-                //         }
-                //     }
-                //     else tower_library_index = pso_tower_index;
-                
-                
-                //     tower_library_index = Math.floor(tower_library_index * (all_surrogates.length+1)); // #previous surrogates + 1 for on-baseplate
-                //     tower_library_index = tower_library_index - 1; // -1 equals build plate
-                //     // if (all_surrogates.length > 0) {
-                //     //     console.log({number_surrogate:all_surrogates.length});
-                //     //     console.log({tower_library_index:tower_library_index});
-                //     //     console.log({pso_tower_index:pso_tower_index});
-                //     // }
-
-                //     // if (tower_library_index >= 0) pso_z = all_surrogates[tower_library_index].starting_height + all_surrogates[tower_library_index].surro.height;
-                //     if (tower_library_index >= 0) pso_z = all_surrogates[tower_library_index].end_height;
-
-                //     // if (tower_library_index >= 0)
-                //     // if (all_surrogates[tower_library_index].starting_height + all_surrogates[tower_library_index].surro.height != all_surrogates[tower_library_index].end_height) {
-                //     //     if (all_surrogates[tower_library_index].surro.type == "simpleRectangle") {
-                //     //         console.log({WARNING:"End height not equal height + starting height"});
-                //     //         console.log({addedHeight:all_surrogates[tower_library_index].starting_height + all_surrogates[tower_library_index].surro.height});
-                //     //         console.log({end_height:all_surrogates[tower_library_index].end_height});
-                //     //     }
-                //     // }
-                // }
-
-                let chosen_rotation,
-                    chosen_x,
-                    chosen_y;
+            // Name parameters for easy handling
+            let pso_x = var_list[0];
+            let pso_y = var_list[1];
+            // let pso_tower_index =   var_list[3];
+            let pso_rotation = var_list[2];
             
-                // // Stability check V2 // TODO: Allow altering rotations
-                // if (tower_library_index >= 0) {
-                //     let x_space = (all_surrogates[tower_library_index].surro.length - pso_surrogate.length - 2.4) * 0.5; // TODO: Set to four times nozzle (+ two times padding size?)
-                //     let y_space = (all_surrogates[tower_library_index].surro.width - pso_surrogate.width - 2.4) * 0.5;
-                //     if (x_space > 0 && y_space > 0) {
+            // let pso_library_index =   var_list[5];
 
-                //         // Handling without rotation :/
-                //         // chosen_rotation = all_surrogates[tower_library_index].rotation;
-                //         let mid_x = (all_surrogates[tower_library_index].geometry[0].bounds.maxx + all_surrogates[tower_library_index].geometry[0].bounds.minx)*0.5;
-                //         let mid_y = (all_surrogates[tower_library_index].geometry[0].bounds.maxy + all_surrogates[tower_library_index].geometry[0].bounds.miny)*0.5
-                //         // if (pso_x > mid_x + x_space) chosen_x = mid_x + x_space;
-                //         // else if (pso_x < mid_x - x_space) chosen_x = mid_x - x_space;
-                //         // else chosen_x = pso_x;
-                //         // if (pso_y > mid_y + y_space) chosen_y = mid_y + y_space;
-                //         // else if (pso_y < mid_y - y_space) chosen_y = mid_y - y_space;
-                //         // else chosen_y = pso_y;
+            // let pso_use_this_surrogate =   var_list[7];
 
-                //         chosen_rotation = all_surrogates[tower_library_index].rotation;
+            // if(true) {
+            // Select test surrogate // Old way letting PSO select library index
+            // if (pso_library_index >= this.surrogate_library.length) {
+            //     pso_library_index = this.surrogate_library.length - (pso_library_index - this.surrogate_library.length); // Bounce of max index of available surrogates
+            // }
+            // else if (pso_library_index < 0) {
+            //     pso_library_index = -pso_library_index; // Bounce of start of surrogate list index 
+            // }
+            //   var_list[5] = pso_library_index; // update PSO variable with bounced value
+            // const library_index = Math.floor(pso_library_index);
+            // let pso_surrogate = this.surrogate_library[library_index];
             
-                //         const degRot = all_surrogates[tower_library_index].rotation * Math.PI / 180;
-                //         const x_dist = pso_x - mid_x;
-                //         const y_dist = pso_y - mid_y;
 
-                //         let local_x_dist = Math.cos(degRot)*x_dist + Math.sin(degRot)*y_dist;
-                //         let local_y_dist = -1*Math.sin(degRot)*x_dist + Math.cos(degRot)*y_dist;
+            let pso_desired_length = var_list[3];
+            let pso_desired_width = var_list[4];
+            let pso_desired_height = var_list[5];
 
-                //         let donothingCounter = 0;
+            let pso_surrogate = getBestFittingSurrogateL2(this.surrogate_library, pso_desired_length, pso_desired_width, pso_desired_height);
 
-                //         if (local_x_dist > x_space) local_x_dist = x_space;
-                //         else if (local_x_dist < -x_space) local_x_dist = -x_space;
-                //         else donothingCounter += 1;
+            // Select test tower position/on baseplate
+            let pso_z = 0;
+            let tower_library_index = -1;
+            
+            // if (this.surrogate_settings.allow_towers == true) {
+            //     if (pso_tower_index >= 1) {
+            //         tower_library_index = 0.99999;
+            //         pso_tower_index = 1 - (pso_tower_index - 1); // bounce
+            //           var_list[3] = pso_tower_index; // update PSO variable with bounced value
+            //     }
+            //     else if (pso_tower_index < 0) {
+            //         tower_library_index = 0;
+            //         if (pso_tower_index < -1) {
+            //             pso_tower_index = -1 - (pso_tower_index + 1); // bounce
+            //               var_list[3] = pso_tower_index; // update PSO variable with bounced value
+            //         }
+            //     }
+            //     else tower_library_index = pso_tower_index;
+            
+            
+            //     tower_library_index = Math.floor(tower_library_index * (all_surrogates.length+1)); // #previous surrogates + 1 for on-baseplate
+            //     tower_library_index = tower_library_index - 1; // -1 equals build plate
+            //     // if (all_surrogates.length > 0) {
+            //     //     console.log({number_surrogate:all_surrogates.length});
+            //     //     console.log({tower_library_index:tower_library_index});
+            //     //     console.log({pso_tower_index:pso_tower_index});
+            //     // }
 
-                //         if (local_y_dist > y_space) local_y_dist = y_space;
-                //         else if (local_y_dist < -y_space) local_y_dist = -y_space;
-                //         else donothingCounter += 1;
+            //     // if (tower_library_index >= 0) pso_z = all_surrogates[tower_library_index].starting_height + all_surrogates[tower_library_index].surro.height;
+            //     if (tower_library_index >= 0) pso_z = all_surrogates[tower_library_index].end_height;
 
-                //         if (donothingCounter == 2) {
+            //     // if (tower_library_index >= 0)
+            //     // if (all_surrogates[tower_library_index].starting_height + all_surrogates[tower_library_index].surro.height != all_surrogates[tower_library_index].end_height) {
+            //     //     if (all_surrogates[tower_library_index].surro.type == "simpleRectangle") {
+            //     //         console.log({WARNING:"End height not equal height + starting height"});
+            //     //         console.log({addedHeight:all_surrogates[tower_library_index].starting_height + all_surrogates[tower_library_index].surro.height});
+            //     //         console.log({end_height:all_surrogates[tower_library_index].end_height});
+            //     //     }
+            //     // }
+            // }
+            
 
-                //             // let global_x_dist = Math.cos(degRot)*local_x_dist - Math.sin(degRot)*local_y_dist;
-                //             // let global_y_dist = Math.sin(degRot)*local_x_dist + Math.cos(degRot)*local_y_dist;
+            let chosen_rotation,
+                chosen_x,
+                chosen_y;
+        
+            
+            // // Stability check V2 // TODO: Allow altering rotations
+            // if (tower_library_index >= 0) {
+            //     let x_space = (all_surrogates[tower_library_index].surro.length - pso_surrogate.length - 2.4) * 0.5; // TODO: Set to four times nozzle (+ two times padding size?)
+            //     let y_space = (all_surrogates[tower_library_index].surro.width - pso_surrogate.width - 2.4) * 0.5;
+            //     if (x_space > 0 && y_space > 0) {
 
-                //             // chosen_x = mid_x + global_x_dist;
-                //             // chosen_y = mid_y + global_y_dist;
+            //         // Handling without rotation :/
+            //         // chosen_rotation = all_surrogates[tower_library_index].rotation;
+            //         let mid_x = (all_surrogates[tower_library_index].geometry[0].bounds.maxx + all_surrogates[tower_library_index].geometry[0].bounds.minx)*0.5;
+            //         let mid_y = (all_surrogates[tower_library_index].geometry[0].bounds.maxy + all_surrogates[tower_library_index].geometry[0].bounds.miny)*0.5
+            //         // if (pso_x > mid_x + x_space) chosen_x = mid_x + x_space;
+            //         // else if (pso_x < mid_x - x_space) chosen_x = mid_x - x_space;
+            //         // else chosen_x = pso_x;
+            //         // if (pso_y > mid_y + y_space) chosen_y = mid_y + y_space;
+            //         // else if (pso_y < mid_y - y_space) chosen_y = mid_y - y_space;
+            //         // else chosen_y = pso_y;
 
-                //             // if ((Math.abs(Math.abs(chosen_x) - Math.abs(pso_x)) < 0.001) && (Math.abs(Math.abs(chosen_y) - Math.abs(pso_y)) < 0.001) ) {}
-                //             // else console.log({WARNING:"ADJUSTMENT"});
-                //             chosen_x = pso_x;
-                //             chosen_y = pso_y;
-                //         } else {
-                //             let global_x_dist = Math.cos(degRot)*local_x_dist - Math.sin(degRot)*local_y_dist;
-                //             let global_y_dist = Math.sin(degRot)*local_x_dist + Math.cos(degRot)*local_y_dist;
+            //         chosen_rotation = all_surrogates[tower_library_index].rotation;
+        
+            //         const degRot = all_surrogates[tower_library_index].rotation * Math.PI / 180;
+            //         const x_dist = pso_x - mid_x;
+            //         const y_dist = pso_y - mid_y;
 
-                //             chosen_x = mid_x + global_x_dist;
-                //             chosen_y = mid_y + global_y_dist;
-                //         }
+            //         let local_x_dist = Math.cos(degRot)*x_dist + Math.sin(degRot)*y_dist;
+            //         let local_y_dist = -1*Math.sin(degRot)*x_dist + Math.cos(degRot)*y_dist;
 
+            //         let donothingCounter = 0;
 
-                //         if (all_surrogates[tower_library_index].surro.type == "prism") { // In case of prism underneath, check for unsupported area
-                //             let unsupported_polygons = [];
-                //             let unsupp_area = 0;
+            //         if (local_x_dist > x_space) local_x_dist = x_space;
+            //         else if (local_x_dist < -x_space) local_x_dist = -x_space;
+            //         else donothingCounter += 1;
 
-                //             let pso_temp_polygons_list;
-                //             // TODO: Use bottom geometry of prism instead?
-                //             if (pso_surrogate.type == "simpleRectangle" || pso_surrogate.type == "stackable") {
-                //                 pso_temp_polygons_list = [generateRectanglePolygonCentered(chosen_x, chosen_y, pso_z, pso_surrogate.length, pso_surrogate.width, chosen_rotation, surrogate_settings.surrogate_padding, this.surrogate_settings.start_slice)];
-                //             }
-                //             else if (pso_surrogate.type == "prism") {
-                //                 pso_temp_polygons_list = [generatePrismPolygon(chosen_x, chosen_y, pso_z, pso_surrogate.prism_geometry, chosen_rotation, surrogate_settings.surrogate_padding, this.surrogate_settings.start_slice)];
-                //             }
+            //         if (local_y_dist > y_space) local_y_dist = y_space;
+            //         else if (local_y_dist < -y_space) local_y_dist = -y_space;
+            //         else donothingCounter += 1;
 
-                //             POLY.subtract(pso_temp_polygons_list, all_surrogates[tower_library_index].geometry, unsupported_polygons, null, this.surrogate_settings.start_slice.z, min);
-                //             unsupported_polygons.forEach(function(unsupp) {
-                //                 unsupp_area += Math.abs(unsupp.areaDeep());
-                //             });
+            //         if (donothingCounter == 2) {
 
-                //             // For now, use 100% supported area only
-                //             if (unsupp_area > 0) { 
-                //                 chosen_x = (chosen_x + mid_x) / 2; // Additional centering, then try again
-                //                 chosen_y = (chosen_y + mid_y) / 2;
-                //                 unsupported_polygons = [];
-                //                 unsupp_area = 0;
+            //             // let global_x_dist = Math.cos(degRot)*local_x_dist - Math.sin(degRot)*local_y_dist;
+            //             // let global_y_dist = Math.sin(degRot)*local_x_dist + Math.cos(degRot)*local_y_dist;
 
-                //                 if (pso_surrogate.type == "simpleRectangle" || pso_surrogate.type == "stackable") {
-                //                     pso_temp_polygons_list = [generateRectanglePolygonCentered(chosen_x, chosen_y, pso_z, pso_surrogate.length, pso_surrogate.width, chosen_rotation, surrogate_settings.surrogate_padding, this.surrogate_settings.start_slice)];
-                //                 }
-                //                 else if (pso_surrogate.type == "prism") {
-                //                     pso_temp_polygons_list = [generatePrismPolygon(chosen_x, chosen_y, pso_z, pso_surrogate.prism_geometry, chosen_rotation, surrogate_settings.surrogate_padding, this.surrogate_settings.start_slice)];
-                //                 }
+            //             // chosen_x = mid_x + global_x_dist;
+            //             // chosen_y = mid_y + global_y_dist;
 
-                //                 POLY.subtract(pso_temp_polygons_list, all_surrogates[tower_library_index].geometry, unsupported_polygons, null, this.surrogate_settings.start_slice.z, min);
-                //                 unsupported_polygons.forEach(function(unsupp) {
-                //                     unsupp_area += Math.abs(unsupp.areaDeep());
-                //                 });
+            //             // if ((Math.abs(Math.abs(chosen_x) - Math.abs(pso_x)) < 0.001) && (Math.abs(Math.abs(chosen_y) - Math.abs(pso_y)) < 0.001) ) {}
+            //             // else console.log({WARNING:"ADJUSTMENT"});
+            //             chosen_x = pso_x;
+            //             chosen_y = pso_y;
+            //         } else {
+            //             let global_x_dist = Math.cos(degRot)*local_x_dist - Math.sin(degRot)*local_y_dist;
+            //             let global_y_dist = Math.sin(degRot)*local_x_dist + Math.cos(degRot)*local_y_dist;
 
-                //                 if (unsupp_area > 0) {
-                //                     continue;
-                //                 }
-                //             }
-                //         }
+            //             chosen_x = mid_x + global_x_dist;
+            //             chosen_y = mid_y + global_y_dist;
+            //         }
 
 
-                //         // console.log({Note:"Valid tower"});
-                //         // console.log({pso_surrogate:pso_surrogate});
-                //         // console.log({bottom_surrogate:all_surrogates[tower_library_index]});
-                //         // let x_move = pso_x % x_space; // Convert to local coordinates
-                //         // let y_move = pso_y % y_space;
-                //         // chosen_x = (all_surrogates[tower_library_index].geometry[0].bounds.maxx + all_surrogates[tower_library_index].geometry[0].bounds.minx)*0.5 + x_move; // Add chosen distance to mid point
-                //         // chosen_y = (all_surrogates[tower_library_index].geometry[0].bounds.maxy + all_surrogates[tower_library_index].geometry[0].bounds.miny)*0.5 + y_move;
-                //     }
-                //     else { // insufficient room on top of surrogate
-                //         // console.log({Note:"Bad tower"});
-                //         // console.log({pso_surrogate:pso_surrogate});
-                //         // console.log({bottom_surrogate:all_surrogates[tower_library_index]});
-                //         continue;
-                //     }
-                // } else { // No tower chosen
-                //     chosen_rotation = pso_rotation;
-                //     chosen_x = pso_x;
-                //     chosen_y = pso_y;
-                // }
-                chosen_rotation = pso_rotation;
-                chosen_x = pso_x;
-                chosen_y = pso_y;
+            //         if (all_surrogates[tower_library_index].surro.type == "prism") { // In case of prism underneath, check for unsupported area
+            //             let unsupported_polygons = [];
+            //             let unsupp_area = 0;
 
-                // // Stability check V1
-                // if (tower_library_index >= 0) {
-                //     let unsupported_polygons = [];
-                //     let unsupp_area = 0, full_area = 0;
-                //     POLY.subtract(pso_polygons_list, all_surrogates[tower_library_index].geometry, unsupported_polygons, null, this.surrogate_settings.start_slice.z, min);
-                //     unsupported_polygons.forEach(function(unsupp) {
-                //         unsupp_area += Math.abs(unsupp.areaDeep());
-                //     });
-                //     pso_polygons_list.forEach(function(full) {
-                //         full_area += Math.abs(full.areaDeep());
-                //     });
+            //             let pso_temp_polygons_list;
+            //             // TODO: Use bottom geometry of prism instead?
+            //             if (pso_surrogate.type == "simpleRectangle" || pso_surrogate.type == "stackable") {
+            //                 pso_temp_polygons_list = [generateRectanglePolygonCentered(chosen_x, chosen_y, pso_z, pso_surrogate.length, pso_surrogate.width, chosen_rotation, surrogate_settings.surrogate_padding, this.surrogate_settings.start_slice)];
+            //             }
+            //             else if (pso_surrogate.type == "prism") {
+            //                 pso_temp_polygons_list = [generatePrismPolygon(chosen_x, chosen_y, pso_z, pso_surrogate.prism_geometry, chosen_rotation, surrogate_settings.surrogate_padding, this.surrogate_settings.start_slice)];
+            //             }
 
-                //     // If less than half the area of the new surro is supported by the surro below, surrogate is unstable
-                //     //if ((unsupp_area * 2) > full_area) {
-                //     // For now, use 100% supported instead
-                //     if (unsupp_area > 0) {
-                        
-                //         continue;
-                //     }
-                // }
-                
-                // generate polygons // TODO: Is it faster to make one poly for the surrogate and then rotate+translate /modify the points directly?
-                let pso_polygons_list = []
-                if (pso_surrogate.type == "simpleRectangle" || pso_surrogate.type == "stackable") {
-                    pso_polygons_list = [generateRectanglePolygonCentered(chosen_x, chosen_y, pso_z, pso_surrogate.length, pso_surrogate.width, chosen_rotation, surrogate_settings.surrogate_padding, this.surrogate_settings.start_slice)];
+            //             POLY.subtract(pso_temp_polygons_list, all_surrogates[tower_library_index].geometry, unsupported_polygons, null, this.surrogate_settings.start_slice.z, min);
+            //             unsupported_polygons.forEach(function(unsupp) {
+            //                 unsupp_area += Math.abs(unsupp.areaDeep());
+            //             });
+
+            //             // For now, use 100% supported area only
+            //             if (unsupp_area > 0) { 
+            //                 chosen_x = (chosen_x + mid_x) / 2; // Additional centering, then try again
+            //                 chosen_y = (chosen_y + mid_y) / 2;
+            //                 unsupported_polygons = [];
+            //                 unsupp_area = 0;
+
+            //                 if (pso_surrogate.type == "simpleRectangle" || pso_surrogate.type == "stackable") {
+            //                     pso_temp_polygons_list = [generateRectanglePolygonCentered(chosen_x, chosen_y, pso_z, pso_surrogate.length, pso_surrogate.width, chosen_rotation, surrogate_settings.surrogate_padding, this.surrogate_settings.start_slice)];
+            //                 }
+            //                 else if (pso_surrogate.type == "prism") {
+            //                     pso_temp_polygons_list = [generatePrismPolygon(chosen_x, chosen_y, pso_z, pso_surrogate.prism_geometry, chosen_rotation, surrogate_settings.surrogate_padding, this.surrogate_settings.start_slice)];
+            //                 }
+
+            //                 POLY.subtract(pso_temp_polygons_list, all_surrogates[tower_library_index].geometry, unsupported_polygons, null, this.surrogate_settings.start_slice.z, min);
+            //                 unsupported_polygons.forEach(function(unsupp) {
+            //                     unsupp_area += Math.abs(unsupp.areaDeep());
+            //                 });
+
+            //                 if (unsupp_area > 0) {
+            //                     continue;
+            //                 }
+            //             }
+            //         }
+
+
+            //         // console.log({Note:"Valid tower"});
+            //         // console.log({pso_surrogate:pso_surrogate});
+            //         // console.log({bottom_surrogate:all_surrogates[tower_library_index]});
+            //         // let x_move = pso_x % x_space; // Convert to local coordinates
+            //         // let y_move = pso_y % y_space;
+            //         // chosen_x = (all_surrogates[tower_library_index].geometry[0].bounds.maxx + all_surrogates[tower_library_index].geometry[0].bounds.minx)*0.5 + x_move; // Add chosen distance to mid point
+            //         // chosen_y = (all_surrogates[tower_library_index].geometry[0].bounds.maxy + all_surrogates[tower_library_index].geometry[0].bounds.miny)*0.5 + y_move;
+            //     }
+            //     else { // insufficient room on top of surrogate
+            //         // console.log({Note:"Bad tower"});
+            //         // console.log({pso_surrogate:pso_surrogate});
+            //         // console.log({bottom_surrogate:all_surrogates[tower_library_index]});
+            //         continue;
+            //     }
+            // } else { // No tower chosen
+            //     chosen_rotation = pso_rotation;
+            //     chosen_x = pso_x;
+            //     chosen_y = pso_y;
+            // }
+            
+            chosen_rotation = pso_rotation;
+            chosen_x = pso_x;
+            chosen_y = pso_y;
+
+            // // Stability check V1
+            // if (tower_library_index >= 0) {
+            //     let unsupported_polygons = [];
+            //     let unsupp_area = 0, full_area = 0;
+            //     POLY.subtract(pso_polygons_list, all_surrogates[tower_library_index].geometry, unsupported_polygons, null, this.surrogate_settings.start_slice.z, min);
+            //     unsupported_polygons.forEach(function(unsupp) {
+            //         unsupp_area += Math.abs(unsupp.areaDeep());
+            //     });
+            //     pso_polygons_list.forEach(function(full) {
+            //         full_area += Math.abs(full.areaDeep());
+            //     });
+
+            //     // If less than half the area of the new surro is supported by the surro below, surrogate is unstable
+            //     //if ((unsupp_area * 2) > full_area) {
+            //     // For now, use 100% supported instead
+            //     if (unsupp_area > 0) {
+                    
+            //         continue;
+            //     }
+            // }
+            
+            // generate polygons // TODO: Is it faster to make one poly for the surrogate and then rotate+translate /modify the points directly?
+            let pso_polygons_list = [];
+            if (pso_surrogate.type == "simpleRectangle" || pso_surrogate.type == "stackable") {
+                pso_polygons_list = [generateRectanglePolygonCentered(chosen_x, chosen_y, pso_z, pso_surrogate.length, pso_surrogate.width, chosen_rotation, surrogate_settings.surrogate_padding, this.surrogate_settings.start_slice)];
+            }
+            else if (pso_surrogate.type == "prism") {
+                pso_polygons_list = [generatePrismPolygon(chosen_x, chosen_y, pso_z, pso_surrogate.prism_geometry, chosen_rotation, surrogate_settings.surrogate_padding, this.surrogate_settings.start_slice)];
+            }
+
+            let oob = false;
+
+            // Out of build-area check
+            for (let pso_poly of pso_polygons_list) {
+                // translate widget coordinate system to build plate coordinate system and compare with build plate size (center is at 0|0, bottom left is at -Width/2|-Depth/2)
+                if (pso_poly.bounds.maxx + shift_x > bedWidthArea || pso_poly.bounds.minx + shift_x < -bedWidthArea || pso_poly.bounds.maxy + shift_y > bedDepthArea || pso_poly.bounds.miny + shift_y < -bedDepthArea || pso_z + pso_surrogate.height > device.bedDepth) {
+                    // console.log(pso_poly.bounds.maxx);
+                    // console.log(pso_poly.bounds.minx);
+                    // console.log(pso_poly.bounds.maxy);
+                    // console.log(pso_poly.bounds.miny);
+                    // console.log("eh");
+                    // TODO: save for return later the negative size of overlap for this test part?
+                    oob = true;
                 }
-                else if (pso_surrogate.type == "prism") {
-                    pso_polygons_list = [generatePrismPolygon(chosen_x, chosen_y, pso_z, pso_surrogate.prism_geometry, chosen_rotation, surrogate_settings.surrogate_padding, this.surrogate_settings.start_slice)];
-                }
+            }
 
-
-                // Out of build-area check
-                for (let pso_poly of pso_polygons_list) {
-                    // translate widget coordinate system to build plate coordinate system and compare with build plate size (center is at 0|0, bottom left is at -Width/2|-Depth/2)
-                    if (pso_poly.bounds.maxx + shift_x > bedWidthArea || pso_poly.bounds.minx + shift_x < -bedWidthArea || pso_poly.bounds.maxy + shift_y > bedDepthArea || pso_poly.bounds.miny + shift_y < -bedDepthArea || pso_z + pso_surrogate.height > device.bedDepth) {
-                        // console.log(pso_poly.bounds.maxx);
-                        // console.log(pso_poly.bounds.minx);
-                        // console.log(pso_poly.bounds.maxy);
-                        // console.log(pso_poly.bounds.miny);
-                        // console.log("eh");
-                        continue; // TODO: save for return later the negative size of overlap for this test part?
-                    }
-                }
+            if (oob) {
+                let fitness = 0;
+                done(fitness);
+            } else {
 
                 let rotation = chosen_rotation; 
                 
@@ -1502,7 +1517,7 @@ const funcs = {
                 let quickList = splitLists[0];
                 let remainderList = splitLists[1];
 
-                //  var_list[iteration_number*this.surrogate_settings.number_of_vars + 7] = 0;
+                //   var_list[7] = 0;
                 // pso_use_this_surrogate = 0;
 
                 // let pso_collision_and_volumes = checkVolumeAndCollisions(this.surrogate_library, this.surrogate_settings, this.surrogate_settings.start_slice, library_index, pso_polygons_list, pso_z, all_surrogates);
@@ -1516,15 +1531,15 @@ const funcs = {
                     
                     // console.log({pso_collision_and_volumes:pso_collision_and_volumes});
                     if (pso_collision_and_volumes[0] === true) { // Collision in quick check found: Use estimate as collided area after reducing by overlap factor.
-                        //  var_list[iteration_number*this.surrogate_settings.number_of_vars + 7] = 0;
+                        //   var_list[7] = 0;
 
-                        let overlap_factor = (pso_collision_and_volumes[2] / (pso_collision_and_volumes[4]));
+                        overlap_factor = (pso_collision_and_volumes[2] / (pso_collision_and_volumes[4]));
                         if (overlap_factor > 1 || isNaN(overlap_factor)) overlap_factor = 1.0;
                         pso_collision_and_volumes[3] = delta_volume_estimate * (1-overlap_factor); // Scale estimate by collision severity
                         // if (overlap_factor < smallest_overlap_factor) smallest_overlap_factor = overlap_factor;
-                        average_overlap_factor += overlap_factor;
+                        // average_overlap_factor = overlap_factor;
                         // overlap_counter += pso_collision_and_volumes[5];
-                        overlap_counter += 1;
+                        // overlap_counter += 1;
                     }
 
                     else { // No collision yet
@@ -1539,21 +1554,21 @@ const funcs = {
                             
                             let total_volume = pso_collision_and_volumes[3] + pso_collision_and_volumes_remaining[3];
                             if (pso_collision_and_volumes_remaining[0] === true) { // Found collision in remaining layers
-                                //  var_list[iteration_number*this.surrogate_settings.number_of_vars + 7] = 0; // Set to collision
+                                //   var_list[7] = 0; // Set to collision
                                 pso_use_this_surrogate = 0;
                                 // console.log({pso_collision_and_volumes_remaining:pso_collision_and_volumes_remaining});
                                 // console.log("Verify: " + pso_collision_and_volumes_remaining[2].toString());
                                 
-                                let overlap_factor = (pso_collision_and_volumes_remaining[2] / (pso_collision_and_volumes_remaining[4]));
+                                overlap_factor = (pso_collision_and_volumes_remaining[2] / (pso_collision_and_volumes_remaining[4]));
                                 if (overlap_factor > 1 || isNaN(overlap_factor)) overlap_factor = 1.0;
-                                average_overlap_factor += overlap_factor;
+                                // average_overlap_factor = overlap_factor;
                                 // overlap_counter += pso_collision_and_volumes_remaining[5];
-                                overlap_counter += 1;
+                                // overlap_counter += 1;
                                 total_volume = ((total_volume / (pso_collision_and_volumes_remaining[6] + quickList.length)) * sliceIndexList.length) * (1-overlap_factor); // Update estimate and scale by collision severity
 
                             }
                             else {
-                                //  var_list[iteration_number*this.surrogate_settings.number_of_vars + 7] = 1; // Set to no collision
+                                //   var_list[7] = 1; // Set to no collision
                                 pso_use_this_surrogate = 1;
                                 
                                 let finalHeight = pso_z + pso_surrogate.height;
@@ -1583,10 +1598,10 @@ const funcs = {
                                 let data_array = {insertion_case:"unknown"};
                                 if (tower_library_index >= 0) {
                                     lower_surrogate.push(all_surrogates[tower_library_index]);
-                                    //  var_list[iteration_number*this.surrogate_settings.number_of_vars + 1] = chosen_x; // We moved the surrogate for the tower successfully
-                                    //  var_list[iteration_number*this.surrogate_settings.number_of_vars + 2] = chosen_y;
-                                    //  var_list[iteration_number*this.surrogate_settings.number_of_vars + 8] = chosen_x; // We moved the surrogate for the tower successfully
-                                    //  var_list[iteration_number*this.surrogate_settings.number_of_vars + 9] = chosen_y;
+                                    //   var_list[1] = chosen_x; // We moved the surrogate for the tower successfully
+                                    //   var_list[2] = chosen_y;
+                                    //   var_list[8] = chosen_x; // We moved the surrogate for the tower successfully
+                                    //   var_list[9] = chosen_y;
                                     tower_details.tower_x = chosen_x; // We moved the surrogate for the tower successfully
                                     tower_details.tower_y = chosen_y;
                                 }
@@ -1627,204 +1642,221 @@ const funcs = {
                             pso_collision_and_volumes[0] = true;// Treat not explored as collision
                         }
                     }
-                    if ((Math.random() < 0.2) && (pso_collision_and_volumes[0] == true) && (tower_library_index >= 0)) { // Encourage build plate exploration if bad tower
-                        //  var_list[iteration_number*this.surrogate_settings.number_of_vars + 3] =  var_list[iteration_number*this.surrogate_settings.number_of_vars + 3] - 0.05; // = 0
-                    } else if ((Math.random() < 0.05) && (pso_collision_and_volumes[0] == true) && (tower_library_index < 0)) { // Encourage tower exploration if bad build plate placement
-                        //  var_list[iteration_number*this.surrogate_settings.number_of_vars + 3] =  var_list[iteration_number*this.surrogate_settings.number_of_vars + 3] + 0.05; // = Math.random()
-                    }
-                    else results_array.push(pso_collision_and_volumes);
+                    // if ((Math.random() < 0.2) && (pso_collision_and_volumes[0] == true) && (tower_library_index >= 0)) { // Encourage build plate exploration if bad tower
+                    //     //   var_list[3] =   var_list[3] - 0.05; // = 0
+                    // } else if ((Math.random() < 0.05) && (pso_collision_and_volumes[0] == true) && (tower_library_index < 0)) { // Encourage tower exploration if bad build plate placement
+                    //     //   var_list[3] =   var_list[3] + 0.05; // = Math.random()
+                    // }
+                    // // else results_array.push(pso_collision_and_volumes);
+                    // else results_array = pso_collision_and_volumes;
+                    results_array = pso_collision_and_volumes;
                 }
-            }
+                else { 
+                    pso_collision_and_volumes[0] = true;
+                    pso_collision_and_volumes[3] = delta_volume_estimate;
+
+                    results_array = pso_collision_and_volumes;
+                }
+                // }
                 // let current_details = [];
                 // for (let j = 1; j < (1+iteration_number)*this.surrogate_settings.number_of_vars; j++) {
                 let current_details = [...var_list];
-                current_details = current_details.slice(1, this.surrogate_settings.number_of_vars + 1)
+                // current_details = current_details.slice(1, this.surrogate_settings.number_of_vars + 1)
                 // let varlistcopy = [...var_list];
                 // console.log({copylist:varlistcopy, index:iteration_number, sliced_list:current_details});
                 // }
                 
-                results_meta_data.candidate_details.push({pso_details:current_details, use_me:pso_use_this_surrogate, tower_details:tower_details});
-            }
+                results_meta_data.candidate_details = {pso_details:current_details, use_me:pso_use_this_surrogate, tower_details:tower_details};
+                // }
 
-            let valid_combination = true;
-            let total_surrogates_volume = this.surrogate_settings.fitness_offset;
-            let total_collided_surrogates_volume = 0;
-            let interaction_layer_set = new Set();
-            // let collision_area_estimate = 0;
-            // let surrogate_area_estimate = 0;
-            const number_of_surrogates = all_surrogates.length;
-            let good_surrogate_count = 0;
+                let valid_combination = true;
+                // let total_surrogates_volume = this.surrogate_settings.fitness_offset;
+                let total_surrogates_volume = 0;
+                let total_collided_surrogates_volume = 0;
+                // let interaction_layer_set = new Set();
+                // let collision_area_estimate = 0;
+                // let surrogate_area_estimate = 0;
+                // const number_of_surrogates = all_surrogates.length;
+                // let good_surrogate_count = 0;
 
-            // console.log({results_array:results_array});
+                // console.log({results_array:results_array});
 
-            let highest_surrogate_volume = 0;
+                let highest_surrogate_volume = 0;
 
-            for (const result of results_array) {
-                if (result[0] === true) { // Collided surrogates
+                // for (const result of results_array) {
+                if (results_array[0] === true) { // Collided surrogates
                     valid_combination = false;
                     // const delta_volume = result[1] - result[2];
-                    total_collided_surrogates_volume += result[3];
+                    total_collided_surrogates_volume = results_array[3];
                     // collision_area_estimate += result[2]; // Get overlap area estimate
                     // surrogate_area_estimate += result[4]; // Biggest sorrgated area
                 }
                 else { // Good surrogates
-                    good_surrogate_count += 1;
+                    // good_surrogate_count += 1;
                     // const delta_volume = result[1] - result[2];
-                    total_surrogates_volume += result[3]; // Get surrogated volume
-                    if (highest_surrogate_volume < result[3]) highest_surrogate_volume = result[3];
+                    total_surrogates_volume = results_array[3]; // Get surrogated volume
+                    // if (highest_surrogate_volume < results_array[3]) highest_surrogate_volume = results_array[3];
+                    highest_surrogate_volume = results_array[3];
                 }
-                // let delta_volume = result[1] - result[2] + this.surrogate_settings.fitness_offset;
-            }
+                    // let delta_volume = result[1] - result[2] + this.surrogate_settings.fitness_offset;
+                // }
 
-            // const average_surrogates_volume = total_surrogates_volume / (good_surrogate_count);
-            const average_surrogates_volume = highest_surrogate_volume;
-            if (this.surrogate_settings.average_so_far < average_surrogates_volume) this.surrogate_settings.average_so_far = average_surrogates_volume;
+                // const average_surrogates_volume = total_surrogates_volume / (good_surrogate_count);
+                const average_surrogates_volume = highest_surrogate_volume;
+                if (this.surrogate_settings.average_so_far < average_surrogates_volume) this.surrogate_settings.average_so_far = average_surrogates_volume;
 
-            for (const surrogate of all_surrogates) {
-                interaction_layer_set.add(surrogate.insertion_data.new_layer_index) // Get number of interaction layers // TODO: add extra interactions as penalty for difficult surrogates (bridges, stacks...)
-            }
+                // for (const surrogate of all_surrogates) {
+                //     interaction_layer_set.add(surrogate.insertion_data.new_layer_index) // Get number of interaction layers // TODO: add extra interactions as penalty for difficult surrogates (bridges, stacks...)
+                // }
 
 
-            // limit influence of collided volume result
-            // if (total_surrogates_volume > this.surrogate_settings.minVolume && total_collided_surrogates_volume > total_surrogates_volume) total_collided_surrogates_volume = total_surrogates_volume;
+                // limit influence of collided volume result
+                // if (total_surrogates_volume > this.surrogate_settings.minVolume && total_collided_surrogates_volume > total_surrogates_volume) total_collided_surrogates_volume = total_surrogates_volume;
 
-            const number_of_interactions = interaction_layer_set.size;
-            let fitness = total_surrogates_volume*15;
+                // const number_of_interactions = interaction_layer_set.size;
+                let fitness = total_surrogates_volume*10;
 
-            // if (total_surrogates_volume > 0) {
-            //     // console.log({interaction_layer_set:interaction_layer_set});
-            //     // console.log({all_surrogates:all_surrogates});
+                // if (total_surrogates_volume > 0) {
+                //     // console.log({interaction_layer_set:interaction_layer_set});
+                //     // console.log({all_surrogates:all_surrogates});
 
-            //     // const w_pieces = 0.3;
-            //     // const w_interactions = 0.7;
-            //     // const surrogate_N_penalty_factor = 0;//0.8;
-            //     // const interaction_N_penalty_factor = 0;//0.35;
+                //     // const w_pieces = 0.3;
+                //     // const w_interactions = 0.7;
+                //     // const surrogate_N_penalty_factor = 0;//0.8;
+                //     // const interaction_N_penalty_factor = 0;//0.35;
 
-            //     // // console.log({total_surrogates_volume:total_surrogates_volume});
-            //     // fitness = total_surrogates_volume / (w_pieces * Math.pow(number_of_surrogates, surrogate_N_penalty_factor) + w_interactions * Math.pow(number_of_interactions, interaction_N_penalty_factor));
-            // }
+                //     // // console.log({total_surrogates_volume:total_surrogates_volume});
+                //     // fitness = total_surrogates_volume / (w_pieces * Math.pow(number_of_surrogates, surrogate_N_penalty_factor) + w_interactions * Math.pow(number_of_interactions, interaction_N_penalty_factor));
+                // }
+                
+                // if (valid_combination) console.log({valid_combination:valid_combination});
+                // console.log({collision_area_estimate:collision_area_estimate});
+                // console.log({surrogate_area_estimate:surrogate_area_estimate});
+
+
+                // let surrogates_placed_pso = 0;
+                // for (let candidate_detail of results_meta_data.candidate_details) {
+                // // for (let iteration_number = 0; iteration_number < this.surrogate_settings.searchspace_max_number_of_surrogates; iteration_number++) {
+                //     // if (var_list[iteration_number * this.surrogate_settings.number_of_vars + 7] > 0.999999 && var_list[iteration_number * this.surrogate_settings.number_of_vars + 7] < 1.000001) {// If surrogate was placed without problem by PSO
+                //     if (candidate_detail.use_me) { 
+                //         surrogates_placed_pso += 1;
+                //     }
+                //     // if (pso_use_this_surrogate == 1) {
+                //     //     surrogates_placed_pso += 1;
+                //     // }
+                // }
+
+
+
+                // if (valid_combination && surrogates_placed_pso > 0) {
+                if (valid_combination) {
+                    // let current_answer = [...var_list];
+                    // this.valid_answers.push(current_answer);
+                    // valid_answers.push(current_answer);
+                    results_meta_data.valid = true;
+                }
+
+                // const w_pieces = 0.3;
+                // const w_interactions = 0.7;
+                // // const surrogate_N_penalty_factor = 0;//0.8;
+                // // const interaction_N_penalty_factor = 0;//0.35;
+
+                // // console.log({total_surrogates_fitness:total_surrogates_volume*15});
+                // // console.log({total_collided_surrogates_volume:total_collided_surrogates_volume});
+                // // console.log({fitness_added:fitness});
+                // if (number_of_surrogates > 1 || number_of_interactions > 1) {
+                //     fitness = fitness / 
+                //                         (w_pieces * Math.pow(number_of_surrogates, this.surrogate_settings.surrogate_N_penalty_factor) + 
+                //                         w_interactions * Math.pow(number_of_interactions, this.surrogate_settings.interaction_N_penalty_factor));
+                // }
+                // // console.log({fitness_interaction_penalty:fitness});
+
+                fitness += total_collided_surrogates_volume;
+
+                // if (average_overlap_factor > 0) average_overlap_factor = average_overlap_factor / overlap_counter;
+
+                // // if (valid_combination === true && fitness > this.surrogate_settings.minVolume) {
+                // if (total_surrogates_volume > this.surrogate_settings.minVolume) {
+                //     // console.log({Note:"Found one fitting surrogate"});
+                //     // console.log({total_surrogates_volume:total_surrogates_volume});
+                //     fitness += (this.surrogate_settings.total_surrogate_volume*2 + this.surrogate_settings.total_surrogate_volume*(1.0-average_overlap_factor));
+                // } 
+                // else if (total_collided_surrogates_volume > this.surrogate_settings.minVolume) {
+                //     fitness += (this.surrogate_settings.total_surrogate_volume*(1.0-average_overlap_factor));
+                // }
+
+                // console.log({fitness_after_bonus:fitness});
+
+                // console.log({average_overlap_factor:average_overlap_factor});
+                
+                results_meta_data.fitness = fitness;
+
+                // if (valid_combination && surrogates_placed_pso > 0) {
+                if (valid_combination) {
+                    this.valid_answers.push(results_meta_data);
+                    valid_answers.push(results_meta_data);
+                }
+
+                done(fitness);
             
-            // if (valid_combination) console.log({valid_combination:valid_combination});
-            // console.log({collision_area_estimate:collision_area_estimate});
-            // console.log({surrogate_area_estimate:surrogate_area_estimate});
 
-
-            let surrogates_placed_pso = 0;
-            for (let candidate_detail of results_meta_data.candidate_details) {
-            // for (let iteration_number = 0; iteration_number < this.surrogate_settings.searchspace_max_number_of_surrogates; iteration_number++) {
-                // if (var_list[iteration_number * this.surrogate_settings.number_of_vars + 7] > 0.999999 && var_list[iteration_number * this.surrogate_settings.number_of_vars + 7] < 1.000001) {// If surrogate was placed without problem by PSO
-                if (candidate_detail.use_me) { 
-                    surrogates_placed_pso += 1;
-                }
-                // if (pso_use_this_surrogate == 1) {
-                //     surrogates_placed_pso += 1;
+                // if (valid_combination === false && total_collided_surrogates_volume > 0) {
+                //     let overlap_factor = (collision_area_estimate / surrogate_area_estimate);
+                //     if (overlap_factor > 1) overlap_factor = 1.0;
+                //     // console.log({overlap_factor:pso_collision_and_volumes[3]});
+                //     // if (fitness > this.surrogate_settings.best_valid) fitness = this.surrogate_settings.best_valid;
+                //     total_collided_surrogates_volume = total_collided_surrogates_volume * (1.0-overlap_factor); // Reduce by overlap percentage
+                //     if (this.surrogate_settings.leniency >= 0) {
+                //         if (Math.random() >= this.surrogate_settings.leniency) {
+                //             // delta_volume = delta_volume * this.surrogate_settings.leniency;
+                //             fitness = fitness + (total_collided_surrogates_volume)*0.01
+                //             // console.log({fitness:fitness});
+                //             done(fitness); 
+                //         }
+                //         else {
+                //             fitness = fitness + (total_collided_surrogates_volume)*0.01
+                //             // console.log({fitness:fitness});
+                //             done(fitness);
+                //         }
+                //         // delta_volume = delta_volume * this.surrogate_settings.leniency;
+                //         // return delta_volume;
+                //     }
+                //     else {
+                //         // Doesn't happen yet. Restore negative numbers that describe overlap area
+                //         console.log({error:"Objective function: Should not have reached this"});
+                //     }
+                // } else {
+                //     // console.log({fitness:fitness});
+                //     done(fitness); 
                 // }
             }
-
-
-
-            if (valid_combination && surrogates_placed_pso > 0) {
-                // let current_answer = [...var_list];
-                // this.valid_answers.push(current_answer);
-                // valid_answers.push(current_answer);
-                results_meta_data.valid = true;
-            }
-
-            const w_pieces = 0.3;
-            const w_interactions = 0.7;
-            // const surrogate_N_penalty_factor = 0;//0.8;
-            // const interaction_N_penalty_factor = 0;//0.35;
-
-            // console.log({total_surrogates_fitness:total_surrogates_volume*15});
-            // console.log({total_collided_surrogates_volume:total_collided_surrogates_volume});
-            // console.log({fitness_added:fitness});
-            if (number_of_surrogates > 1 || number_of_interactions > 1) {
-                fitness = fitness / 
-                                    (w_pieces * Math.pow(number_of_surrogates, this.surrogate_settings.surrogate_N_penalty_factor) + 
-                                    w_interactions * Math.pow(number_of_interactions, this.surrogate_settings.interaction_N_penalty_factor));
-            }
-            // console.log({fitness_interaction_penalty:fitness});
-
-            fitness += total_collided_surrogates_volume;
-
-            if (average_overlap_factor > 0) average_overlap_factor = average_overlap_factor / overlap_counter;
-
-            // if (valid_combination === true && fitness > this.surrogate_settings.minVolume) {
-            if (total_surrogates_volume > this.surrogate_settings.minVolume) {
-                // console.log({Note:"Found one fitting surrogate"});
-                // console.log({total_surrogates_volume:total_surrogates_volume});
-                fitness += (this.surrogate_settings.total_surrogate_volume*2 + this.surrogate_settings.total_surrogate_volume*(1.0-average_overlap_factor));
-            } 
-            else if (total_collided_surrogates_volume > this.surrogate_settings.minVolume) {
-                fitness += (this.surrogate_settings.total_surrogate_volume*(1.0-average_overlap_factor));
-            }
-
-            // console.log({fitness_after_bonus:fitness});
-
-            // console.log({average_overlap_factor:average_overlap_factor});
-            
-            results_meta_data.fitness = fitness;
-            this.valid_answers.push(results_meta_data);
-            valid_answers.push(results_meta_data);
-
-            done(fitness);
-
-            // if (valid_combination === false && total_collided_surrogates_volume > 0) {
-            //     let overlap_factor = (collision_area_estimate / surrogate_area_estimate);
-            //     if (overlap_factor > 1) overlap_factor = 1.0;
-            //     // console.log({overlap_factor:pso_collision_and_volumes[3]});
-            //     // if (fitness > this.surrogate_settings.best_valid) fitness = this.surrogate_settings.best_valid;
-            //     total_collided_surrogates_volume = total_collided_surrogates_volume * (1.0-overlap_factor); // Reduce by overlap percentage
-            //     if (this.surrogate_settings.leniency >= 0) {
-            //         if (Math.random() >= this.surrogate_settings.leniency) {
-            //             // delta_volume = delta_volume * this.surrogate_settings.leniency;
-            //             fitness = fitness + (total_collided_surrogates_volume)*0.01
-            //             // console.log({fitness:fitness});
-            //             done(fitness); 
-            //         }
-            //         else {
-            //             fitness = fitness + (total_collided_surrogates_volume)*0.01
-            //             // console.log({fitness:fitness});
-            //             done(fitness);
-            //         }
-            //         // delta_volume = delta_volume * this.surrogate_settings.leniency;
-            //         // return delta_volume;
-            //     }
-            //     else {
-            //         // Doesn't happen yet. Restore negative numbers that describe overlap area
-            //         console.log({error:"Objective function: Should not have reached this"});
-            //     }
-            // } else {
-            //     // console.log({fitness:fitness});
-            //     done(fitness); 
-            // }
             
         }, {
             async: true
         });
 
         let pso_variable_list = [
-            { start: 0, end: surrogate_settings.searchspace_max_number_of_surrogates}// 0: Meta: # of surrogates to be placed
+            // { start: 0, end: surrogate_settings.searchspace_max_number_of_surrogates}// 0: Meta: # of surrogates to be placed
         ];
 
-        for (let pso_variables_idx = 0; pso_variables_idx < surrogate_settings.searchspace_max_number_of_surrogates; pso_variables_idx += 1) {
-            // Could give each block a yes/no variable instead of the meta-#-of-surrogates
-            pso_variable_list.push({ start: min_x, end: max_x});    // 0: X position
-            pso_variable_list.push({ start: min_y, end: max_y});    // 1: Y position
-            pso_variable_list.push({ start: 0, end: 360});          // 2: Rotation in degrees
-            // Z height from 0 to model_height for bridge surrogates
-            // yes/no switch between index-height and absolute-height method
-            // pso_variable_list.push({ start: 0, end: optimizer.surrogate_library.length}); 
-                                                                    // 5: Which surrogate was placed: library index, mapped from 0 to library_length
-            pso_variable_list.push({ start: surrogate_settings.smallest_length, end: surrogate_settings.biggest_length});  // 3: Desired length of ideal surrogate, mapped from smallest to biggest available lengths                                                   
-            pso_variable_list.push({ start: surrogate_settings.smallest_width, end: surrogate_settings.biggest_width});  // 4 {10}: Desired length of ideal surrogate, mapped from smallest to biggest available lengths                                                   
-            pso_variable_list.push({ start: surrogate_settings.smallest_height, end: surrogate_settings.biggest_height});  // 5 {11}: Desired length of ideal surrogate, mapped from smallest to biggest available lengths                                                   
-            // pso_variable_list.push({ start: 0, end: 1});            // 6: Target extension for height-varying surrogates, 0 = min_height, 1 = max_height
-            // pso_variable_list.push({ start: 0, end: 0});            // 7: local meta variable: if this surrogate data should be used or not
-            // pso_variable_list.push({ start: 0, end: 0});            // 8: local meta variable: Post-tower X position
-            // pso_variable_list.push({ start: 0, end: 0});            // 9: local meta variable: Post-tower Y position
+        // for (let pso_variables_idx = 0; pso_variables_idx < surrogate_settings.searchspace_max_number_of_surrogates; pso_variables_idx += 1) {
+        // Could give each block a yes/no variable instead of the meta-#-of-surrogates
+        pso_variable_list.push({ start: min_x, end: max_x});    // 0: X position
+        pso_variable_list.push({ start: min_y, end: max_y});    // 1: Y position
+        pso_variable_list.push({ start: 0, end: 360});          // 2: Rotation in degrees
+        // Z height from 0 to model_height for bridge surrogates
+        // yes/no switch between index-height and absolute-height method
+        // pso_variable_list.push({ start: 0, end: optimizer.surrogate_library.length}); 
+                                                                // 5: Which surrogate was placed: library index, mapped from 0 to library_length
+        pso_variable_list.push({ start: surrogate_settings.smallest_length, end: surrogate_settings.biggest_length});  // 3: Desired length of ideal surrogate, mapped from smallest to biggest available lengths                                                   
+        pso_variable_list.push({ start: surrogate_settings.smallest_width, end: surrogate_settings.biggest_width});  // 4 {10}: Desired length of ideal surrogate, mapped from smallest to biggest available lengths                                                   
+        pso_variable_list.push({ start: surrogate_settings.smallest_height, end: surrogate_settings.biggest_height});  // 5 {11}: Desired length of ideal surrogate, mapped from smallest to biggest available lengths                                                   
+        // pso_variable_list.push({ start: 0, end: 1});            // 6: Target extension for height-varying surrogates, 0 = min_height, 1 = max_height
+        // pso_variable_list.push({ start: 0, end: 0});            // 7: local meta variable: if this surrogate data should be used or not
+        // pso_variable_list.push({ start: 0, end: 0});            // 8: local meta variable: Post-tower X position
+        // pso_variable_list.push({ start: 0, end: 0});            // 9: local meta variable: Post-tower Y position
             
-        }
+        // }
 
 
         // set an initial population of 20 particles spread across the search space *[-10, 10] x [-10, 10]*
@@ -1915,6 +1947,8 @@ const funcs = {
         }
     
 
+        let return_list = [];
+
         if (surrogate_number_goal > 0) {
             log('Starting optimizer');
             loop();
@@ -1925,339 +1959,33 @@ const funcs = {
 
             let pso_position_vars = optimizer.getBestPosition();
 
+            valid_answers.sort(function(a, b) {
+                var keyA = a.fitness,
+                    keyB = b.fitness;
+                // Compare the 2 dates
+                if (keyA < keyB) return 1;
+                if (keyA > keyB) return -1;
+                return 0;
+            });
+
             console.log({all_valid_answers_found:optimizer.valid_answers});
             console.log({all_valid_answers_found_global:valid_answers});
 
             let best_result = getBestResult(optimizer.valid_answers);
             console.log({best_result:best_result});
-
-
-            let counter = 0;
-
-            // for (let pso_result_surrogate_index = 0; pso_result_surrogate_index < surrogate_settings.searchspace_max_number_of_surrogates; pso_result_surrogate_index++) {
-            for (let candidate_detail of best_result.candidate_details) {
-                // console.log({number_in_array:pso_result_surrogate_index * surrogate_settings.number_of_vars + 7});
-                // console.log(pso_position_vars[pso_result_surrogate_index * surrogate_settings.number_of_vars + 7]);
-                // console.log({candidate_number:pso_result_surrogate_index, useOrIgnore:valid_answers[pso_result_surrogate_index].use}); // Faulty?? valid answers is all answers, not just the best/last?
-                counter++;
-                console.log({candidate_number:counter, useOrIgnore:candidate_detail.use_me});
-                // if (pso_position_vars[pso_result_surrogate_index * surrogate_settings.number_of_vars + 7] > 0.999999 && pso_position_vars[pso_result_surrogate_index * surrogate_settings.number_of_vars + 7] < 1.000001) {// If surrogate was placed without problem by PSO
-                if (candidate_detail.use_me) { // If surrogate was placed without problem by PSO
-                // if (pso_use_this_surrogate == 1) {// If surrogate was placed without problem by PSO
-                    // try_x = pso_position_vars[pso_result_surrogate_index * surrogate_settings.number_of_vars + 1];
-                    try_x = candidate_detail.pso_details[0];
-                    // try_y = pso_position_vars[pso_result_surrogate_index * surrogate_settings.number_of_vars + 2];
-                    try_y = candidate_detail.pso_details[1];
-                    // try_rotation = pso_position_vars[pso_result_surrogate_index * surrogate_settings.number_of_vars + 4];
-                    try_rotation = candidate_detail.pso_details[3];
-
-                    // let pso_desired_length = pso_position_vars[pso_result_surrogate_index * surrogate_settings.number_of_vars + 5];
-                    let pso_desired_length = candidate_detail.pso_details[4];
-                    // let pso_desired_width = pso_position_vars[pso_result_surrogate_index * surrogate_settings.number_of_vars + 10];
-                    let pso_desired_width = candidate_detail.pso_details[5];
-                    // let pso_desired_height = pso_position_vars[pso_result_surrogate_index * surrogate_settings.number_of_vars + 11];
-                    let pso_desired_height = candidate_detail.pso_details[6];
-
-                    try_surro = getBestFittingSurrogateL2(surros, pso_desired_length, pso_desired_width, pso_desired_height);
-
-                    // // Select chosen surrogate
-                    // let pso_chosen_surro = Math.floor(pso_position_vars[pso_result_surrogate_index * surrogate_settings.number_of_vars + 5]);
-                    // if (pso_chosen_surro >= surros.length) {
-                    //     pso_chosen_surro = surros.length-1; // Probably unnecessary with bounce
-                    //     console.log({WARNING:"outside (above) of bounce range"});
-                    // }
-                    // else if (pso_chosen_surro < 0) {
-                    //     pso_chosen_surro = 0;
-                    //     console.log({WARNING:"outside (below) of bounce range"});
-                    // }
-
-                    // try_surro = surros[pso_chosen_surro];
-
-                    // Select test tower position/on baseplate
-                    let tower_library_float = candidate_detail.pso_details[2];
-                    try_z = 0;
-                    let tower_library_index = -1;
-                    if (surrogate_settings.allow_towers == true) {
-                        if (tower_library_float >= 1) {
-                            tower_library_index = 0.99999;
-                        }
-                        else if (tower_library_float < 0) {
-                            tower_library_index = 0;
-                        } else tower_library_index = tower_library_float;
-
-                        tower_library_index = Math.floor(tower_library_index * (surrogates_placed.length+1)); // #previous surrogates + 1 for on-baseplate
-                        tower_library_index = tower_library_index - 1; 
-
-                        // if (tower_library_index >= 0) try_z = surrogates_placed[tower_library_index].starting_height + surrogates_placed[tower_library_index].surro.height;
-                        if (tower_library_index >= 0) try_z = surrogates_placed[tower_library_index].end_height;
-                    }
-    
-
-                    // Adjust position/rotation to lower surrogate in tower
-                    if (tower_library_index >= 0) {
-                        // let x_space = (surrogates_placed[tower_library_index].surro.length - try_surro.length - 1.6) * 0.5; // TODO: Set to two times nozzle size
-                        // let y_space = (surrogates_placed[tower_library_index].surro.width - try_surro.width - 1.6) * 0.5;
-                        try_rotation = surrogates_placed[tower_library_index].rotation;
-                        // try_x = pso_position_vars[pso_result_surrogate_index * surrogate_settings.number_of_vars + 8];
-                        // try_y = pso_position_vars[pso_result_surrogate_index * surrogate_settings.number_of_vars + 9];
-                        try_x = TODOobject.tower_details.tower_x;
-                        try_y = TODOobject.tower_details.tower_y;
-                        // let mid_x = (surrogates_placed[tower_library_index].geometry[0].bounds.maxx + surrogates_placed[tower_library_index].geometry[0].bounds.minx)*0.5;
-                        // let mid_y = (surrogates_placed[tower_library_index].geometry[0].bounds.maxy + surrogates_placed[tower_library_index].geometry[0].bounds.miny)*0.5
-                        // if (try_x > mid_x + x_space) try_x = mid_x + x_space;
-                        // else if (try_x < mid_x - x_space) try_x = mid_x - x_space;
-                        // if (try_y > mid_y + y_space) try_y = mid_y + y_space;
-                        // else if (try_y < mid_y - y_space) try_y = mid_y - y_space;
-                    } 
-
-
-                    // Check if surrogate is available
-                    if (try_surro.available === false) {
-                        console.log({Warning_note:"A surro has been chosen that was not available."});
-                    }
-
-                    let pso_polygons_list = [];
-                    let prism_bottoms = [];
-                    let finalHeight = try_z + try_surro.height;
-                    let id_extension;
-                    if (try_surro.type == "simpleRectangle") {
-                        pso_polygons_list = [generateRectanglePolygonCentered(try_x, try_y, try_z, try_surro.length, try_surro.width, try_rotation, surrogate_settings.surrogate_padding, bottom_slice)];
-                    }
-                    else if (try_surro.type == "prism") {
-                        pso_polygons_list = [generatePrismPolygon(try_x, try_y, try_z, try_surro.prism_geometry, try_rotation, surrogate_settings.surrogate_padding, bottom_slice)];
-                        // const deg = try_rotation * Math.PI / 180;
-                        // const alignX = Math.cos(deg)*5 - Math.sin(deg)*5;
-                        // const alignY = Math.sin(deg)*5 + Math.cos(deg)*5;
-                        // const alignX = 0; const alignY = 0;
-                        prism_bottoms = [generatePrismPolygon(try_x, try_y, try_z, try_surro.bottom_geometry, try_rotation, surrogate_settings.surrogate_padding, bottom_slice)]; // TODO align these using SVG viewbox
-                        const extensionIndexList = getSliceIndexList(surrogate_settings.precomputed_slice_heights, try_z + try_surro.minHeight, try_z + try_surro.maxHeight);
-                        const extensionData = checkVolumeAndCollisionsExtend(surrogate_settings.all_slices, extensionIndexList, pso_polygons_list, finalHeight);
-                        finalHeight = extensionData[0];
-                    } else {
-                        pso_polygons_list = [generateRectanglePolygonCentered(try_x, try_y, try_z, try_surro.length, try_surro.width, try_rotation, surrogate_settings.surrogate_padding, bottom_slice)];
-                        const stackIndexList = getStackableIndexList(surrogate_settings.precomputed_slice_heights, try_z + try_surro.minHeight, try_surro.addMaxNumber, try_surro.addHeight);
-                        const stackingData = checkVolumeAndCollisionsStack(surrogate_settings.all_slices, stackIndexList, pso_polygons_list, finalHeight, try_surro.addHeight);
-                        finalHeight = stackingData[0];
-                        id_extension = stackingData[2];
-                    }
-
-                    // generate candidate and validation insertion case and layer
-                    let lower_surro = [];
-                    let empty_array = [];
-                    let data_array = {insertion_case:"unknown"};
-                    if (tower_library_index >= 0) {
-                        lower_surro.push(surrogates_placed[tower_library_index]);
-                    }
-                    let end_height = finalHeight;
-                    console.log({try_z:try_z});
-                    console.log({finalHeight:finalHeight});
-                    let candidate = {
-                        geometry:pso_polygons_list, 
-                        rotation:try_rotation,
-                        surro:try_surro, starting_height:try_z, 
-                        end_height:end_height, 
-                        down_surrogate:lower_surro, 
-                        up_surrogate:empty_array, 
-                        outlines_drawn:0, 
-                        insertion_data:data_array,
-                        bottom_geometry:prism_bottoms,
-                        id_extension:id_extension
-                    };
-
-                    if (tower_library_index >= 0) {
-                        surrogates_placed[tower_library_index].up_surrogate.push(candidate); // Add backwards reference for tower
-                    }
-
-
-                    // Rotation debug testing
-                    for (let debugint = 1; debugint < 2; debugint = debugint + 85) {
-                        continue;
-                        // let trysurrorandom = surros[Math.floor(Math.random() * surros.length)];
-                        // console.log({trysurrorandom:trysurrorandom});
-                        // let pso_polygons_listDB = [generateRectanglePolygonCentered(try_x, try_y, up.z, trysurrorandom.length, trysurrorandom.width, debugint, surrogate_settings.surrogate_padding, bottom_slice)];
-                        // let pso_polygons_listDB = [generateRectanglePolygonCentered(try_x, try_y, up.z, try_surro.length, try_surro.width, debugint, surrogate_settings.surrogate_padding, bottom_slice)];
-
-                        // console.log({try_x:try_x});
-                        // console.log({boundmid:(candidate.geometry[0].bounds.maxx + candidate.geometry[0].bounds.minx)*0.5});
-
-                        // let testLength = 10;
-                        // let testWidth = 5;
-
-                        // let x_space = (try_surro.length - testLength)*0.5;
-                        // let y_space = (try_surro.width - testWidth)*0.5;
-
-                        // let targetX = Math.random()*200-100;
-                        // let targetY = Math.random()*200-100;
-
-                        // let degRot = try_rotation * Math.PI / 180;
-                        // let x_dist = targetX - try_x;
-                        // let y_dist = targetY - try_y;
-
-                        // // x_dist = 10;
-                        // // y_dist = 0;
-
-                        // let local_x_dist = Math.cos(degRot)*x_dist + Math.sin(degRot)*y_dist;
-                        // let local_y_dist = -1*Math.sin(degRot)*x_dist + Math.cos(degRot)*y_dist;
-
-                        
-
-                        // // local_x_dist = 10;
-                        // // local_y_dist = 7;
-
-                        // if (local_x_dist > x_space) local_x_dist = x_space;
-                        // else if (local_x_dist < -x_space) local_x_dist = -x_space;
-                        // // else local_x_dist = 0;
-
-                        // if (local_y_dist > y_space) local_y_dist = y_space;
-                        // else if (local_y_dist < -y_space) local_y_dist = -y_space;
-                        // // else local_x_dist = 0;
-
-                        // let global_x_dist = Math.cos(degRot)*local_x_dist - Math.sin(degRot)*local_y_dist;
-                        // let global_y_dist = Math.sin(degRot)*local_x_dist + Math.cos(degRot)*local_y_dist;
-
-                        // let baseXAfter = try_x + global_x_dist;
-                        // let baseYAfter = try_y + global_y_dist;
-
-
-                        // let pso_polygons_listDB = [generatePrismPolygon(try_x, try_y, up.z, prisms[0].geometry_points, debugint, surrogate_settings.surrogate_padding, bottom_slice)];
-                        // let pso_polygons_listDB2 = [generateRectanglePolygonCentered(baseXAfter, baseYAfter, up.z, testLength, testWidth, try_rotation, surrogate_settings.surrogate_padding, bottom_slice)];
-                        // let candidateDB2 = {
-                        //     geometry:pso_polygons_listDB2, 
-                        //     rotation:try_rotation,
-                        //     surro:try_surro, 
-                        //     // surro:trysurrorandom, 
-                        //     starting_height:try_z, 
-                        //     end_height:end_height, 
-                        //     down_surrogate:lower_surro, 
-                        //     up_surrogate:empty_array, 
-                        //     outlines_drawn:0, 
-                        //     insertion_data:data_array
-                        // };
-
-                        // surrogates_placed.push(candidateDB2);
-                        
-                        // let pso_polygons_listDB = [generatePrismPolygon(try_x+debugint*3, try_y, up.z, try_surro.geometry, debugint, surrogate_settings.surrogate_padding, bottom_slice)];
-                        let pso_polygons_listDB = [generateRectanglePolygonCentered(0, 0, up.z, bedWidthArea*2, bedDepthArea*2, 0, surrogate_settings.surrogate_padding, bottom_slice)];
-
-                        // const alignX = 0; const alignY = 0;
-                        // prism_bottoms = [generatePrismPolygon(try_x+debugint*3, try_y, try_z, try_surro.bottom_geometry, debugint, surrogate_settings.surrogate_padding, bottom_slice)]; // TODO align these using SVG viewbox
-
-                        let candidateDB = {
-                            geometry:pso_polygons_listDB, 
-                            rotation:debugint,
-                            surro:try_surro, 
-                            // surro:trysurrorandom, 
-                            starting_height:try_z, 
-                            end_height:end_height, 
-                            down_surrogate:lower_surro, 
-                            up_surrogate:empty_array, 
-                            outlines_drawn:0, 
-                            insertion_data:data_array,
-                            bottom_geometry:prism_bottoms
-                        };
-
-                        surrogates_placed.push(candidateDB);
-                    }
-
-
-
-                    // console.log({candidate:candidate});
-                    check_surrogate_insertion_case(candidate, bottom_slice, surrogate_settings);
-
-                    // Check if it is on a consecutive layer from a previous surrogate
-                    let consecutive = false;
-                    surrogates_placed.forEach(function(surrogate) {
-                        if (Math.abs(candidate.insertion_data.index - surrogate.insertion_data.index) === 1) {
-                            consecutive = true;
-                        }
-                    });
-                    if (consecutive) {
-                        // good = false;
-                        // repetition_counter++;
-                        // continue;
-                        console.log({Warning_note:"Two surrogates placed on conecutive layers."})
-                    }
-
-                    surrogates_placed.push(candidate);
-                    candidate.surro.available = false; // Mark surro as used
-    
-                    console.log({placed_surro_name:candidate.surro.id});
-
-                }
-            }
             
-            if (surrogates_placed.length > 0) {
-                // TODO: Error handling for no surros?
+            let select_index = 1;
+            while (select_index < valid_answers.length) {
+                return_list.push(valid_answers[select_index-1]);
+                select_index = Math.ceil(select_index * 1.5);
             }
 
-        }
+            console.log({return_list:return_list});
+
+        }   
         
-        // All surrogates have been placed now 
 
-        console.log({surrogates_placed:surrogates_placed});
-
-        let post_surrogate_support_amounts = getTotalSupportVolume(bottom_slice);
-        console.log({post_surrogate_support_amounts:post_surrogate_support_amounts});
-
-        let volume_saved = pre_surrogate_support_amounts[0] - post_surrogate_support_amounts[0];
-        let volume_percentage_saved = volume_saved / pre_surrogate_support_amounts[0];
-        if (isNaN(volume_percentage_saved)) volume_percentage_saved = 0;
-
-        
-        bottom_slice.handled = true;
-        let all_out_slices = [];
-        up = bottom_slice;
-        // For all slices
-        // while (up) {
-        //     up.replaced_volume = volume_saved;
-        //     all_out_slices.push(up);
-        //     up = up.up;
-        // }
-
-
-        // var endTime = new Date().getTime();
-        // var sTime = endTime - startTime;
-
-        // // More logging for research purposes
-
-        // const efficiencyData = {numberPauses: surrogate_settings.pauseLayers.length, numberSurrogates: surrogates_placed.length, materialWeightEstimateTube: 0, materialWeightEstimateBar: 0, materialWeightEstimateEllipse: 0, timestamp: widget.surrogate_data.timestamp, id: widget.id, previous_volume:pre_surrogate_support_amounts[0], new_volume:post_surrogate_support_amounts[0], volume_percentage_saved:volume_percentage_saved, sTime:sTime};
-
-        // console.log({efficiencyData:efficiencyData});
-
-        // // TODO: Make this not super ugly, return properly
-        // bottom_slice.efficiencyData = efficiencyData;
-
-        // function download(filename, text) {
-        //     var pom = document.createElement('a');
-        //     pom.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
-        //     pom.setAttribute('download', filename);
-        
-        //     if (document.createEvent) {
-        //         var event = document.createEvent('MouseEvents');
-        //         event.initEvent('click', true, true);
-        //         pom.dispatchEvent(event);
-        //     }
-        //     else {
-        //         pom.click();
-        //     }
-        // }
-        // let csv_log = "";
-
-        // csv_log += ","+efficiencyData.id+",,"+efficiencyData.previous_volume+","+efficiencyData.new_volume+","+efficiencyData.volume_percentage_saved+",,,,";
-
-        // download(efficiencyData.timestamp+"_"+efficiencyData.id+".txt", csv_log);
-
-        // console.log({slicing_results_obj:efficiencyData});
-
-
-        // console.log({theWidget: widget});
-
-        // console.log({surrogate_all_slices:all_out_slices});
-
-        // return all_out_slices;
-    
-
-        reply({ seq, output:number_mock_slices });
+        reply({ seq, output:return_list.length, return_list:return_list });
     },
 
     bad: (data, seq) => {
