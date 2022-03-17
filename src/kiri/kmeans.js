@@ -4,19 +4,9 @@
 "use strict";
 
 // dep: geo.base
-// dep: geo.polygons
 gapp.register("kiri.kmeans", [], (root, exports) => {
 
 const { base, kiri } = root;
-
-// const { api, client, consts, utils } = kiri;
-// const { consts, utils } = kiri;
-
-const { key, polygons } = base;
-const { util } = base;
-
-const POLY = base.polygons;
-const NOKEY = key.NONE;
 
 var distances = {
    euclidean: function(v1, v2) {
@@ -299,6 +289,6 @@ gapp.overlay(kiri, {
    newKMeans
 });
 
-kiri.KMeans = KMeans;
+// kiri.KMeans = KMeans;
 
 });

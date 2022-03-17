@@ -26,7 +26,6 @@ function _filterDuplicates(pointset) {
 }
 
 function _sortByX(pointset) {
-    console.log({pointset:pointset});
     return pointset.sort(function(a, b) {
         return (a[0] - b[0]) || (a[1] - b[1]);
     });
@@ -163,7 +162,6 @@ function _concave(convex, maxSqEdgeLen, maxSearchArea, grid, edgeSkipList) {
 }
 
 function hull(pointset, concavity, format) {
-    console.log({pointset1:pointset});
     let maxEdgeLen = concavity || 20;
 
     const points = _filterDuplicates(_sortByX(toXy(pointset, format)));
@@ -287,7 +285,6 @@ function grid(points, cellSize) {
 }
 
 function toXy(pointset, format) {
-    console.log({pointset:pointset});
     if (format === undefined) {
         return pointset.slice();
     }

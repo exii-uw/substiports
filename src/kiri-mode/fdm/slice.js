@@ -975,11 +975,34 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             // prisms_obj.push({geometry_points:parseSVGFromText(val[1]), name:"blue_jack", ini_height:48.9, extension_range:35})
             let view = null; // TODO
 
-            let [ support_points, support_points_simple ] = getSupportPoints(bottom_slice, process, settings); 
+            let [ support_pointsDB, support_points_simpleDB ] = getSupportPointsDebug(bottom_slice, process, settings);
+
+            let [ support_points, support_points_simple ] = getSupportPoints(bottom_slice, process, settings);
 
             console.log({support_points_simple:support_points_simple});
             console.log({support_points:support_points});
 
+            // Get concave hulls of support clusters
+            let cluster_promises = [];
+
+            for (let kn = 1; kn < 7; kn++) {
+                const kint = Math.floor(kn); // Not sure if required to ensure kn doesn't change during minion runtime
+                cluster_promises.push(kiri.minions.clusterSupports(support_points_simple, kint, bottom_slice.z));
+            }
+            
+            let cluster_list = [];
+            if (cluster_promises) {
+                for (let p of cluster_promises) {
+                    p.then(data => {
+                        // tracker(count++, promises.length, data);
+                        console.log({clusterHullData:data});
+                        cluster_list.push(data);
+                    });
+                }
+                await Promise.all(cluster_promises);
+            }
+
+            console.log({cluster_list:cluster_list});
 
             let surrogate_library = getSurrogateLibrary(prisms_obj);
 
@@ -996,7 +1019,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             
             let test_promises = [];
 
-            let test_array = [5, 8, 10, 3, 7, 29, 1, 15, 88, 6];
+            // let test_array = [5, 8, 10, 3, 7, 29, 1, 15, 88, 6];
             let test_out = [];
             
     
@@ -1009,23 +1032,19 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             console.log({decodedTop:decodedTop});
 
 
-            let test_test_array = [encodedTop,[2,3,4,[11,12]],[5,6,7]];
+            // let test_test_array = [encodedTop,[2,3,4,[11,12]],[5,6,7]];
 
             let encoded_kiri_tops = []
             for (let oneTop of test_poly_list) {
                 encoded_kiri_tops.push(kiri.codec.encode(oneTop, {full: true}));
             }
 
-
-            console.log({top_kiri:kiri});
-            console.log({aSlice:highest_slice.down});
-
-            for (let integr of test_array) {
-                test_promises.push(kiri.minions.test(integr, highest_slice, test_poly_list, encoded_kiri_tops, test_test_array));
-            }
+            // for (let integr of test_array) {
+            //     test_promises.push(kiri.minions.test(integr, highest_slice, test_poly_list, encoded_kiri_tops, test_test_array));
+            // }
             surrogate_settings.start_slice = null;
             surrogate_settings.all_slices = null;
-            test_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings, settings.device, bottom_slice.widget));
+            test_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, cluster_list[0].concave_cluster_hulls[0], surrogate_settings, settings.device, bottom_slice.widget));
             // test_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings, settings.device, bottom_slice.widget));
             // test_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings, settings.device, bottom_slice.widget));
             // test_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings, settings.device, bottom_slice.widget));
@@ -1182,34 +1201,21 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                 // let encodededTop3 = kiri.codec.encode(oneTop);
                 // let encodededTop2 = oneTop.encode({full: true});
                 // // let encodededTop4 = oneTop.encode(true);
-                // console.log({encodededTop1:encodededTop1});
-                // console.log({encodededTop2:encodededTop2});
-                // console.log({encodededTop3:encodededTop3});
-                // console.log({encodededTop4:encodededTop4});
             }
             // for (let oneTop of current_slice.topPolys()) {
             //     encodedTops.push(kiri.codec.encode(oneTop, {full: true}));
             //     let encodededTop1 = kiri.codec.encode([oneTop], {full: true});
             //     let encodededTop3 = kiri.codec.encode(oneTop);
             //     let encodededTop2 = oneTop.encode({full: true});
-            //     // let encodededTop4 = oneTop.encode(true);
-            //     console.log({encodededTop1:encodededTop1});
-            //     console.log({encodededTop2:encodededTop2});
-            //     console.log({encodededTop3:encodededTop3});
-            //     // console.log({encodededTop4:encodededTop4});
             // }
             if (current_slice.supports) {
                 // for (let oneSupport of current_slice.supports) {
                 //     encodedSupports.push(kiri.codec.encode(oneSupport, {full: true}));
                 //     // let encodedSupport = kiri.codec.encode(oneSupport, {full: true});
-                //     // console.log({encodedSupport:encodedSupport});
                 //     // let encodedSupport2 = kiri.codec.encode(oneSupport);
-                //     // console.log({encodedSupport2:encodedSupport2});
                 // }
                 encodedSupports = kiri.codec.encode(current_slice.supports);
-                // console.log({encodedSupportList:encodedSupportList});
                 // let encodedSupportList2 = kiri.codec.encode(current_slice.supports);
-                // console.log({encodedSupportList2:encodedSupportList2});
             }
 
             let sliceDetailList = [encodedSlice, encodedTops, encodedSupports, sliceHeight];
@@ -1268,7 +1274,114 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
             // Also add outlines of all polygons to get high fidelity clusters
             for (let support_poly of bottom_slice.supports)  {
-                console.log({support_poly:support_poly});
+                for (let point of support_poly.points) {
+                    let test_point = newPoint(point.x, point.y, point.z);
+                    valid_points.push(test_point);
+                }
+            }
+            bottom_slice.support_points = valid_points;
+
+            // Check how high supports are for each point
+            let height_points = [...valid_points];
+            // let height_points_outline = [...supp_outline_points]; // TODO: Faster to handle outline points differently? Compare points to all outline points directly?
+            let next_slice = bottom_slice.up;
+            while (next_slice) {
+                let height_points_i = height_points.length;
+                while(height_points_i--) {
+                    if (next_slice.supports) {
+                        let point_valid = false;
+                        for (let support_poly of next_slice.supports)  {
+                            if (height_points[height_points_i].isInPolygon(support_poly)) { // TODO: inPolygon vs. isInPolygon checks for holes(children)
+                                point_valid = true;
+                                break;
+                            }
+                        }
+                        if (point_valid) {
+                            height_points[height_points_i].z = next_slice.z;
+                        } else {
+                            height_points.splice(height_points_i, 1);
+                        }
+                    }
+                }
+
+                // height_points_i = height_points_outline.length;
+                // while(height_points_i--) {
+                //     if (next_slice.supports) {
+                //         let point_valid = false;
+                //         for (let support_poly of next_slice.supports)  {
+                //             if (height_points_outline[height_points_i].nearPolygon(support_poly, 0.1, true)) { // check if point still on polygon outline (within distance), including inner polys
+                //                 point_valid = true;
+                //                 break;
+                //             }
+                //         }
+                //         if (point_valid) {
+                //             height_points_outline[height_points_i].z = next_slice.z;
+                //         } else {
+                //             height_points_outline.splice(height_points_i, 1);
+                //         }
+                //     }
+                // }
+                
+                let points_slice_copy = [...height_points]; // Save remaining support points to slice
+                next_slice.support_points = points_slice_copy;
+
+                next_slice = next_slice.up;
+            }
+        }
+
+        let simple_valid_p = getSimplePointsArray(valid_points, false);
+
+        return [ valid_points, simple_valid_p ];
+    }
+
+    function getSupportPointsDebug(slice, proc, settings) {
+
+        let bottom_slice = slice;
+        // let last_bottom_slice;
+        // while (bottom_slice) {
+        //     last_bottom_slice = bottom_slice;
+        //     bottom_slice = bottom_slice.down;
+        // }
+
+        // bottom_slice = last_bottom_slice;
+        console.log({bottom_slice: bottom_slice});
+
+        let search_density = 1;
+        let search_padding = 0; // TODO: Adjust to size of surrogate/largest surrogate?
+        // Search bounds
+        const min_x = bottom_slice.widget.bounds.min.x - search_padding;
+        const max_x = bottom_slice.widget.bounds.max.x + search_padding;
+        const min_y = bottom_slice.widget.bounds.min.y - search_padding;
+        const max_y = bottom_slice.widget.bounds.max.y + search_padding;
+
+        let valid_points = [];
+        // let supp_outline_points = [];
+        if (!bottom_slice.supports || bottom_slice.supports.length === 0) {
+        } else {
+            for (let point_x = min_x; point_x < max_x; point_x += search_density) {
+                for (let point_y = min_y; point_y < max_y; point_y += search_density) {
+                    let test_point = newPoint(point_x, point_y, bottom_slice.z);
+                    let point_valid = false;
+
+                    for (let support_poly of bottom_slice.supports)  {
+                    //bottom_slice.supports.forEach(function(support_poly) {
+                        if (test_point.isInPolygon(support_poly)) { // TODO: inPolygon vs. isInPolygon checks for holes(children)
+                            point_valid = true;
+                            break;
+                        }
+                    }
+
+                    //});
+                    if (point_valid) {
+                        valid_points.push(test_point);
+                    }
+                }
+            }
+
+            console.log({valid_points_length:valid_points.length});
+
+            // Also add outlines of all polygons to get high fidelity clusters
+            for (let support_poly of bottom_slice.supports)  {
                 for (let point of support_poly.points) {
                     let test_point = newPoint(point.x, point.y, point.z);
                     valid_points.push(test_point);
@@ -1334,7 +1447,6 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
         let simple_valid_p = getSimplePointsArray(valid_points, false);
 
-        
         var clusters = kmeans.cluster(simple_valid_p, 2);
 
         //  var hull = new HULL.hull();
@@ -1407,14 +1519,31 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
             let debugint = Math.floor(Math.random()*(debug_outline_poly.length-1))+1;
             // for (let debugint = 1; debugint < debug_outline_poly.length; debugint++) {
-            let x_dir = debug_outline_poly.points[debugint-1].x - debug_outline_poly.points[debugint].x;
-            let y_dir = debug_outline_poly.points[debugint-1].y - debug_outline_poly.points[debugint].y;
+            // let x_dir = debug_outline_poly.points[debugint-1].x - debug_outline_poly.points[debugint].x;
+            // let y_dir = debug_outline_poly.points[debugint-1].y - debug_outline_poly.points[debugint].y;
 
-            let hull_rot = Math.atan2(y_dir, x_dir)*180/Math.PI;
-            let one_candidate = generateRectangleDEBUG(debug_outline_poly.points[debugint].x, debug_outline_poly.points[debugint].y, bottom_slice.z, 20, -10, hull_rot, 0.4, bottom_slice);
+            // let hull_rot = Math.atan2(y_dir, x_dir)*180/Math.PI+180;
+
+            // let hull_rot_90 = hull_rot + 90;
+
+            // let one_candidate = generateRectangleDEBUG(debug_outline_poly.points[debugint-1].x, debug_outline_poly.points[debugint-1].y, bottom_slice.z, 20, 10, hull_rot, 0.4, bottom_slice);
+            // bottom_slice.tops[0].fill_sparse.push(one_candidate);
+            // let one_candidate2 = generateRectangleDEBUG(debug_outline_poly.points[debugint].x, debug_outline_poly.points[debugint].y, bottom_slice.z, 20, 10, hull_rot_90, 0.4, bottom_slice);
+            // bottom_slice.tops[0].fill_sparse.push(one_candidate2);
+
+
+            let x_dir = hull_points[debugint-1].x - hull_points[debugint].x;
+            let y_dir = hull_points[debugint-1].y - hull_points[debugint].y;
+
+            let hull_rot = Math.atan2(y_dir, x_dir)*180/Math.PI+180;
+
+            let hull_rot_90 = hull_rot + 90;
+
+            let one_candidate = generateRectangleDEBUG(hull_points[debugint-1].x, hull_points[debugint-1].y, bottom_slice.z, 20, 10, hull_rot, 0.4, bottom_slice);
             bottom_slice.tops[0].fill_sparse.push(one_candidate);
+            let one_candidate2 = generateRectangleDEBUG(hull_points[debugint].x, hull_points[debugint].y, bottom_slice.z, 20, 10, hull_rot_90, 0.4, bottom_slice);
+            bottom_slice.tops[0].fill_sparse.push(one_candidate2);
             // }
-
         }
 
         let slice_debug_counter = 0;
@@ -1586,8 +1715,8 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         
         // Autosort this and use old automated stackable add method...
 
-        // addOption(surrogates, 93.8, 89.9, 3.33, "floppyx1");
-        // addOption(surrogates, 154.3, 105, 5.35, "saw plate");
+        addOption(surrogates, 93.8, 89.9, 3.33, "floppyx1");
+        addOption(surrogates, 154.3, 105, 5.35, "saw plate");
         // addOption(surrogates, 137.5, 55.57, 6.62, "wood plate");
         // addOption(surrogates, 208.8, 164, 6.66, "wood plate large");
         // addOption(surrogates, 93.8, 89.9, 6.66, "floppyx2");
@@ -1939,21 +2068,25 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             surrogate_settings.interaction_N_penalty_factor = 0;
             surrogate_settings.surrogate_N_penalty_factor = 0;
             surrogate_settings.searchspace_min_number_of_surrogates = 0;
+            surrogate_settings.surrogateInteraction = "off";
         } else if(proc.surrogateInteraction == "low") {
             surrogate_settings.minVolume = 100;
             surrogate_settings.interaction_N_penalty_factor = 0.35;
             surrogate_settings.surrogate_N_penalty_factor = 0.8;
             surrogate_settings.searchspace_min_number_of_surrogates = 2;
+            surrogate_settings.surrogateInteraction = "low";
         } else if(proc.surrogateInteraction == "medium") {
             surrogate_settings.minVolume = 50;
             surrogate_settings.interaction_N_penalty_factor = 0.3;
             surrogate_settings.surrogate_N_penalty_factor = 0.65;
             surrogate_settings.searchspace_min_number_of_surrogates = 3;
+            surrogate_settings.surrogateInteraction = "medium";
         } else if(proc.surrogateInteraction == "high") {
             surrogate_settings.minVolume = 10;
             surrogate_settings.interaction_N_penalty_factor = 0.0;
             surrogate_settings.surrogate_N_penalty_factor = 0.0;
             surrogate_settings.searchspace_min_number_of_surrogates = 5;
+            surrogate_settings.surrogateInteraction = "high";
         }
 
         if (proc.surrogateSearchQual == "fastest") {
@@ -1961,32 +2094,36 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             surrogate_settings.simplification_factor = 4.0;
             surrogate_settings.search_persistance = 4;
             surrogate_settings.minImprovementPercentage = 0.08;
-            surrogate_settings.numberOfParticles = 175;
+            surrogate_settings.numberOfParticles = 10;
             surrogate_settings.searchspace_max_number_of_surrogates = 4;
+            surrogate_settings.surrogateSearchQual = "fastest";
             
         } else if(proc.surrogateSearchQual == "fair") {
             surrogate_settings.exploration_factor = 0.2;
             surrogate_settings.simplification_factor = 3.5;
             surrogate_settings.search_persistance = 5;
             surrogate_settings.minImprovementPercentage = 0.04;
-            surrogate_settings.numberOfParticles = 175;
+            surrogate_settings.numberOfParticles = 15;
             surrogate_settings.searchspace_max_number_of_surrogates = 5;
+            surrogate_settings.surrogateSearchQual = "fair";
 
         } else if(proc.surrogateSearchQual == "good") {
             surrogate_settings.exploration_factor = 0.12;
             surrogate_settings.simplification_factor = 3;
             surrogate_settings.search_persistance = 5;
             surrogate_settings.minImprovementPercentage = 0.015;
-            surrogate_settings.numberOfParticles = 250;
+            surrogate_settings.numberOfParticles = 20;
             surrogate_settings.searchspace_max_number_of_surrogates = 6;
+            surrogate_settings.surrogateSearchQual = "good";
 
         } else if(proc.surrogateSearchQual == "best") {
             surrogate_settings.exploration_factor = 0.0;
             surrogate_settings.simplification_factor = 2.5;
             surrogate_settings.search_persistance = 8;
             surrogate_settings.minImprovementPercentage = 0.01;
-            surrogate_settings.numberOfParticles = 600;//275;
+            surrogate_settings.numberOfParticles = 30;//275;
             surrogate_settings.searchspace_max_number_of_surrogates = 7;
+            surrogate_settings.surrogateSearchQual = "best";
         }
 
         console.log({surrogateSearchQual:proc.surrogateSearchQual});
@@ -4075,7 +4212,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             surrogate_settings.simplification_factor = 4.0;
             surrogate_settings.search_persistance = 4;
             surrogate_settings.minImprovementPercentage = 0.08;
-            surrogate_settings.numberOfParticles = 175;
+            surrogate_settings.numberOfParticles = 10; // 175
             surrogate_settings.searchspace_max_number_of_surrogates = 4;
             
         } else if(proc.surrogateSearchQual == "fair") {
@@ -4083,7 +4220,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             surrogate_settings.simplification_factor = 3.5;
             surrogate_settings.search_persistance = 5;
             surrogate_settings.minImprovementPercentage = 0.04;
-            surrogate_settings.numberOfParticles = 175;
+            surrogate_settings.numberOfParticles = 15;
             surrogate_settings.searchspace_max_number_of_surrogates = 5;
 
         } else if(proc.surrogateSearchQual == "good") {
@@ -4091,7 +4228,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             surrogate_settings.simplification_factor = 3;
             surrogate_settings.search_persistance = 5;
             surrogate_settings.minImprovementPercentage = 0.015;
-            surrogate_settings.numberOfParticles = 250;
+            surrogate_settings.numberOfParticles = 20;
             surrogate_settings.searchspace_max_number_of_surrogates = 6;
 
         } else if(proc.surrogateSearchQual == "best") {
@@ -4099,7 +4236,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             surrogate_settings.simplification_factor = 2.5;
             surrogate_settings.search_persistance = 8;
             surrogate_settings.minImprovementPercentage = 0.01;
-            surrogate_settings.numberOfParticles = 600;//275;
+            surrogate_settings.numberOfParticles = 30;//275;
             surrogate_settings.searchspace_max_number_of_surrogates = 7;
         }
 

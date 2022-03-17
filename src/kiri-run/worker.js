@@ -248,7 +248,25 @@ kiri.minions = {
         });
     },
 
-    surrogateClusterSearch(slice_stack_data, surrogate_library, support_points, susu_settings, device, widget) {
+
+    clusterSupports(support_points, kn, bottom_z) {
+        return new Promise((resolve, reject) => {
+            if (concurrent < 2) {
+                console.log("CLUSTERING SUPPORTS FAILED!");
+                reject("clustering supports failed");
+            }
+            minwork.queue({
+                cmd: "clusterSupports",
+                support_points: support_points, 
+                kn: kn,
+                bottom_z: bottom_z
+            }, data => { // This handles the data returned by the minion function 
+                resolve(data);
+            });
+        });
+    },
+
+    surrogateClusterSearch(slice_stack_data, surrogate_library, hull_points, susu_settings, device, widget) {
         return new Promise((resolve, reject) => {
             if (concurrent < 2) {
                 console.log("CLUSTER SEARCH FAILED!");
@@ -260,7 +278,7 @@ kiri.minions = {
                 cmd: "surrogateClusterSearch",
                 slice_stack_data: slice_stack_data,
                 surrogate_library: surrogate_library,
-                support_points: support_points, 
+                hull_points: hull_points, 
                 susu_settings: susu_settings,
                 device: mockDevice,
                 widget: mockWidget
