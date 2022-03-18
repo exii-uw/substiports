@@ -313,12 +313,10 @@ const funcs = {
         //POLY.expand(tops, offset, slice.z, slice.offsets = []);
 
         function getBestResult(optmizer_results) {
-            let chosen_result;
+            let chosen_result = null;
             let highest_fitness = Number.NEGATIVE_INFINITY;
-            let good_counter = 0;
             for (let result of optmizer_results) {
                 if (result.valid) {
-                    good_counter++;
                     if (result.fitness > highest_fitness) {
                         highest_fitness = result.fitness;
                         chosen_result = result;
@@ -1294,7 +1292,7 @@ const funcs = {
             let overlap_factor = 0;
 
             let candidate;
-            let results_meta_data = {valid:false, candidate_details:null, fitness:Number.NEGATIVE_INFINITY};
+            let results_meta_data = {valid:false, candidate_details:null, fitness:Number.NEGATIVE_INFINITY, tower_size:1, below:null, aboves:[]};
 
             let pso_use_this_surrogate = 0;
             let tower_details = {tower_x:null, tower_y:null};
@@ -1586,7 +1584,7 @@ const funcs = {
             particle_counter++;
         }
 
-        console.log({optimizer_after_init2:optimizer._particles});
+        // console.log({optimizer_after_init2:optimizer._particles});
         // run the optimizer 40 iterations
         let improvement_Decay = 0;
         let last_Best = 0;
@@ -1671,13 +1669,13 @@ const funcs = {
         let t_iterations = 0;
         function t_loop() {
             if (t_iterations >= t_maxIterations) {
-                log('Max iterations reached. Ending search.');
+                // log('Max iterations reached. Ending search.');
             }
             else {
                 t_iterations++;
                 t_optimizer.step(t_loop);
                 let stepFitness = t_optimizer.getBestFitness();
-                console.log({fitness:stepFitness});
+                if (stepFitness > 0) console.log({fitness:stepFitness});
             }
         }
     
@@ -1691,7 +1689,8 @@ const funcs = {
         t_optimizer.valid_answers = [];
         t_optimizer.setObjectiveFunction(function (var_list, done) { 
             let all_surrogates = [];
-            let lower_surr = this.surrogate_settings.lower_surr;
+            let lower_full = this.surrogate_settings.lower_surr;
+            let lower_surr = lower_full.candidate_details.candidate_obj;
             // for (old_surrogate of this.surrogate_settings.existing_surrogates) {
             //     all_surrogates.push(old_surrogate);
             // };
@@ -1700,7 +1699,8 @@ const funcs = {
             let overlap_factor = 0;
 
             let candidate;
-            let results_meta_data = {valid:false, candidate_details:null, fitness:Number.NEGATIVE_INFINITY};
+            let ts = 1 + lower_full.tower_size;
+            let results_meta_data = {valid:false, candidate_details:null, fitness:Number.NEGATIVE_INFINITY, tower_size:ts, below:lower_full, aboves:[]};
 
             let pso_use_this_surrogate = 0;
             let tower_details = {tower_x:null, tower_y:null};
@@ -1830,6 +1830,12 @@ const funcs = {
                 // console.log({Note:"Bad tower"});
                 // console.log({pso_surrogate:pso_surrogate});
                 // console.log({bottom_surrogate:lower_surr});
+                if (x_space < 0) {
+                    var_list[2] = var_list[2] * 0.75; // Look for less long surrogate
+                }
+                if (y_space < 0) {
+                    var_list[3] = var_list[3] * 0.75; // Look for less wide surrogate                
+                }
                 bad_tower = true;
             }
 
@@ -2017,7 +2023,8 @@ const funcs = {
                     // let current_details = [];
                     // for (let j = 1; j < (1+iteration_number)*this.surrogate_settings.number_of_vars; j++) {
                     let current_details = [...var_list];
-                    
+                    tower_details.tower_x = chosen_x;
+                    tower_details.tower_y = chosen_y;
                     results_meta_data.candidate_details = {pso_details:current_details, pso_idx:pso_idx, candidate_obj:candidate, use_me:pso_use_this_surrogate, tower_details:tower_details};                    // }
 
                     let valid_combination = true;
@@ -2067,7 +2074,7 @@ const funcs = {
 
                     fitness += (pso_surrogate.width * pso_surrogate.length);
 
-                    results_meta_data.fitness = fitness;
+                    results_meta_data.fitness = (lower_full.fitness + fitness - (pso_surrogate.width * pso_surrogate.length));
 
                     // if (valid_combination && surrogates_placed_pso > 0) {
                     if (valid_combination) {
@@ -2104,41 +2111,80 @@ const funcs = {
             console.log(optimizer.getBestFitness(), optimizer.getBestPosition());
             // Optimizer area ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-            let pso_position_vars = optimizer.getBestPosition();
+            // let pso_position_vars = optimizer.getBestPosition();
 
-            valid_answers.sort(function(a, b) {
+            // console.log({all_valid_answers_found:optimizer.valid_answers});
+            // console.log({all_valid_answers_found_global:valid_answers});
+
+            // let best_result = getBestResult(optimizer.valid_answers);
+            // console.log({best_result:best_result});
+            
+            let simple_list = [];
+            let tower_list = [];
+            for (let valid_answer of valid_answers) {
+                t_optimizer.init(20, pso_tower_var_list);
+                
+                t_optimizer.surrogate_settings.lower_surr = valid_answer; 
+                t_optimizer.valid_answers = [];
+
+                t_iterations = 0;
+                t_loop();
+                let best_tower = getBestResult(t_optimizer.valid_answers);
+                if (t_optimizer.valid_answers.length > 0) console.log({tower_valid_answers:t_optimizer.valid_answers});
+                let lower_answer = valid_answer;
+                if (best_tower) { // Add the best tower to all lower levels
+                    while (lower_answer) {
+                        lower_answer.aboves.push(best_tower);
+                        lower_answer.tower_fitness = best_tower.fitness;
+                        lower_answer = lower_answer.below;
+                    }
+                    if (valid_answer.tower_size == 1) tower_list.push(valid_answer);
+                } else {
+                    if (valid_answer.tower_size == 1) simple_list.push(valid_answer); // Avoid adding higher levels of a tower again
+                }
+            }
+            simple_list.sort(function(a, b) { // Best results first
                 var keyA = a.fitness,
                     keyB = b.fitness;
-                // Compare the 2 dates
                 if (keyA < keyB) return 1;
                 if (keyA > keyB) return -1;
                 return 0;
             });
 
-            console.log({all_valid_answers_found:optimizer.valid_answers});
-            console.log({all_valid_answers_found_global:valid_answers});
+            tower_list.sort(function(a, b) {
+                var keyA = a.tower_fitness,
+                    keyB = b.tower_fitness;
+                if (keyA < keyB) return 1;
+                if (keyA > keyB) return -1;
+                return 0;
+            });
 
-            let best_result = getBestResult(optimizer.valid_answers);
-            console.log({best_result:best_result});
-            
-            let select_index = 1;
-            while (select_index < valid_answers.length) {
-                return_list.push(valid_answers[select_index-1]);
-                select_index = Math.ceil(select_index * 1.5);
+            let jump_index = 1;
+            while(jump_index <= tower_list.length) {
+                return_list.push(tower_list[jump_index-1]);
+                jump_index = Math.ceil(jump_index * 1.5);
             }
+
+            jump_index = 1;
+            while(jump_index <= simple_list.length) {
+                return_list.push(simple_list[jump_index-1]);
+                jump_index = Math.ceil(jump_index * 1.5);
+            }
+
+            console.log({simple_list:simple_list});
+            console.log({tower_list:tower_list});
+            
+            // jump_index = 1;
+            // for (let select_index = 0; select_index < valid_answers.length; select_index++) {
+            //     if (valid_answers[select_index].aboves.length > 0) {
+            //         return_list.push(valid_answers[select_index]);
+            //     } else if (select_index >= jump_index) {
+            //         return_list.push(valid_answers[select_index]);
+            //         jump_index = Math.ceil(jump_index * 1.5);
+            //     }
+            // }
 
             console.log({return_list:return_list});
-
-            for (let valid_answer of valid_answers) {
-                t_optimizer.init(20, pso_tower_var_list);
-                
-                t_optimizer.surrogate_settings.lower_surr = valid_answer.candidate_details.candidate_obj; 
-                console.log({valid_answer:valid_answer});
-                console.log({lowerSurr:t_optimizer.surrogate_settings.lower_surr});
-                t_iterations = 0;
-                t_loop();
-                console.log(t_optimizer.getBestFitness(), t_optimizer.getBestPosition());
-            }
 
         }   
         
