@@ -1042,23 +1042,24 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             // for (let integr of test_array) {
             //     test_promises.push(kiri.minions.test(integr, highest_slice, test_poly_list, encoded_kiri_tops, test_test_array));
             // }
+            let optimizer_promises = [];
             surrogate_settings.start_slice = null;
             surrogate_settings.all_slices = null;
-            test_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, cluster_list[0].concave_cluster_hulls[0], surrogate_settings, settings.device, bottom_slice.widget));
-            // test_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings, settings.device, bottom_slice.widget));
-            // test_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings, settings.device, bottom_slice.widget));
-            // test_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings, settings.device, bottom_slice.widget));
-            // test_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings, settings.device, bottom_slice.widget));
-            // test_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings, settings.device, bottom_slice.widget));
-            // test_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings, settings.device, bottom_slice.widget));
-            // test_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings, settings.device, bottom_slice.widget));
-            // test_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings, settings.device, bottom_slice.widget));
-            // test_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings, settings.device, bottom_slice.widget));
-            // test_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings, settings.device, bottom_slice.widget));
-            // test_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings, settings.device, bottom_slice.widget));
-            // test_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings, settings.device, bottom_slice.widget));
-            // test_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings, settings.device, bottom_slice.widget));
-            // test_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings, settings.device, bottom_slice.widget));
+            optimizer_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, cluster_list[0].concave_cluster_hulls[0], surrogate_settings, settings.device, bottom_slice.widget));
+            // optimizer_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings, settings.device, bottom_slice.widget));
+            // optimizer_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings, settings.device, bottom_slice.widget));
+            // optimizer_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings, settings.device, bottom_slice.widget));
+            // optimizer_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings, settings.device, bottom_slice.widget));
+            // optimizer_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings, settings.device, bottom_slice.widget));
+            // optimizer_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings, settings.device, bottom_slice.widget));
+            // optimizer_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings, settings.device, bottom_slice.widget));
+            // optimizer_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings, settings.device, bottom_slice.widget));
+            // optimizer_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings, settings.device, bottom_slice.widget));
+            // optimizer_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings, settings.device, bottom_slice.widget));
+            // optimizer_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings, settings.device, bottom_slice.widget));
+            // optimizer_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings, settings.device, bottom_slice.widget));
+            // optimizer_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings, settings.device, bottom_slice.widget));
+            // optimizer_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings, settings.device, bottom_slice.widget));
 
     
             // if (test_promises) {
@@ -1078,59 +1079,66 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             //     }
             // }
 
+            let candidate_list = [];
 
-            if (test_promises) {
+
+            if (optimizer_promises) {
                 console.log(test_out.length);
-                for (let p of test_promises) {
+                for (let p of optimizer_promises) {
                     p.then(data => {
                         // tracker(count++, promises.length, data);
                         console.log({data:data});
-                        console.log({p:p});
-                        test_out.push(data[0]);
-                        let numberBig = false;
-                        if (data.output[0] > 200) numberBig = true;
-                        // if (p[0][0] > 200) numberBig = true;
-                        console.log({numberBig:numberBig});
-
+                        // let numberBig = false;
+                        // if (data.output[0] > 200) numberBig = true;
+                        // // if (p[0][0] > 200) numberBig = true;
+                        // console.log({numberBig:numberBig});
+                        candidate_list.push(...data.return_list)
                     });
                 }
-                await Promise.all(test_promises);
+                await Promise.all(optimizer_promises);
             }
 
-            console.log({test_out:test_out});
-            console.log(test_out.length);
-    
+            // Handle decoding geometry polys AFTER verification
+            // for (let return_obj of data.return_list) {
+            //     let decoded_geometry = kiri.codec.decode(return_obj.candidate_details.candidate_obj.geometry);
+            //     return_obj.candidate_details.candidate_obj.geometry = decoded_geometry;
+            //     for (let above of return_obj.aboves) {
+            //         let decoded_geometry = kiri.codec.decode(above.candidate_details.candidate_obj.geometry);
+            //         above.candidate_details.candidate_obj.geometry = decoded_geometry;
+            //     }
+            // }
 
 
-            
+            let verify_lists = Array.from(Array(kiri.minions.concurrent), () => []);
+
+            let worker_number = 0;
+            for (let candidate_index in candidate_list) { // Split verification tasks roughly evenly to workers
+                verify_lists[worker_number].push(candidate_index);
+                worker_number++;
+                // if (worker_number >= kiri.minions.concurrent) {
+                if (true) {
+                    worker_number = 0;
+                }
+            }
+
             // let surrogated_slices = doSurrogates(surrogate_library, surrogate_settings, highest_slice, process, widget.shadow, settings, view, prisms_obj);
-            surrogate_settings.start_slice = null;
-            surrogate_settings.all_slices = null;
-            console.log({surrogate_settings:surrogate_settings}); 
             // console.log({surro_settings:surro_settings}); 
             // widget.slices = surrogated_slices;
 
+            let verify_promises = [];
+            let just_one = true;
+            for (let verify_list of verify_lists) {
+                if (just_one) verify_promises.push(kiri.minions.verifyCandidateOverlap(verify_list, candidate_list));
+                just_one = false;
+            }
 
-            let search_promises = [];
-
-            // search_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings));
-
-            if (search_promises) {
-                console.log(test_out.length);
-                for (let p of search_promises) {
+            if (verify_promises) {
+                for (let p of verify_promises) {
                     p.then(data => {
-                        // tracker(count++, promises.length, data);
-                        console.log({data:data});
-                        console.log({p:p});
-                        test_out.push(data[0]);
-                        let numberBig = false;
-                        if (data.output[0] > 200) numberBig = true;
-                        // if (p[0][0] > 200) numberBig = true;
-                        console.log({numberBig:numberBig});
-
+                        console.log({verify_data:data});
                     });
                 }
-                await Promise.all(search_promises);
+                await Promise.all(verify_promises);
             }
 
             profileEnd();
@@ -1724,9 +1732,9 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
         // addOption(surrogates, 73, 10.43, 9.5, "support bar");
         // // addOption(surrogates, 93.8, 89.9, 9.99, "floppyx3");
-        // addOption(surrogates, 44.35, 18.33, 10.16, "wood bar4"); // addOption(surrogates, 44.35, 18.33, 10.16, "wood bar dirty");
-        // addOption(surrogates, 49.8, 47.4, 10.5, "blue support");
-        // addOption(surrogates, 27.31, 23.75, 10.55, "support flat");
+        addOption(surrogates, 44.35, 18.33, 10.16, "wood bar4"); // addOption(surrogates, 44.35, 18.33, 10.16, "wood bar dirty");
+        addOption(surrogates, 49.8, 47.4, 10.5, "blue support");
+        addOption(surrogates, 27.31, 23.75, 10.55, "support flat");
         // addOption(surrogates, 97, 18.35, 11.18, "wood bar3"); //addOption(surrogates, 97, 18.35, 11.18, "wood bar two holes");
         // addOption(surrogates, 100.75, 18.52, 12.2, "wood bar2"); // addOption(surrogates, 100.75, 18.52, 12.2, "wood bar math");
 

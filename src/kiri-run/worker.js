@@ -282,8 +282,24 @@ kiri.minions = {
                 susu_settings: susu_settings,
                 device: mockDevice,
                 widget: mockWidget
+            }, data => { // This handles the data returned by the minion function
+                resolve(data);
+            });
+        });
+    },
+
+    verifyCandidateOverlap(verify_list, candidate_list) {
+        return new Promise((resolve, reject) => {
+            if (concurrent < 2) {
+                console.log("OVERLAP VERIFICATION FAILED!");
+                reject("overlap verification failed");
+            }
+            minwork.queue({
+                cmd: "verifyCandidateOverlap",
+                verify_list: verify_list,
+                candidate_list: candidate_list
             }, data => { // This handles the data returned by the minion function 
-                console.log({minion_output:data.output})
+                console.log({overlapLists:data.graph_edges_lists});
                 resolve(data);
             });
         });
