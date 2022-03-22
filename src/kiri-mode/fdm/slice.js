@@ -1031,7 +1031,6 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             let decodedTop = kiri.codec.decode(encodedTop, {full: true});
             console.log({decodedTop:decodedTop});
 
-
             // let test_test_array = [encodedTop,[2,3,4,[11,12]],[5,6,7]];
 
             let encoded_kiri_tops = []
@@ -1092,7 +1091,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                         // if (data.output[0] > 200) numberBig = true;
                         // // if (p[0][0] > 200) numberBig = true;
                         // console.log({numberBig:numberBig});
-                        candidate_list.push(...data.return_list)
+                        candidate_list.push(...data.return_list);
                     });
                 }
                 await Promise.all(optimizer_promises);
@@ -1111,6 +1110,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
             let verify_lists = Array.from(Array(kiri.minions.concurrent), () => []);
 
+            console.log("Starting to prepare verification");
             let worker_number = 0;
             for (let candidate_index in candidate_list) { // Split verification tasks roughly evenly to workers
                 verify_lists[worker_number].push(candidate_index);
@@ -1125,6 +1125,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             // console.log({surro_settings:surro_settings}); 
             // widget.slices = surrogated_slices;
 
+            console.log("Starting to verify overlaps");
             let verify_promises = [];
             let just_one = true;
             for (let verify_list of verify_lists) {
@@ -1132,18 +1133,112 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                 just_one = false;
             }
 
+            let graph_edges_sets = [];
+
             if (verify_promises) {
                 for (let p of verify_promises) {
                     p.then(data => {
                         console.log({verify_data:data});
+                        graph_edges_sets.push(...data.graph_edges_lists);
                     });
                 }
                 await Promise.all(verify_promises);
             }
 
+            console.log("Done with verification");
+
+
+            function k_combinations(set, k) {
+                var i, j, combs, head, tailcombs;
+                
+                // There is no way to take e.g. sets of 5 elements from
+                // a set of 4.
+                if (k > set.length || k <= 0) {
+                    return [];
+                }
+                
+                // K-sized set has only one K-sized subset.
+                if (k == set.length) {
+                    return [set];
+                }
+                
+                // There is N 1-sized subsets in a N-sized set.
+                if (k == 1) {
+                    combs = [];
+                    for (i = 0; i < set.length; i++) {
+                        combs.push([set[i]]);
+                    }
+                    return combs;
+                }
+                
+                combs = [];
+                for (i = 0; i < set.length - k + 1; i++) {
+                    // head is a list that includes only our current element.
+                    head = set.slice(i, i + 1);
+                    // We take smaller combinations from the subsequent elements
+                    tailcombs = k_combinations(set.slice(i + 1), k - 1);
+                    // For each (k-1)-combination we join it with the current
+                    // and store it to the set of k-combinations.
+                    for (j = 0; j < tailcombs.length; j++) {
+                        combs.push(head.concat(tailcombs[j]));
+                    }
+                }
+
+                return combs;
+            }
+
+            function up_to_m_combinations(set, m) {
+                var k, i, combs, k_combs;
+                combs = [];
+                
+                // Calculate all non-empty k-combinations
+                for (k = 1; k <= m; k++) {
+                    k_combs = k_combinations(set, k);
+                    for (i = 0; i < k_combs.length; i++) {
+                        combs.push(k_combs[i]);
+                    }
+                }
+                return combs;
+            }
+
+            
+            
+            let index_array = [ ...Array(candidate_list.length).keys() ];
+
+            console.log({index_array:index_array});
+
+            var candidate_combinations = up_to_m_combinations(index_array, 4);
+
+            console.log({candidate_combinations:candidate_combinations});
+            let good_combinations_list = [[], [], [], []];
+            
+            let good_combination = true;
+            for (let combination of candidate_combinations) {
+                next_combination:
+                for (let candidate_idx of combination) { // check if the graph edges that show whether two surrogates can be placed without overlap
+                    for (let candidate_idx2 of combination) {
+                        if (!graph_edges_sets[candidate_idx].has(candidate_idx2)) {
+                            good_combination = false;
+                            break next_combination;
+                        }
+                    }
+                }
+                if (good_combination)  {
+                    console.log({good_combination:combination});
+                    // let [ low_ia, med_ia, high_ia, max_ia ] = calculateCombinationFitnesses(combination); // TODO
+                    // candidate_combinations[0].push(low_ia);
+                    // candidate_combinations[1].push(med_ia);
+                    // candidate_combinations[2].push(high_ia);
+                    // candidate_combinations[3].push(max_ia);
+                }
+                good_combination = true;
+            }
+
+
             profileEnd();
             
 
+            
 
 
             profileStart("support-fill");

@@ -2152,7 +2152,7 @@ const funcs = {
         let return_list = [];
 
         if (surrogate_number_goal > 0) {
-            log('Starting optimizer');
+            // log('Starting optimizer');
             loop();
 
             // print the best found fitness value and position in the search space
@@ -2163,12 +2163,10 @@ const funcs = {
 
             valid_answers = sortSL(valid_answers, true);
 
-            console.log(valid_answers.length);
             valid_answers = removeEquivalentSolutions(valid_answers);
-            console.log(valid_answers.length);
             valid_answers.reverse();
             // console.log({all_valid_answers_found:optimizer.valid_answers});
-            console.log({all_valid_answers_found_global:valid_answers});
+            // console.log({all_valid_answers_found_global:valid_answers});
 
             // let best_result = getBestResult(optimizer.valid_answers);
             // console.log({best_result:best_result});
@@ -2192,31 +2190,28 @@ const funcs = {
                     if (hightest_tower_found < o_valid_answers[0].tower_size) hightest_tower_found = o_valid_answers[0].tower_size;
                     o_valid_answers = sortSL(o_valid_answers, true);
                     o_valid_answers = removeEquivalentSolutions(o_valid_answers);
-                    valid_answers.push(...o_valid_answers);
-
+                    
                     // let best_tower = getBestResult(o_valid_answers);
                     let best_tower = o_valid_answers[o_valid_answers.length-1];
+                    valid_answers.push(...o_valid_answers);
                     // if (t_optimizer.valid_answers.length > 0) console.log({tower_valid_answers:t_optimizer.valid_answers});
                     let lower_answer = valid_answer;
-                    if (best_tower) { // Add the best tower(at current height) to lowest level ////all lower levels
                         
-                        let lowest;
-                        let relevant_candidates = [best_tower];
-                        while (lower_answer) {
-                            if (lower_answer.tower_size > 1) relevant_candidates.push(lower_answer);
-                            // lower_answer.aboves.push(best_tower);
-                            // lower_answer.tower_fitness = best_tower.fitness;
-                            lowest = lower_answer;
-                            lower_answer = lower_answer.below;
-                        }
-                        if (!lowest.tower_fitness[best_tower.tower_size-1] || lowest.tower_fitness[valid_answer.tower_size-1] < best_tower.fitness) { // new best tower at this height
-                            lowest.tower_fitness[best_tower.tower_size-1] = best_tower.fitness;
-                            lowest.aboves[best_tower.tower_size-1] = relevant_candidates;
-                        }
-                        if (valid_answer.tower_size == 1) tower_list.push(valid_answer);
-                    } else {
-                        if (valid_answer.tower_size == 1) simple_list.push(valid_answer); // Avoid adding higher levels of a tower again
+                    let lowest;
+                    let relevant_candidates = [best_tower];
+                    while (lower_answer) {
+                        if (lower_answer.tower_size > 1) relevant_candidates.push(lower_answer);
+                        // lower_answer.aboves.push(best_tower);
+                        // lower_answer.tower_fitness = best_tower.fitness;
+                        lowest = lower_answer;
+                        lower_answer = lower_answer.below;
                     }
+                    if (!lowest.tower_fitness[best_tower.tower_size-1] || lowest.tower_fitness[valid_answer.tower_size-1] < best_tower.fitness) { // new best tower at this height
+                        lowest.tower_fitness[best_tower.tower_size-1] = best_tower.fitness;
+                        lowest.aboves[best_tower.tower_size-1] = relevant_candidates;
+                    }
+                    if (valid_answer.tower_size == 1) tower_list.push(valid_answer);
+                    
                 } else {
                     if (valid_answer.tower_size == 1) simple_list.push(valid_answer); // Avoid adding higher levels of a tower again
                 }
@@ -2231,51 +2226,37 @@ const funcs = {
 
             for (let tower_size = 2; tower_size <= hightest_tower_found; tower_size++) { // get best* towers for each discovered size
                 let pruned_tower_list = [];
+                let idx_counter = 0;
                 for (let tower_answer of tower_list) {
                     if (tower_answer.tower_fitness.length >= tower_size) {
-                        pruned_tower_list.push(tower_answer);
+                        pruned_tower_list.push({idx:idx_counter, tower_answer:tower_answer});
+
                     }
+                    idx_counter++;
                 }
                 pruned_tower_list.sort(function(a, b) { // Sort by fitness of tower at that height
-                    var keyA = a.tower_fitness[tower_size-1],
-                        keyB = b.tower_fitness[tower_size-1];
+                    var keyA = a.tower_answer.tower_fitness[tower_size-1],
+                        keyB = b.tower_answer.tower_fitness[tower_size-1];
                     if (keyA < keyB) return 1;
                     if (keyA > keyB) return -1;
                     return 0;
                 });
 
-                console.log({pruned_tower_list:pruned_tower_list});
-
                 let remove_indices = [];
                 jump_index = 1;
-                while(jump_index <= pruned_tower_list.length) {
-                    return_list.push(pruned_tower_list[jump_index-1]);
-                    remove_indices.push(jump_index-1);
+                while(jump_index <= pruned_tower_list.length) {                    
+                    return_list.push(pruned_tower_list[jump_index-1].tower_answer);
+                    remove_indices.push(pruned_tower_list[jump_index-1].idx); // Save position in original list to remove tower from to avoid picking same tower twice
                     jump_index = Math.ceil(jump_index * 2);
                 }
 
-                console.log(remove_indices.length);
-                remove_indices.reverse(); // traverse backwards for splicing
+                remove_indices.sort(function(a, b){return b-a}); // traverse backwards for splicing
                 for (let remove_index of remove_indices) { // Don't include answers more than once
                     tower_list.splice(remove_index, 1);
                 }
             }
-
-            console.log({simple_list:simple_list});
-            console.log({tower_list:tower_list});
             
-            // jump_index = 1;
-            // for (let select_index = 0; select_index < valid_answers.length; select_index++) {
-            //     if (valid_answers[select_index].aboves.length > 0) {
-            //         return_list.push(valid_answers[select_index]);
-            //     } else if (select_index >= jump_index) {
-            //         return_list.push(valid_answers[select_index]);
-            //         jump_index = Math.ceil(jump_index * 1.5);
-            //     }
-            // }
-
             console.log({return_list:return_list});
-
         }   
         
         for (let return_obj of return_list) {
@@ -2287,6 +2268,7 @@ const funcs = {
                     let decoded_geometry_a = kiri.codec.encode(above.candidate_details.candidate_obj.geometry);
                     above.candidate_details.candidate_obj.area2 = above.candidate_details.candidate_obj.geometry[0].area2;
                     above.candidate_details.candidate_obj.geometry = decoded_geometry_a;
+                    above.below = null; // get rid of data no longer needed for encoding
                 }
             }
         }
@@ -2310,9 +2292,9 @@ const funcs = {
 
         for (let position in verify_list) {
             let index = parseInt(verify_list[position]);
-            let no_overlap_combinations = [];
+            let no_overlap_combinations = new Set();
             for (let other_candidate_index = 0; other_candidate_index < candidate_list.length; other_candidate_index++) {
-                if (index == other_candidate_index) no_overlap_combinations.push(other_candidate_index);
+                if (index == other_candidate_index) no_overlap_combinations.add(other_candidate_index);
                 else {
                     let collision_detection = [];
 
@@ -2320,7 +2302,7 @@ const funcs = {
                     
                     if (collision_detection.length == 1) {
                         if (candidate_list[index].candidate_details.candidate_obj.geometry[0].isEquivalent(collision_detection[0])) {
-                            no_overlap_combinations.push(other_candidate_index);
+                            no_overlap_combinations.add(other_candidate_index);
                         }
                     }
                 }
@@ -2329,6 +2311,22 @@ const funcs = {
             // counter++;
         }
  
+        reply({ seq, graph_edges_lists });
+    },
+
+    validateCombinations: (data, seq) => {
+        let { combinations_list, graph_edges_sets, fitness_list } = data; 
+
+        for (let combination of combinations_list) {
+            for (let candidate of combination) {
+                let good_combination = combination.every(function (i) {
+                    graph_edges_sets[i].has(candidate);
+                });
+                if (good_combination) console.log({combination:combination});
+            }
+        }
+
+
         reply({ seq, graph_edges_lists });
     },
 
