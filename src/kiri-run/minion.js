@@ -2288,7 +2288,7 @@ const funcs = {
             // }
         }
 
-        let graph_edges_lists = Array.from(Array(verify_list.length), () => []);
+        let graph_edges_sets = Array.from(Array(verify_list.length), () => []);
 
         for (let position in verify_list) {
             let index = parseInt(verify_list[position]);
@@ -2307,27 +2307,102 @@ const funcs = {
                     }
                 }
             }
-            graph_edges_lists[position] = no_overlap_combinations;
+            graph_edges_sets[position] = no_overlap_combinations;
             // counter++;
         }
  
-        reply({ seq, graph_edges_lists });
+        reply({ seq, graph_edges_sets });
     },
 
     validateCombinations: (data, seq) => {
-        let { combinations_list, graph_edges_sets, fitness_list } = data; 
+        let { candidate_list, graph_edges_sets } = data; 
 
-        for (let combination of combinations_list) {
-            for (let candidate of combination) {
-                let good_combination = combination.every(function (i) {
-                    graph_edges_sets[i].has(candidate);
-                });
-                if (good_combination) console.log({combination:combination});
+        function k_combinations(set, k) {
+            var i, j, combs, head, tailcombs;
+            
+            // There is no way to take e.g. sets of 5 elements from
+            // a set of 4.
+            if (k > set.length || k <= 0) {
+                return [];
             }
+            
+            // K-sized set has only one K-sized subset.
+            if (k == set.length) {
+                return [set];
+            }
+            
+            // There is N 1-sized subsets in a N-sized set.
+            if (k == 1) {
+                combs = [];
+                for (i = 0; i < set.length; i++) {
+                    combs.push([set[i]]);
+                }
+                return combs;
+            }
+            
+            combs = [];
+            for (i = 0; i < set.length - k + 1; i++) {
+                // head is a list that includes only our current element.
+                head = set.slice(i, i + 1);
+                // We take smaller combinations from the subsequent elements
+                tailcombs = k_combinations(set.slice(i + 1), k - 1);
+                // For each (k-1)-combination we join it with the current
+                // and store it to the set of k-combinations.
+                for (j = 0; j < tailcombs.length; j++) {
+                    combs.push(head.concat(tailcombs[j]));
+                }
+            }
+
+            return combs;
         }
 
+        function up_to_m_combinations(set, m) {
+            var k, i, combs, k_combs;
+            combs = [];
+            
+            // Calculate all non-empty k-combinations
+            for (k = 1; k <= m; k++) {
+                k_combs = k_combinations(set, k);
+                for (i = 0; i < k_combs.length; i++) {
+                    combs.push(k_combs[i]);
+                }
+            }
+            return combs;
+        }
 
-        reply({ seq, graph_edges_lists });
+        let index_array = [ ...Array(candidate_list.length).keys() ];
+
+        console.log({index_array:index_array});
+
+        var candidate_combinations = up_to_m_combinations(index_array, 4);
+
+        console.log({candidate_combinations:candidate_combinations});
+        let good_combinations_list = [[], [], [], []];
+        
+        let good_combination = true;
+        for (let combination of candidate_combinations) {
+            next_combination:
+            for (let candidate_idx of combination) { // check if the graph edges that show whether two surrogates can be placed without overlap
+                for (let candidate_idx2 of combination) { // Triple loop useful to skip large parts of check? // TODO: check whether array.every() is faster
+                    if (!graph_edges_sets[candidate_idx].has(candidate_idx2)) {
+                        good_combination = false;
+                        break next_combination;
+                    }
+                }
+            }
+
+            if (good_combination)  {
+                console.log({good_combination:combination});
+                // let [ low_ia, med_ia, high_ia, max_ia ] = calculateCombinationFitnesses(combination); // TODO
+                // candidate_combinations[0].push(low_ia);
+                // candidate_combinations[1].push(med_ia);
+                // candidate_combinations[2].push(high_ia);
+                // candidate_combinations[3].push(max_ia);
+            }
+            good_combination = true;
+        }
+
+        reply({ seq, graph_edges_sets });
     },
 
     bad: (data, seq) => {

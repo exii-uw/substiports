@@ -982,12 +982,18 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             console.log({support_points_simple:support_points_simple});
             console.log({support_points:support_points});
 
+
+            let susu_data_objs = [];
+
             // Get concave hulls of support clusters
             let cluster_promises = [];
 
-            for (let kn = 1; kn < 7; kn++) {
-                const kint = Math.floor(kn); // Not sure if required to ensure kn doesn't change during minion runtime
+            let k_means_depth = 5;
+
+            for (let kn = 0; kn < k_means_depth; kn++) {
+                const kint = Math.floor(kn+1); // Not sure if required to ensure kn doesn't change during minion runtime
                 cluster_promises.push(kiri.minions.clusterSupports(support_points_simple, kint, bottom_slice.z));
+                susu_data_objs.push({kn:kn, candidate_list:[], graph_edges_sets:[], verify_list:[]});
             }
             
             let cluster_list = [];
@@ -995,14 +1001,11 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                 for (let p of cluster_promises) {
                     p.then(data => {
                         // tracker(count++, promises.length, data);
-                        console.log({clusterHullData:data});
                         cluster_list.push(data);
                     });
                 }
                 await Promise.all(cluster_promises);
             }
-
-            console.log({cluster_list:cluster_list});
 
             let surrogate_library = getSurrogateLibrary(prisms_obj);
 
@@ -1011,7 +1014,6 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
             let sliceStackData = getEncodedData(bottom_slice);
             console.log({sliceStackData:sliceStackData});
-
             console.log({bottomMock:sliceStackData[0]});
             console.log({bottom_slice:bottom_slice});
 
@@ -1044,21 +1046,14 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             let optimizer_promises = [];
             surrogate_settings.start_slice = null;
             surrogate_settings.all_slices = null;
-            optimizer_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, cluster_list[0].concave_cluster_hulls[0], surrogate_settings, settings.device, bottom_slice.widget));
-            // optimizer_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings, settings.device, bottom_slice.widget));
-            // optimizer_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings, settings.device, bottom_slice.widget));
-            // optimizer_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings, settings.device, bottom_slice.widget));
-            // optimizer_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings, settings.device, bottom_slice.widget));
-            // optimizer_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings, settings.device, bottom_slice.widget));
-            // optimizer_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings, settings.device, bottom_slice.widget));
-            // optimizer_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings, settings.device, bottom_slice.widget));
-            // optimizer_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings, settings.device, bottom_slice.widget));
-            // optimizer_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings, settings.device, bottom_slice.widget));
-            // optimizer_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings, settings.device, bottom_slice.widget));
-            // optimizer_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings, settings.device, bottom_slice.widget));
-            // optimizer_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings, settings.device, bottom_slice.widget));
-            // optimizer_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings, settings.device, bottom_slice.widget));
-            // optimizer_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, support_points_simple, surrogate_settings, settings.device, bottom_slice.widget));
+            // optimizer_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, cluster_list[0].concave_cluster_hulls[0], surrogate_settings, settings.device, bottom_slice.widget, cluster_list[0].kn));
+
+            for (let cluster of cluster_list) {
+                console.log({cluster:cluster});
+                for (let cluster_hull of cluster.concave_cluster_hulls) {
+                    optimizer_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, cluster_hull, surrogate_settings, settings.device, bottom_slice.widget, cluster.kn-1)); // kn-1 because we plus1 them when building clusters, but susu_data_objs counting starts at 0
+                }
+            }
 
     
             // if (test_promises) {
@@ -1078,20 +1073,20 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             //     }
             // }
 
-            let candidate_list = [];
-
+            // let candidate_lists = Array.from(Array(k_means_depth), () => []);
 
             if (optimizer_promises) {
-                console.log(test_out.length);
                 for (let p of optimizer_promises) {
                     p.then(data => {
+
                         // tracker(count++, promises.length, data);
                         console.log({data:data});
                         // let numberBig = false;
                         // if (data.output[0] > 200) numberBig = true;
                         // // if (p[0][0] > 200) numberBig = true;
                         // console.log({numberBig:numberBig});
-                        candidate_list.push(...data.return_list);
+                        // candidate_lists[data.kn].push(...data.return_list); // TODO: Potentially keep sublists for starting one verification thread per cluster thread  
+                        susu_data_objs[data.kn].candidate_list.push(...data.return_list);
                     });
                 }
                 await Promise.all(optimizer_promises);
@@ -1108,17 +1103,22 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             // }
 
 
-            let verify_lists = Array.from(Array(kiri.minions.concurrent), () => []);
+            // let verify_lists = Array.from(Array(kiri.minions.concurrent), () => []);
+            let verify_lists = Array.from(Array(susu_data_objs.length), () => []);
 
             console.log("Starting to prepare verification");
             let worker_number = 0;
-            for (let candidate_index in candidate_list) { // Split verification tasks roughly evenly to workers
-                verify_lists[worker_number].push(candidate_index);
-                worker_number++;
-                // if (worker_number >= kiri.minions.concurrent) {
-                if (true) {
-                    worker_number = 0;
+            for (let susu_data of susu_data_objs) {
+                for (let candidate_index in susu_data.candidate_list) { // Add list indices 
+                    // verify_lists[worker_number].push(candidate_index); // TODO: Separate work into multiple workers
+                    susu_data.verify_list.push(candidate_index);
+                    // worker_number++;
+                    // if (worker_number >= kiri.minions.concurrent) {
+                    // if (true) {
+                    //     worker_number = 0;
+                    // }
                 }
+                worker_number++;
             }
 
             // let surrogated_slices = doSurrogates(surrogate_library, surrogate_settings, highest_slice, process, widget.shadow, settings, view, prisms_obj);
@@ -1128,9 +1128,11 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             console.log("Starting to verify overlaps");
             let verify_promises = [];
             let just_one = true;
-            for (let verify_list of verify_lists) {
-                if (just_one) verify_promises.push(kiri.minions.verifyCandidateOverlap(verify_list, candidate_list));
-                just_one = false;
+            // for (let verify_list of verify_lists) {
+            for (let susu_data of susu_data_objs) {
+                verify_promises.push(kiri.minions.verifyCandidateOverlap(susu_data.verify_list, susu_data.candidate_list, susu_data.kn));
+                // if (just_one) verify_promises.push(kiri.minions.verifyCandidateOverlap(verify_list, candidate_list, kn));
+                // just_one = false;
             }
 
             let graph_edges_sets = [];
@@ -1139,7 +1141,8 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                 for (let p of verify_promises) {
                     p.then(data => {
                         console.log({verify_data:data});
-                        graph_edges_sets.push(...data.graph_edges_lists);
+                        // graph_edges_sets.push(...data.graph_edges_lists);
+                        susu_data_objs[data.kn].graph_edges_sets.push(...data.graph_edges_sets);
                     });
                 }
                 await Promise.all(verify_promises);
@@ -1148,91 +1151,45 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             console.log("Done with verification");
 
 
-            function k_combinations(set, k) {
-                var i, j, combs, head, tailcombs;
-                
-                // There is no way to take e.g. sets of 5 elements from
-                // a set of 4.
-                if (k > set.length || k <= 0) {
-                    return [];
-                }
-                
-                // K-sized set has only one K-sized subset.
-                if (k == set.length) {
-                    return [set];
-                }
-                
-                // There is N 1-sized subsets in a N-sized set.
-                if (k == 1) {
-                    combs = [];
-                    for (i = 0; i < set.length; i++) {
-                        combs.push([set[i]]);
-                    }
-                    return combs;
-                }
-                
-                combs = [];
-                for (i = 0; i < set.length - k + 1; i++) {
-                    // head is a list that includes only our current element.
-                    head = set.slice(i, i + 1);
-                    // We take smaller combinations from the subsequent elements
-                    tailcombs = k_combinations(set.slice(i + 1), k - 1);
-                    // For each (k-1)-combination we join it with the current
-                    // and store it to the set of k-combinations.
-                    for (j = 0; j < tailcombs.length; j++) {
-                        combs.push(head.concat(tailcombs[j]));
-                    }
-                }
-
-                return combs;
+            // TODO: decode candidates
+            // TODO: Do simple insertion case checks 
+            // TODO: Combine minion verify and validate calls, OR make verfiy run with extra threads 
+      
+            let validate_promises = [];
+            for (let susu_data of susu_data_objs) {
+                validate_promises.push(kiri.minions.validateCombinations(susu_data.candidate_list, susu_data.graph_edges_sets, susu_data.kn))
             }
-
-            function up_to_m_combinations(set, m) {
-                var k, i, combs, k_combs;
-                combs = [];
-                
-                // Calculate all non-empty k-combinations
-                for (k = 1; k <= m; k++) {
-                    k_combs = k_combinations(set, k);
-                    for (i = 0; i < k_combs.length; i++) {
-                        combs.push(k_combs[i]);
-                    }
-                }
-                return combs;
-            }
-
             
+            // let index_array = [ ...Array(candidate_list.length).keys() ];
+
+            // console.log({index_array:index_array});
+
+            // var candidate_combinations = up_to_m_combinations(index_array, 4);
+
+            // console.log({candidate_combinations:candidate_combinations});
+            // let good_combinations_list = [[], [], [], []];
             
-            let index_array = [ ...Array(candidate_list.length).keys() ];
-
-            console.log({index_array:index_array});
-
-            var candidate_combinations = up_to_m_combinations(index_array, 4);
-
-            console.log({candidate_combinations:candidate_combinations});
-            let good_combinations_list = [[], [], [], []];
-            
-            let good_combination = true;
-            for (let combination of candidate_combinations) {
-                next_combination:
-                for (let candidate_idx of combination) { // check if the graph edges that show whether two surrogates can be placed without overlap
-                    for (let candidate_idx2 of combination) {
-                        if (!graph_edges_sets[candidate_idx].has(candidate_idx2)) {
-                            good_combination = false;
-                            break next_combination;
-                        }
-                    }
-                }
-                if (good_combination)  {
-                    console.log({good_combination:combination});
-                    // let [ low_ia, med_ia, high_ia, max_ia ] = calculateCombinationFitnesses(combination); // TODO
-                    // candidate_combinations[0].push(low_ia);
-                    // candidate_combinations[1].push(med_ia);
-                    // candidate_combinations[2].push(high_ia);
-                    // candidate_combinations[3].push(max_ia);
-                }
-                good_combination = true;
-            }
+            // let good_combination = true;
+            // for (let combination of candidate_combinations) {
+            //     next_combination:
+            //     for (let candidate_idx of combination) { // check if the graph edges that show whether two surrogates can be placed without overlap
+            //         for (let candidate_idx2 of combination) {
+            //             if (!graph_edges_sets[candidate_idx].has(candidate_idx2)) {
+            //                 good_combination = false;
+            //                 break next_combination;
+            //             }
+            //         }
+            //     }
+            //     if (good_combination)  {
+            //         console.log({good_combination:combination});
+            //         // let [ low_ia, med_ia, high_ia, max_ia ] = calculateCombinationFitnesses(combination); // TODO
+            //         // candidate_combinations[0].push(low_ia);
+            //         // candidate_combinations[1].push(med_ia);
+            //         // candidate_combinations[2].push(high_ia);
+            //         // candidate_combinations[3].push(max_ia);
+            //     }
+            //     good_combination = true;
+            // }
 
 
             profileEnd();

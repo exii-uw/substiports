@@ -266,7 +266,7 @@ kiri.minions = {
         });
     },
 
-    surrogateClusterSearch(slice_stack_data, surrogate_library, hull_points, susu_settings, device, widget) {
+    surrogateClusterSearch(slice_stack_data, surrogate_library, hull_points, susu_settings, device, widget, kn) {
         return new Promise((resolve, reject) => {
             if (concurrent < 2) {
                 console.log("CLUSTER SEARCH FAILED!");
@@ -283,12 +283,13 @@ kiri.minions = {
                 device: mockDevice,
                 widget: mockWidget
             }, data => { // This handles the data returned by the minion function
+                data.kn = kn;
                 resolve(data);
             });
         });
     },
 
-    verifyCandidateOverlap(verify_list, candidate_list) {
+    verifyCandidateOverlap(verify_list, candidate_list, kn) {
         return new Promise((resolve, reject) => {
             if (concurrent < 2) {
                 console.log("OVERLAP VERIFICATION FAILED!");
@@ -299,7 +300,25 @@ kiri.minions = {
                 verify_list: verify_list,
                 candidate_list: candidate_list
             }, data => { // This handles the data returned by the minion function 
-                console.log({overlapLists:data.graph_edges_lists});
+                console.log({overlapLists:data.graph_edges_sets});
+                data.kn = kn;
+                resolve(data);
+            });
+        });
+    },
+
+    validateCombinations(candidate_list, graph_edges_sets, kn) {
+        return new Promise((resolve, reject) => {
+            if (concurrent < 2) {
+                console.log("CONBINATION VALIDATION FAILED!");
+                reject("combination calidation failed");
+            }
+            minwork.queue({
+                cmd: "validateCombinations",
+                candidate_list: candidate_list,
+                graph_edges_sets:graph_edges_sets
+            }, data => { // This handles the data returned by the minion function 
+                data.kn = kn;
                 resolve(data);
             });
         });
