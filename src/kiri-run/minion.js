@@ -647,7 +647,7 @@ const funcs = {
                         post_collision_area += Math.abs(top_poly.areaDeep());
                     });
                     
-                    if ((pre_collision_area - post_collision_area) > 0.00001) { // rounded the same // TODO: Currently testing whether we need Math abs with switched subtraction order
+                    if ((pre_collision_area - post_collision_area) > 0.001) { // rounded the same // TODO: Currently testing whether we need Math abs with switched subtraction order
                         // if ((slice_height_range.bottom_height + surrogate_settings.min_squish_height) < (try_surro.minHeight + try_z)) {
                         if ((iterate_layers_VandC.z - surrogate_settings.min_squish_height) < (try_surro.minHeight + try_z)) {
                             collision = true;
@@ -685,7 +685,7 @@ const funcs = {
                                     post_collision_area += Math.abs(top_poly.areaDeep());
                                 });
                                 
-                                if ((pre_collision_area - post_collision_area) > 0.00001) {
+                                if ((pre_collision_area - post_collision_area) > 0.001) {
                                     // if ((slice_height_range.bottom_height + surrogate_settings.min_squish_height) < (try_surro.minHeight + try_z)) {
                                     if ((iterate_layers_VandC.z - surrogate_settings.min_squish_height) < (try_surro.minHeight + try_z)) {
                                         collision = true;
@@ -780,7 +780,7 @@ const funcs = {
                 //     console.log({collision_area:collision_area});
                 // }
                 
-                if (collision_area > 0.00001) { // rounded the same // TODO: Currently testing whether we need Math abs with switched subtraction order
+                if (collision_area > 0.001) { // rounded the same // TODO: Currently testing whether we need Math abs with switched subtraction order
                     // if ((slice_height_range.bottom_height + surrogate_settings.min_squish_height) < (try_surro.minHeight + try_z)) {
                     // total_collision_area += collision_area;
                     collision = true;
@@ -812,12 +812,12 @@ const funcs = {
                             });
 
                             const collision_area_other_surrogates = pre_collision_area - post_collision_area;
-                            // if (collision_area_other_surrogates < -0.00000001) {
-                            //     console.log({WARNING:"AAAAAAAAAAA ABS NEEDED"});
-                            //     console.log({collision_area_other_surrogates:collision_area_other_surrogates});
-                            // }
+                            if (collision_area_other_surrogates < -0.00000001) {
+                                console.log({WARNING:"AAAAAAAAAAA ABS NEEDED"});
+                                console.log({collision_area_other_surrogates:collision_area_other_surrogates});
+                            }
                             
-                            if ((collision_area_other_surrogates) > 0.00001) {
+                            if ((collision_area_other_surrogates) > 0.001) {
                                 // total_collision_area += collision_area_other_surrogates;
                                 collision = true;
                                 // collisions_found += 1;
@@ -892,7 +892,7 @@ const funcs = {
                 //     console.log({collision_area:collision_area});
                 // }
                 
-                if ((collision_area) > 0.00001) { // rounded the same 
+                if ((collision_area) > 0.001) { // rounded the same 
                     // total_collision_area += collision_area;
                     collision = true;
                     // collisions_found += 1;
@@ -996,7 +996,7 @@ const funcs = {
                 //     console.log({collision_area:collision_area});
                 // }
                 
-                if ((collision_area) > 0.00001) { // rounded the same 
+                if ((collision_area) > 0.001) { // rounded the same 
                     break;
                 }
 
@@ -1100,7 +1100,7 @@ const funcs = {
                     //     console.log({collision_area:collision_area});
                     // }
                     
-                    if ((collision_area) > 0.00001) { // rounded the same 
+                    if ((collision_area) > 0.001) { // rounded the same 
                         issueFound = true;
                         break;
                     }
@@ -2117,7 +2117,7 @@ const funcs = {
             let solution_list_i = solution_list.length - 1;
             let last_fitness = solution_list[solution_list_i].fitness;
             while(solution_list_i--) {
-                if (last_fitness - solution_list[solution_list_i].fitness < 5) {
+                if (last_fitness - solution_list[solution_list_i].fitness < 1) {
                     solution_list.splice(solution_list_i, 1);
                 } 
                 else {
@@ -2247,7 +2247,7 @@ const funcs = {
                 while(jump_index <= pruned_tower_list.length) {                    
                     return_list.push(pruned_tower_list[jump_index-1].tower_answer);
                     remove_indices.push(pruned_tower_list[jump_index-1].idx); // Save position in original list to remove tower from to avoid picking same tower twice
-                    jump_index = Math.ceil(jump_index * 2);
+                    jump_index = Math.ceil(jump_index * 1.5);
                 }
 
                 remove_indices.sort(function(a, b){return b-a}); // traverse backwards for splicing
@@ -2294,28 +2294,122 @@ const funcs = {
             let index = parseInt(verify_list[position]);
             let no_overlap_combinations = new Set();
             for (let other_candidate_index = 0; other_candidate_index < candidate_list.length; other_candidate_index++) {
-                if (index == other_candidate_index) no_overlap_combinations.add(other_candidate_index);
+                if (index == other_candidate_index) {}// Do nothing, this is added later //no_overlap_combinations.add(other_candidate_index);
                 else {
                     let collision_detection = [];
-
-                    POLY.subtract(candidate_list[index].candidate_details.candidate_obj.geometry, candidate_list[other_candidate_index].candidate_details.candidate_obj.geometry, collision_detection, null, 0, 0.05); // TODO: Check if Z matters
+                    POLY.subtract(candidate_list[index].candidate_details.candidate_obj.geometry, candidate_list[other_candidate_index].candidate_details.candidate_obj.geometry, collision_detection, null, 0, 0.05); // TODO: Check if Z matters //candidate_list[index].candidate_details.candidate_obj.geometry[0].points[0].z
                     
                     if (collision_detection.length == 1) {
-                        if (candidate_list[index].candidate_details.candidate_obj.geometry[0].isEquivalent(collision_detection[0])) {
+                        // if (candidate_list[index].candidate_details.candidate_obj.geometry[0].isEquivalent(collision_detection[0], true)) {
+                        //     no_overlap_combinations.add(other_candidate_index);
+                        // }
+
+                        let post_collision_area = 0, pre_collision_area = 0;
+                        candidate_list[index].candidate_details.candidate_obj.geometry.forEach(function(top_poly) {
+                            pre_collision_area += Math.abs(top_poly.areaDeep());
+                        });
+                        collision_detection.forEach(function(top_poly) {
+                            post_collision_area += Math.abs(top_poly.areaDeep());
+                        });
+        
+                        const collision_area = Math.abs(pre_collision_area - post_collision_area);
+                        // if (collision_area < -0.000001) {
+                        //     console.log({WARNING:"AAAAAAAAAAA ABS NEEDED"});
+                        //     console.log({collision_area:collision_area});
+                        // }
+                        
+                        if (collision_area < 0.001) { // rounded the same // TODO: Currently testing whether we need Math abs with switched subtraction order
+                            // if ((slice_height_range.bottom_height + surrogate_settings.min_squish_height) < (try_surro.minHeight + try_z)) {
+                            // total_collision_area += collision_area;
+                            // collision = true;
+                            // collisions_found += 1;
                             no_overlap_combinations.add(other_candidate_index);
-                        }
+                            
+                        } 
+                        // if ((collision && equivalent) || (!collision && !equivalent)) {
+                        //     console.log({Warning:"Area and equivalence check disagree"});
+                        //     console.log({collision_area:collision_area});
+                        //     console.log({collision:collision});
+                        //     console.log({equivalent:equivalent});
+                        //     console.log({candidate_gemoetry:candidate_list[index].candidate_details.candidate_obj.geometry});
+                        //     console.log({collision_detection:collision_detection});
+                        // }
                     }
                 }
             }
             graph_edges_sets[position] = no_overlap_combinations;
             // counter++;
         }
+
+        const isSameSet = (s1, s2) => {
+            if (s1.size !== s2.size) {
+                return false;
+            }
+            return [...s1].every(i => s2.has(i))
+        }
+        let handled_set = new Set();
+        let prune_list = [];
+        for (let set_index in graph_edges_sets) {
+            if (!handled_set.has(set_index)) { // Skip handled sets
+                let identical_sets = new Set();
+                for (let other_set_index in graph_edges_sets) {  
+                    if (!handled_set.has(other_set_index)) { // Skip handled sets
+                        if (isSameSet(graph_edges_sets[other_set_index], graph_edges_sets[set_index])) {
+                            identical_sets.add(other_set_index);
+                            identical_sets.add(set_index);
+                            handled_set.add(other_set_index);
+                            handled_set.add(set_index);
+                        }
+                    }
+                }
+                if (identical_sets.size > 1) {
+                    let identicals = [...identical_sets];
+                    let best_tower_f = 0;
+                    let best_f = 0;
+                    let tower_idx;
+                    let best_idx;
+                    for (let id_index of identicals) {
+                        if (candidate_list[id_index].fitness > best_f) {
+                            best_f = candidate_list[id_index].fitness;
+                            best_idx = id_index;
+                        }
+                        if (candidate_list[id_index].tower_fitness[candidate_list[id_index].tower_fitness.length-1] > best_tower_f) {
+                            best_tower_f = candidate_list[id_index].tower_fitness[candidate_list[id_index].tower_fitness.length-1];
+                            tower_idx = id_index;
+                        }
+                    }
+
+                    // Save best simple and best tower identicals from pruning
+                    identical_sets.delete(best_idx);
+                    identical_sets.delete(tower_idx);
+
+                    console.log({identicals:identicals});
+                    console.log({identical_sets:identical_sets});
+                    // prune_list.push(...[identical_sets]);
+                    identical_sets.forEach(idx => prune_list.push(idx));
+                }
+
+            }
+        }
+
+        prune_list.sort(function(a, b){return b-a});
+
+        for (let idx = 0; idx < graph_edges_sets.length; idx++) { // Add identity to sets to make later computation simpler
+            graph_edges_sets[idx].add(idx);
+        }
  
-        reply({ seq, graph_edges_sets });
+        reply({ seq, graph_edges_sets, prune_list });
     },
 
     validateCombinations: (data, seq) => {
-        let { candidate_list, graph_edges_sets } = data; 
+        let { candidate_list, graph_edges_sets, pre_prune_list } = data; 
+
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+        }
 
         function k_combinations(set, k) {
             var i, j, combs, head, tailcombs;
@@ -2372,34 +2466,138 @@ const funcs = {
 
         let index_array = [ ...Array(candidate_list.length).keys() ];
 
+        for (let prune_idx of pre_prune_list) { // prune in reverse order
+            index_array.splice(prune_idx, 1);
+        }
+
         console.log({index_array:index_array});
 
-        var candidate_combinations = up_to_m_combinations(index_array, 4);
+        let max_rank = 0;
+        let graph_ranks = new Set();
+        for (let ge_set of graph_edges_sets) {
+            graph_ranks.add(ge_set.size);
+            if (max_rank < ge_set.size) {
+                max_rank = ge_set.size;
+            }
+        }
+        console.log({max_rank:max_rank});
+        // let graph_ranks_ordered = Array.from(graph_ranks).sort(function(a, b){return a-b});
+        // console.log({graph_ranks_ordered:graph_ranks_ordered});
 
-        console.log({candidate_combinations:candidate_combinations});
-        let good_combinations_list = [[], [], [], []];
+        for (let combination_size = 1; combination_size <= 8; combination_size++) {
+        // for (let rank of graph_ranks_ordered) {
+            if (combination_size == 1) {
+                // Skip validation and go straight to fitness calculation 
+            } else { 
+                if (max_rank >= combination_size) { // Higher ranks: remove low rank vertices first
+                    let index_prune_list = [];
+                    for (let index in index_array) { 
+                        if (graph_edges_sets[index_array[index]].size < combination_size) {
+                            index_prune_list.push(index);
+                        }
+                    }
         
-        let good_combination = true;
-        for (let combination of candidate_combinations) {
-            next_combination:
-            for (let candidate_idx of combination) { // check if the graph edges that show whether two surrogates can be placed without overlap
-                for (let candidate_idx2 of combination) { // Triple loop useful to skip large parts of check? // TODO: check whether array.every() is faster
-                    if (!graph_edges_sets[candidate_idx].has(candidate_idx2)) {
-                        good_combination = false;
-                        break next_combination;
+                    index_prune_list.sort(function(a, b){return b-a}); // prune in reverse direction
+                    for (let prune_index of index_prune_list) {
+                        index_array.splice(prune_index, 1);
+                    }
+
+                    if (index_array.length >= combination_size) { // Need at least this many candidates to build a combination of this size
+                        // Generate candidate combinations from remaining candidates
+                        let cutoff_size = 400;
+                        switch(combination_size) {
+                            case 3:
+                                cutoff_size = 95;
+                                break;
+                            case 4:
+                                cutoff_size = 42;
+                                break;
+                            case 5:
+                                cutoff_size = 28;
+                                break;
+                            case 6:
+                                cutoff_size = 22;
+                                break;
+                            case 7:
+                                cutoff_size = 18;
+                                break;
+                            case 8:
+                                cutoff_size = 16;                     
+                        }
+
+                        if (index_array.length >= cutoff_size) {
+                            console.log("TODO: shorten list of size: " +index_array.length+ " to size: " +cutoff_size);
+
+                            shuffleArray(index_array);
+                            index_array.splice(0, cutoff_size); // If there are still too many options (despite all the smart pruning before) to feasibly handle the NP problem, we just have to randomly cut some
+                        }
+
+                        var candidate_combinations = k_combinations(index_array, combination_size);
+
+                        console.log({candidate_combinations:candidate_combinations});
+                        let good_combinations_list = [[], [], [], []];
+                        
+                        let good_combination = true;
+                        for (let combination of candidate_combinations) {
+                            next_combination:
+                            for (let candidate_idx of combination) { // check if the graph edges that show whether two surrogates can be placed without overlap
+                                for (let candidate_idx2 of combination) { // Triple loop useful to skip large parts of check? // TODO: check whether array.every() is faster
+                                    if (!graph_edges_sets[candidate_idx].has(candidate_idx2)) {
+                                        good_combination = false;
+                                        break next_combination;
+                                    }
+                                }
+                            }
+                
+                            if (good_combination)  {
+                                console.log({good_combination:combination});
+                                // let [ low_ia, med_ia, high_ia, max_ia ] = calculateCombinationFitnesses(combination); // TODO
+                                // candidate_combinations[0].push(low_ia);
+                                // candidate_combinations[1].push(med_ia);
+                                // candidate_combinations[2].push(high_ia);
+                                // candidate_combinations[3].push(max_ia);
+                            }
+                            good_combination = true;
+                        }
+
+
+                    } else console.log("Not enough candidates of that rank exist");
+                } else console.log("No candidates of that rank exist");
+
+
+            }
+        }
+        
+        
+
+        if (false) {
+            var candidate_combinations = up_to_m_combinations(index_array, 4);
+
+            console.log({candidate_combinations:candidate_combinations});
+            let good_combinations_list = [[], [], [], []];
+            
+            let good_combination = true;
+            for (let combination of candidate_combinations) {
+                next_combination:
+                for (let candidate_idx of combination) { // check if the graph edges that show whether two surrogates can be placed without overlap
+                    for (let candidate_idx2 of combination) { // Triple loop useful to skip large parts of check? // TODO: check whether array.every() is faster
+                        if (!graph_edges_sets[candidate_idx].has(candidate_idx2)) {
+                            good_combination = false;
+                            break next_combination;
+                        }
                     }
                 }
-            }
 
-            if (good_combination)  {
-                console.log({good_combination:combination});
-                // let [ low_ia, med_ia, high_ia, max_ia ] = calculateCombinationFitnesses(combination); // TODO
-                // candidate_combinations[0].push(low_ia);
-                // candidate_combinations[1].push(med_ia);
-                // candidate_combinations[2].push(high_ia);
-                // candidate_combinations[3].push(max_ia);
+                if (good_combination)  {
+                    // console.log({good_combination:combination});
+                    // let [ low_ia, med_ia, high_ia, max_ia ] = calculateCombinationFitnesses(combination); // TODO
+                    // candidate_combinations[0].push(low_ia);
+                    // candidate_combinations[1].push(med_ia);
+                    // candidate_combinations[2].push(high_ia);
+                    // candidate_combinations[3].push(max_ia);
+                }
+                good_combination = true;
             }
-            good_combination = true;
         }
 
         reply({ seq, graph_edges_sets });

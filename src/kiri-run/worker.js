@@ -301,22 +301,24 @@ kiri.minions = {
                 candidate_list: candidate_list
             }, data => { // This handles the data returned by the minion function 
                 console.log({overlapLists:data.graph_edges_sets});
+                console.log({prune_list:data.prune_list});
                 data.kn = kn;
                 resolve(data);
             });
         });
     },
 
-    validateCombinations(candidate_list, graph_edges_sets, kn) {
+    validateCombinations(candidate_list, graph_edges_sets, prune_list, kn) {
         return new Promise((resolve, reject) => {
             if (concurrent < 2) {
-                console.log("CONBINATION VALIDATION FAILED!");
+                console.log("COMBINATION VALIDATION FAILED!");
                 reject("combination calidation failed");
             }
             minwork.queue({
                 cmd: "validateCombinations",
                 candidate_list: candidate_list,
-                graph_edges_sets:graph_edges_sets
+                graph_edges_sets: graph_edges_sets,
+                pre_prune_list:prune_list
             }, data => { // This handles the data returned by the minion function 
                 data.kn = kn;
                 resolve(data);
