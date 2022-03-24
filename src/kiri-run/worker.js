@@ -308,7 +308,7 @@ kiri.minions = {
         });
     },
 
-    validateCombinations(candidate_list, graph_edges_sets, prune_list, kn) {
+    validateCombinations(candidate_list, graph_edges_sets, prune_list, susu_settings, kn) {
         return new Promise((resolve, reject) => {
             if (concurrent < 2) {
                 console.log("COMBINATION VALIDATION FAILED!");
@@ -318,7 +318,8 @@ kiri.minions = {
                 cmd: "validateCombinations",
                 candidate_list: candidate_list,
                 graph_edges_sets: graph_edges_sets,
-                pre_prune_list:prune_list
+                pre_prune_list:prune_list,
+                susu_settings: susu_settings
             }, data => { // This handles the data returned by the minion function 
                 data.kn = kn;
                 resolve(data);

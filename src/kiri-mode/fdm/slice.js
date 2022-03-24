@@ -1251,15 +1251,14 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
 
             // TODO: decode candidates
-            // TODO: Do simple insertion case checks 
             // TODO: Combine minion verify and validate calls, OR make verfiy run with extra threads
             // TODO: Increase min fitness for low quality search
             // TODO: Fix prism search
-            // TODO: Adjust surrogate settings // Particle size generation // having all interaction level parameters in parallel
+            // TODO: Adjust surrogate settings // Particle size generation
       
             let validate_promises = [];
             for (let susu_data of susu_data_objs) {
-                validate_promises.push(kiri.minions.validateCombinations(susu_data.candidate_list, susu_data.graph_edges_sets, susu_data.prune_list, susu_data.kn));
+                validate_promises.push(kiri.minions.validateCombinations(susu_data.candidate_list, susu_data.graph_edges_sets, susu_data.prune_list, surrogate_settings, susu_data.kn));
             }
             
             // let index_array = [ ...Array(candidate_list.length).keys() ];
@@ -2224,6 +2223,15 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         let surrogate_settings = {};
 
         surrogate_settings.minSupportArea = proc.supportMinArea;
+
+        // Have all settings available in parallel
+        surrogate_settings.interaction_N_penalty_factor_high = 0.0;
+        surrogate_settings.surrogate_N_penalty_factor_high = 0.0;
+        surrogate_settings.interaction_N_penalty_factor_med = 0.3;
+        surrogate_settings.surrogate_N_penalty_factor_med = 0.65;
+        surrogate_settings.interaction_N_penalty_factor_low = 0.35;
+        surrogate_settings.surrogate_N_penalty_factor_low = 0.8;
+
 
         if (proc.surrogateInteraction == "off") {
             surrogate_settings.minVolume = 10;

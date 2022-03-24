@@ -2402,12 +2402,40 @@ const funcs = {
     },
 
     validateCombinations: (data, seq) => {
-        let { candidate_list, graph_edges_sets, pre_prune_list } = data; 
+        let { candidate_list, graph_edges_sets, pre_prune_list, susu_settings } = data; 
+        let surrogate_settings = susu_settings;
 
         function shuffleArray(array) {
             for (let i = array.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
                 [array[i], array[j]] = [array[j], array[i]];
+            }
+        }
+
+        function cartesian(args) {
+            var r = [], max = args.length-1;
+
+            function helper(arr, i) {
+                for (var j=0, l=args[i].length; j<l; j++) {
+                    var a = arr.slice(0); // clone arr
+                    a.push(args[i][j]);
+                    if (i==max) {
+                        r.push(a);
+                    }
+                    else
+                        helper(a, i+1);
+                }
+            }
+            helper([], 0);
+            return r;
+        }
+
+        function simple_insertion_case_check(surrogate, precomputed_slice_heights) {
+            for (let sliceIndex = 0; sliceIndex < precomputed_slice_heights.length-1; sliceIndex++){
+                if (precomputed_slice_heights[sliceIndex].stopAbove >= surrogate.end_height) {
+                    surrogate.insertion_data.new_layer_index = sliceIndex;
+                    break;
+                }
             }
         }
 
@@ -2484,10 +2512,77 @@ const funcs = {
         // let graph_ranks_ordered = Array.from(graph_ranks).sort(function(a, b){return a-b});
         // console.log({graph_ranks_ordered:graph_ranks_ordered});
 
+        if (false)
+        for (const surrogate of all_surrogates) {
+            interaction_layer_set.add(surrogate.insertion_data.new_layer_index) // Get number of interaction layers // TODO: add extra interactions as penalty for difficult surrogates (bridges, stacks...)
+        }
+
+        let final_selection_list = [{final_fitness:0}, {final_fitness:0}, {final_fitness:0}]; // low, med, high interaction
+
+        let lists = cartesian([[10,11,12],[1,2,4,3],[101]]); // Use twice, once with indexes, once with fitness values // Or just indexes
+        // TODO: To find interaction layer set, use indexes as a while counter and go through aboves++ while adding layer numbers to set
+        // TODO: NVM it is just all the objects in the aboves list at that index
+        console.log({lists:lists});
+
+        const w_pieces = 0.3;
+        const w_interactions = 0.7;
+        const surro_n_p_f_low = surrogate_settings.surrogate_N_penalty_factor_low;
+        const surro_n_p_f_med = surrogate_settings.surrogate_N_penalty_factor_med;
+        const surro_n_p_f_high = surrogate_settings.surrogate_N_penalty_factor_high;
+        const interaction_n_p_f_low = surrogate_settings.interaction_N_penalty_factor_low;
+        const interaction_n_p_f_med = surrogate_settings.interaction_N_penalty_factor_med;
+        const interaction_n_p_f_high = surrogate_settings.interaction_N_penalty_factor_high;
+
+
         for (let combination_size = 1; combination_size <= 8; combination_size++) {
         // for (let rank of graph_ranks_ordered) {
+            let interaction_layer_set = new Set();
+
             if (combination_size == 1) {
                 // Skip validation and go straight to fitness calculation 
+                for (let candidate of candidate_list) {
+                    // Also prepares surros for later iterations 
+                    simple_insertion_case_check(candidate.candidate_details.candidate_obj, surrogate_settings.precomputed_slice_heights); 
+                    for (let above_idx = 1; above_idx < candidate.aboves.length; above_idx++) {
+                        for (let above of candidate.aboves[above_idx]) {
+                            simple_insertion_case_check(above.candidate_details.candidate_obj, surrogate_settings.precomputed_slice_heights);
+                        }
+                    }
+
+                    let tower_counter = 1;
+                    for (let tower_f of candidate.tower_fitness) {
+                        let final_fitness = tower_f;
+                        let fifi_list = [];
+                        let number_of_surrogates = tower_counter;
+                        let number_of_interactions = tower_counter;
+                        if (tower_counter > 1) {
+                            const final_fitness_low = final_fitness / 
+                                                (w_pieces * Math.pow(number_of_surrogates, surro_n_p_f_low) + 
+                                                w_interactions * Math.pow(number_of_interactions, interaction_n_p_f_low));
+                            const final_fitness_med = final_fitness / 
+                                                (w_pieces * Math.pow(number_of_surrogates, surro_n_p_f_med) + 
+                                                w_interactions * Math.pow(number_of_interactions, interaction_n_p_f_med));
+                            const final_fitness_high = final_fitness / 
+                                                (w_pieces * Math.pow(number_of_surrogates, surro_n_p_f_high) + 
+                                                w_interactions * Math.pow(number_of_interactions, interaction_n_p_f_high));
+                            fifi_list.push(final_fitness_low);
+                            fifi_list.push(final_fitness_med);
+                            fifi_list.push(final_fitness_high);
+                        }
+                        for (let i = 0; i < 3; i++) {
+                            if (final_selection_list[i].final_fitness < fifi_list[i]) {
+                                final_selection_list[i] = {
+                                    final_fitness:final_fitness,
+                                    used_candidates: [{cd:candidate, tower_step_selection:tower_counter}]
+                                };
+                            }
+                        }
+                        
+                        tower_counter++;
+                    }
+                }
+
+
             } else { 
                 if (max_rank >= combination_size) { // Higher ranks: remove low rank vertices first
                     let index_prune_list = [];
@@ -2535,7 +2630,7 @@ const funcs = {
                         var candidate_combinations = k_combinations(index_array, combination_size);
 
                         console.log({candidate_combinations:candidate_combinations});
-                        let good_combinations_list = [[], [], [], []];
+                        
                         
                         let good_combination = true;
                         for (let combination of candidate_combinations) {
@@ -2568,7 +2663,7 @@ const funcs = {
             }
         }
         
-        
+        console.log({final_selection_list:final_selection_list});
 
         if (false) {
             var candidate_combinations = up_to_m_combinations(index_array, 4);
