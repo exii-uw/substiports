@@ -136,22 +136,42 @@ const funcs = {
     },
 
     test: (data, seq) => {
-        console.log({minion_data:data});
-        console.log({minion_data:data});
-        let { number, coded_slice, slice2, two_list, topList } = data;
-        console.log({two_list:two_list});
-        let slice3 = codec.decode(data.coded_slice, {full: true});
-        let slice4 = codec.encode(slice3);
-        let out = [];
-        // let outtop = codec.decode(data.coded_tops[0], {full: true});
-        let topFromList = topList[0];
-        // console.log({outtop:outtop});
-        
-        let outkiritop = codec.decode(topFromList);
-        let outtop = outkiritop;
-        out.push(number*100);
-        out.push(data.number*100);
-        reply({ seq, output: out, coded_slice, slice2, slice3, slice4, outtop });
+        if (false) {
+            let { encodedPoly } = data;
+            console.log({encodedPoly:encodedPoly});
+
+            let twinPolys = [encodedPoly[0], encodedPoly[0]];
+            console.log({twinPolys:twinPolys});
+            // reply({ seq, twinPolys });
+        }
+        else {
+
+            console.log({minion_data:data});
+            console.log({minion_data:data});
+            let { encodedPolys, number, coded_slice, slice2, two_list, topList, tops } = data;
+            console.log({minionEncodedPolys:encodedPolys});
+            console.log({minionTopList:topList});
+            encodedPolys[0] = encodedPolys[1];
+            console.log({two_list:two_list});
+            console.log({topList1:topList});
+            // let slice3 = codec.decode(data.coded_slice, {full: true});
+            // let slice4 = codec.encode(slice3);
+            let out = [];
+            // let outtop = codec.decode(data.coded_tops[0], {full: true});
+            let topFromList = topList[0];
+            // console.log({outtop:outtop});
+            
+            // let outkiritop = codec.decode(topFromList);
+            // let outtop = outkiritop;
+            out.push(number*100);
+            out.push(data.number*100);
+            // tops[1] = tops[0];
+            topList[0] = topList[1];
+            console.log({topList2:topList});
+            
+
+            reply({ seq, output: out, coded_slice, slice2, tops, topList, encodedPolys });
+        }
     },
 
     clusterSupports: (data, seq) => {
@@ -1629,10 +1649,10 @@ const funcs = {
             } else {
                 iterations++;
                 // log('Iteration ' + iterations + '/' + maxIterations + ' ');
-                log('Iteration ' + iterations);
+                // log('Iteration ' + iterations);
 
                 let stepFitness = optimizer.getBestFitness();
-                console.log({fitness:stepFitness});
+                // console.log({fitness:stepFitness});
                 // console.log(optimizer.surrogate_settings);
                 // const origResult = optimizer.getBestPosition();
                 // const cloneResult = [...origResult];
@@ -1651,7 +1671,7 @@ const funcs = {
                     //     offset_set = true;
                     // }
                     improvement_Decay = improvement_Decay*0.05 + stepFitness - last_Best;
-                    console.log({improvement_Decay:improvement_Decay});
+                    // console.log({improvement_Decay:improvement_Decay});
                     if (improvement_Decay == 0 || improvement_Decay < last_Best * optimizer.surrogate_settings.minImprovementPercentage) { // Improvement by at least some %
                         consecutive_weak_steps++;
                     }
@@ -2383,8 +2403,6 @@ const funcs = {
                     identical_sets.delete(best_idx);
                     identical_sets.delete(tower_idx);
 
-                    console.log({identicals:identicals});
-                    console.log({identical_sets:identical_sets});
                     // prune_list.push(...[identical_sets]);
                     identical_sets.forEach(idx => prune_list.push(idx));
                 }
@@ -2478,20 +2496,6 @@ const funcs = {
             return combs;
         }
 
-        function up_to_m_combinations(set, m) {
-            var k, i, combs, k_combs;
-            combs = [];
-            
-            // Calculate all non-empty k-combinations
-            for (k = 1; k <= m; k++) {
-                k_combs = k_combinations(set, k);
-                for (i = 0; i < k_combs.length; i++) {
-                    combs.push(k_combs[i]);
-                }
-            }
-            return combs;
-        }
-
         function validateResults(final_selection_list, result_fitness, number_of_surrogates, number_of_interactions, candidate_selection_list) {
             let fifi_list = [];
             const final_fitness_low = result_fitness / 
@@ -2537,17 +2541,7 @@ const funcs = {
         // let graph_ranks_ordered = Array.from(graph_ranks).sort(function(a, b){return a-b});
         // console.log({graph_ranks_ordered:graph_ranks_ordered});
 
-        if (false)
-        for (const surrogate of all_surrogates) {
-            interaction_layer_set.add(surrogate.insertion_data.new_layer_index) // Get number of interaction layers // TODO: add extra interactions as penalty for difficult surrogates (bridges, stacks...)
-        }
-
         let final_selection_list = [{final_fitness:0}, {final_fitness:0}, {final_fitness:0}]; // low, med, high interaction
-
-        let lists = cartesian([[10,11,12],[1,2,4,3],[101]]); // Use twice, once with indexes, once with fitness values // Or just indexes
-        // TODO: To find interaction layer set, use indexes as a while counter and go through aboves++ while adding layer numbers to set
-        // TODO: NVM it is just all the objects in the aboves list at that index
-        console.log({lists:lists});
 
         const w_pieces = 0.3;
         const w_interactions = 0.7;
@@ -2561,8 +2555,6 @@ const funcs = {
 
         for (let combination_size = 1; combination_size <= 8; combination_size++) {
         // for (let rank of graph_ranks_ordered) {
-            let interaction_layer_set = new Set();
-
             if (combination_size == 1) {
                 // Skip validation and go straight to fitness calculation 
                 for (let candidate of candidate_list) {
@@ -2584,6 +2576,7 @@ const funcs = {
 
 
             } else { 
+                let no_success = true;
                 if (max_rank >= combination_size) { // Higher ranks: remove low rank vertices first
                     let index_prune_list = [];
                     for (let index in index_array) { 
@@ -2599,32 +2592,33 @@ const funcs = {
 
                     if (index_array.length >= combination_size) { // Need at least this many candidates to build a combination of this size
                         // Generate candidate combinations from remaining candidates
-                        let cutoff_size = 400;
+                        let cutoff_size = 450;
                         switch(combination_size) {
                             case 3:
-                                cutoff_size = 95; // Set cutoff size to avoid runtime explosion
+                                cutoff_size = 96; // Set cutoff size to avoid runtime explosion
                                 break;
                             case 4:
-                                cutoff_size = 42;
+                                cutoff_size = 44;
                                 break;
                             case 5:
-                                cutoff_size = 28;
+                                cutoff_size = 29;
                                 break;
                             case 6:
-                                cutoff_size = 22;
+                                cutoff_size = 23;
                                 break;
                             case 7:
-                                cutoff_size = 18;
+                                cutoff_size = 19;
                                 break;
                             case 8:
-                                cutoff_size = 16;                     
+                                cutoff_size = 17;                     
                         }
 
-                        if (index_array.length >= cutoff_size) {
-                            console.log("TODO: shorten list of size: " +index_array.length+ " to size: " +cutoff_size);
+                        if (index_array.length > cutoff_size) {
+                            console.log("Shorten list of size: " +index_array.length+ " to size: " +cutoff_size);
 
                             shuffleArray(index_array);
-                            index_array.splice(0, cutoff_size); // If there are still too many options (despite all the smart pruning before) to feasibly handle the NP problem, we just have to randomly cut some
+                            let cuttedArr = index_array.splice(cutoff_size-1, index_array.length-cutoff_size); // If there are still too many options (despite all the smart pruning before) to feasibly handle the NP problem, we just have to randomly cut some
+                            console.log({cuttedArr:cuttedArr, index_array:index_array});
                         }
 
                         var candidate_combinations = k_combinations(index_array, combination_size);
@@ -2645,7 +2639,8 @@ const funcs = {
                             }
                 
                             if (good_combination)  {
-                                console.log({good_combination:combination});
+                                no_success = false;
+                                // console.log({good_combination:combination});
                                 // let [ low_ia, med_ia, high_ia, max_ia ] = calculateCombinationFitnesses(combination); // TODO
                                 // candidate_combinations[0].push(low_ia);
                                 // candidate_combinations[1].push(med_ia);
@@ -2657,12 +2652,12 @@ const funcs = {
 
                                 for (let comb_ind of combination) {
                                     let part_tower_options = [ ...Array(candidate_list[comb_ind].tower_fitness.length).keys() ];
-                                    console.log({part_tower_options:part_tower_options});
+                                    // console.log({part_tower_options:part_tower_options});
                                     part_ind_lists.push(part_tower_options);
                                 }
 
                                 let tower_selection_options = cartesian(part_ind_lists);
-                                console.log({tower_selection_options:tower_selection_options});
+                                if (tower_selection_options.length > 3) console.log({tower_selection_options:tower_selection_options});
                                 for (let opt of tower_selection_options) {
                                     let total_surrs = 0;
                                     let total_interaction_set = new Set();
@@ -2680,11 +2675,9 @@ const funcs = {
                                             }
                                         }
                                     }
-                                    console.log({comb:combination, total_combined_fitness:total_combined_fitness, total_interaction_set:total_interaction_set, total_surrs:total_surrs})
+                                    // console.log({comb:combination, total_combined_fitness:total_combined_fitness, total_interaction_set:total_interaction_set, total_surrs:total_surrs})
                                     validateResults(final_selection_list, total_combined_fitness, total_surrs, total_interaction_set.size, candidate_selection_list);
                                 }
-
-
                             }
                             good_combination = true;
                         }
@@ -2693,43 +2686,12 @@ const funcs = {
                     } else console.log("Not enough candidates of that rank exist");
                 } else console.log("No candidates of that rank exist");
 
-
+                if (no_success) combination_size = 100; // Stop loop since no more combinations of this size have been found so combinations of bigger size are impossible 
             }
         }
         
         console.log({final_selection_list:final_selection_list});
-
-        if (false) {
-            var candidate_combinations = up_to_m_combinations(index_array, 4);
-
-            console.log({candidate_combinations:candidate_combinations});
-            let good_combinations_list = [[], [], [], []];
-            
-            let good_combination = true;
-            for (let combination of candidate_combinations) {
-                next_combination:
-                for (let candidate_idx of combination) { // check if the graph edges that show whether two surrogates can be placed without overlap
-                    for (let candidate_idx2 of combination) { // Triple loop useful to skip large parts of check? // TODO: check whether array.every() is faster
-                        if (!graph_edges_sets[candidate_idx].has(candidate_idx2)) {
-                            good_combination = false;
-                            break next_combination;
-                        }
-                    }
-                }
-
-                if (good_combination)  {
-                    // console.log({good_combination:combination});
-                    // let [ low_ia, med_ia, high_ia, max_ia ] = calculateCombinationFitnesses(combination); // TODO
-                    // candidate_combinations[0].push(low_ia);
-                    // candidate_combinations[1].push(med_ia);
-                    // candidate_combinations[2].push(high_ia);
-                    // candidate_combinations[3].push(max_ia);
-                }
-                good_combination = true;
-            }
-        }
-
-        reply({ seq, graph_edges_sets });
+        reply({ seq, final_selection_list });
     },
 
     bad: (data, seq) => {

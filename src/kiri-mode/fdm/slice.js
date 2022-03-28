@@ -1058,7 +1058,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             for (let kn = 0; kn < k_means_depth; kn++) {
                 const kint = Math.floor(kn+1); // Not sure if required to ensure kn doesn't change during minion runtime
                 cluster_promises.push(kiri.minions.clusterSupports(support_points_simple, kint, bottom_slice.z));
-                susu_data_objs.push({kn:kn, candidate_list:[], graph_edges_sets:[], verify_list:[], prune_list:[]});
+                susu_data_objs.push({kn:kn, candidate_list:[], graph_edges_sets:[], verify_list:[], prune_list:[], selection_list:[]});
             }
             
             let cluster_list = [];
@@ -1086,19 +1086,40 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             
             let test_promises = [];
 
-            // let test_array = [5, 8, 10, 3, 7, 29, 1, 15, 88, 6];
+            let test_array = [5, 8, 10, 3, 7, 29, 1, 15, 88, 6];
             let test_out = [];
             
     
             let test_poly_list = bottom_slice.topPolys();
             console.log({bottom_slice:bottom_slice});
             console.log({test_poly_list:test_poly_list});
+            
+            // let point1 = newPoint(0,0,0);
+            // let point2 = newPoint(0,1,0);
+            // let point3 = newPoint(1,1,0);
+            // let point4 = newPoint(1,0,0);
+            // let rect_points = [point1, point2, point3, point4];
+            // let rectanglePolygon = base.newPolygon(rect_points);
+            // let rectanglePolygon2 = base.newPolygon(rect_points);
+            // let rectanglePolygon3 = base.newPolygon(rect_points);
+            // let rectanglePolygon4 = base.newPolygon(rect_points);
+            // let encodedPolys = kiri.codec.encode([rectanglePolygon, rectanglePolygon2, rectanglePolygon3, rectanglePolygon4], {full: true});
 
-            let encodedTop = kiri.codec.encode(test_poly_list, {full: true});
-            let decodedTop = kiri.codec.decode(encodedTop, {full: true});
-            console.log({decodedTop:decodedTop});
+            let encodedTops = kiri.codec.encode(test_poly_list, {full: true});
 
-            // let test_test_array = [encodedTop,[2,3,4,[11,12]],[5,6,7]];
+            let decodedTop = kiri.codec.decode(encodedTops, {full: true});
+            // console.log({encodedPolys:encodedPolys});
+
+            let test_test_array = [encodedTops,[2,3,4,[11,12]],[5,6,7]];
+
+            // let test_poly_list2 = bottom_slice.topPolys();
+            // let encodedPolys2 = kiri.codec.encode(test_poly_list2, {full: true});
+            // encodedPolys2[0] = encodedPolys2[1];
+            // let decodedPolys2 = kiri.codec.decode(encodedPolys2, {full: true});
+            // console.log({decodedPolys2:decodedPolys2})
+            // let decodedPolys3 = kiri.codec.decode(encodedPolys2, {full: true});
+            // console.log({decodedPolys3:decodedPolys3})
+
 
             let encoded_kiri_tops = []
             for (let oneTop of test_poly_list) {
@@ -1106,8 +1127,9 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             }
 
             // for (let integr of test_array) {
-            //     test_promises.push(kiri.minions.test(integr, highest_slice, test_poly_list, encoded_kiri_tops, test_test_array));
+            //     test_promises.push(kiri.minions.test(encodedPolys, integr, highest_slice, test_poly_list, encodedTops, test_test_array));
             // }
+
             let optimizer_promises = [];
             surrogate_settings.start_slice = null;
             surrogate_settings.all_slices = null;
@@ -1138,7 +1160,23 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             //     }
             // }
 
+            
+            if (test_promises) {
+                for (let p of test_promises) {
+                    p.then(data => {
+                        console.log({test_data:data});
+                        // graph_edges_sets.push(...data.graph_edges_lists);
+                        // susu_data_objs[data.kn].graph_edges_sets.push(...data.graph_edges_sets);
+                        // susu_data_objs[data.kn].prune_list.push(...data.prune_list);
+                    });
+                }
+                await Promise.all(test_promises);
+            }
+
             // let candidate_lists = Array.from(Array(k_means_depth), () => []);
+
+
+            let best_of_best_results = [];
 
             if (optimizer_promises) {
                 for (let p of optimizer_promises) {
@@ -1152,10 +1190,20 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                         // console.log({numberBig:numberBig});
                         // candidate_lists[data.kn].push(...data.return_list); // TODO: Potentially keep sublists for starting one verification thread per cluster thread  
                         susu_data_objs[data.kn].candidate_list.push(...data.return_list);
+                        let t_height = 0;
+                        for (let return_obj of data.return_list) {
+                            if (return_obj.tower_fitness.length > t_height) {
+                                best_of_best_results.push(return_obj);
+                                t_height += 1;
+                            }
+                        }
                     });
                 }
                 await Promise.all(optimizer_promises);
             }
+
+            // Add best_of_bests combination holder
+            susu_data_objs.push({kn:k_means_depth, candidate_list:best_of_best_results, graph_edges_sets:[], verify_list:[], prune_list:[]});
 
             // Handle decoding geometry polys AFTER verification
             // for (let return_obj of data.return_list) {
@@ -1223,8 +1271,6 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                 // just_one = false;
             }
 
-            let graph_edges_sets = [];
-
             if (verify_promises) {
                 for (let p of verify_promises) {
                     p.then(data => {
@@ -1247,9 +1293,9 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             //     console.log({pruned_edge_sets:susu_data.graph_edges_sets});
             // }
 
-            console.log("Done with verification");
+            console.log("Starting validation of combinations");
 
-
+            // TODO TODO
             // TODO: decode candidates
             // TODO: Combine minion verify and validate calls, OR make verfiy run with extra threads
             // TODO: Increase min fitness for low quality search
@@ -1260,6 +1306,34 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             for (let susu_data of susu_data_objs) {
                 validate_promises.push(kiri.minions.validateCombinations(susu_data.candidate_list, susu_data.graph_edges_sets, susu_data.prune_list, surrogate_settings, susu_data.kn));
             }
+
+            if (validate_promises) {
+                for (let p of validate_promises) {
+                    p.then(data => {
+                        console.log({validate_data:data});
+                        susu_data_objs[data.kn].selection_list=data.final_selection_list;
+                    });
+                }
+                await Promise.all(validate_promises);
+            }
+
+
+            let global_selection_list = [{final_fitness:0}, {final_fitness:0}, {final_fitness:0}]; // low, med, high interaction
+
+            for (let data_obj of susu_data_objs) {
+                for (let i = 0; i < 3; i++) {
+                    if (global_selection_list[i].final_fitness < data_obj.selection_list[i].final_fitness) {
+                        global_selection_list[i] = {
+                            final_fitness: data_obj.selection_list[i].final_fitness,
+                            result_fitness: data_obj.selection_list[i].result_fitness,
+                            used_candidates: data_obj.selection_list[i].used_candidates,
+                            best_kn: data_obj.kn
+                        };
+                    }
+                }
+            }
+
+            console.log({global_selection_list:global_selection_list});
             
             // let index_array = [ ...Array(candidate_list.length).keys() ];
 

@@ -215,7 +215,7 @@ kiri.minions = {
         }
     },
 
-    test(numb, sl, top, kiriTops, two_list) { // Making preparations for the (equally named) minion function
+    test(encodedPolys, numb, sl, top, kiriTops, two_list) { // Making preparations for the (equally named) minion function
         return new Promise((resolve, reject) => {
             if (concurrent < 2) {
                 reject("concurrent test unavaiable");
@@ -234,16 +234,30 @@ kiri.minions = {
             // }
             minwork.queue({
                 cmd: "test",
+                encodedPolys: encodedPolys,
                 number: numb,
                 two_list: two_list,
                 // test_slice: sl,
                 coded_slice: codec.encode(sl, {full: true}),
                 // coded_tops: encoded_worker_tops,
-                topList: kiriTops
+                topList: kiriTops,
+                tops: top
             }, data => { // This handles the data returned by the minion function 
                 // let polys = codec.decode(data.clips);
-                let result_number = data.output;
-                resolve(data);
+                // let polys = codec.decode(data.tops);
+                console.log({dataTopList:data.topList});
+                console.log({dataEncodedPolys:data.encodedPolys});
+
+                // let polys = codec.decode(data.encodedPolys);
+                // console.log({polys:polys});
+
+                let polys2 = codec.decode(data.topList);
+                console.log({polys2:polys2});
+                // let result_number = data.output;
+                // data.tops = polys;
+                // let decodedPolys = codec.decode(data.twinPolys);
+
+                resolve(polys2);
             });
         });
     },
