@@ -2492,6 +2492,31 @@ const funcs = {
             return combs;
         }
 
+        function validateResults(final_selection_list, result_fitness, number_of_surrogates, number_of_interactions, candidate_selection_list) {
+            let fifi_list = [];
+            const final_fitness_low = result_fitness / 
+                                (w_pieces * Math.pow(number_of_surrogates, surro_n_p_f_low) + 
+                                w_interactions * Math.pow(number_of_interactions, interaction_n_p_f_low));
+            const final_fitness_med = result_fitness / 
+                                (w_pieces * Math.pow(number_of_surrogates, surro_n_p_f_med) + 
+                                w_interactions * Math.pow(number_of_interactions, interaction_n_p_f_med));
+            const final_fitness_high = result_fitness / 
+                                (w_pieces * Math.pow(number_of_surrogates, surro_n_p_f_high) + 
+                                w_interactions * Math.pow(number_of_interactions, interaction_n_p_f_high));
+            fifi_list.push(final_fitness_low);
+            fifi_list.push(final_fitness_med);
+            fifi_list.push(final_fitness_high);
+            for (let i = 0; i < 3; i++) {
+                if (final_selection_list[i].final_fitness < fifi_list[i]) {
+                    final_selection_list[i] = {
+                        final_fitness:fifi_list[i],
+                        result_fitness: result_fitness,
+                        used_candidates: candidate_selection_list
+                    };
+                }
+            }
+        }
+
         let index_array = [ ...Array(candidate_list.length).keys() ];
 
         for (let prune_idx of pre_prune_list) { // prune in reverse order
@@ -2551,33 +2576,8 @@ const funcs = {
 
                     let tower_counter = 1;
                     for (let tower_f of candidate.tower_fitness) {
-                        let final_fitness = tower_f;
-                        let fifi_list = [];
-                        let number_of_surrogates = tower_counter;
-                        let number_of_interactions = tower_counter;
-                        if (tower_counter > 1) {
-                            const final_fitness_low = final_fitness / 
-                                                (w_pieces * Math.pow(number_of_surrogates, surro_n_p_f_low) + 
-                                                w_interactions * Math.pow(number_of_interactions, interaction_n_p_f_low));
-                            const final_fitness_med = final_fitness / 
-                                                (w_pieces * Math.pow(number_of_surrogates, surro_n_p_f_med) + 
-                                                w_interactions * Math.pow(number_of_interactions, interaction_n_p_f_med));
-                            const final_fitness_high = final_fitness / 
-                                                (w_pieces * Math.pow(number_of_surrogates, surro_n_p_f_high) + 
-                                                w_interactions * Math.pow(number_of_interactions, interaction_n_p_f_high));
-                            fifi_list.push(final_fitness_low);
-                            fifi_list.push(final_fitness_med);
-                            fifi_list.push(final_fitness_high);
-                        }
-                        for (let i = 0; i < 3; i++) {
-                            if (final_selection_list[i].final_fitness < fifi_list[i]) {
-                                final_selection_list[i] = {
-                                    final_fitness:final_fitness,
-                                    used_candidates: [{cd:candidate, tower_step_selection:tower_counter}]
-                                };
-                            }
-                        }
-                        
+                        let candidate_selection_list = [{cd:candidate, tower_step_selection:tower_counter}];
+                        validateResults(final_selection_list, tower_f, tower_counter, tower_counter, candidate_selection_list);
                         tower_counter++;
                     }
                 }
@@ -2602,7 +2602,7 @@ const funcs = {
                         let cutoff_size = 400;
                         switch(combination_size) {
                             case 3:
-                                cutoff_size = 95;
+                                cutoff_size = 95; // Set cutoff size to avoid runtime explosion
                                 break;
                             case 4:
                                 cutoff_size = 42;
@@ -2651,6 +2651,40 @@ const funcs = {
                                 // candidate_combinations[1].push(med_ia);
                                 // candidate_combinations[2].push(high_ia);
                                 // candidate_combinations[3].push(max_ia);
+
+
+                                let part_ind_lists = [];
+
+                                for (let comb_ind of combination) {
+                                    let part_tower_options = [ ...Array(candidate_list[comb_ind].tower_fitness.length).keys() ];
+                                    console.log({part_tower_options:part_tower_options});
+                                    part_ind_lists.push(part_tower_options);
+                                }
+
+                                let tower_selection_options = cartesian(part_ind_lists);
+                                console.log({tower_selection_options:tower_selection_options});
+                                for (let opt of tower_selection_options) {
+                                    let total_surrs = 0;
+                                    let total_interaction_set = new Set();
+                                    let total_combined_fitness = 0;
+                                    let candidate_selection_list = [];
+                                    for (let opt_idxs in opt) { // 0 to combination_size
+                                        // opt_idxs has the position in the combination, opt[opt_idxs] has the chosen tower height
+                                        total_surrs += opt[opt_idxs]+1; // Adds one per surrogate location, plus additional tower height
+                                        total_interaction_set.add(candidate_list[combination[opt_idxs]].candidate_details.candidate_obj.insertion_data.new_layer_index);
+                                        total_combined_fitness += candidate_list[combination[opt_idxs]].tower_fitness[opt[opt_idxs]];
+                                        candidate_selection_list.push({cd:candidate_list[combination[opt_idxs]], tower_step_selection:opt[opt_idxs]});
+                                        if (opt[opt_idxs] > 0) {
+                                            for (let above of candidate_list[combination[opt_idxs]].aboves[opt[opt_idxs]]) {
+                                                total_interaction_set.add(above.candidate_details.candidate_obj.insertion_data.new_layer_index);
+                                            }
+                                        }
+                                    }
+                                    console.log({comb:combination, total_combined_fitness:total_combined_fitness, total_interaction_set:total_interaction_set, total_surrs:total_surrs})
+                                    validateResults(final_selection_list, total_combined_fitness, total_surrs, total_interaction_set.size, candidate_selection_list);
+                                }
+
+
                             }
                             good_combination = true;
                         }
