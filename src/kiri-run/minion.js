@@ -426,7 +426,6 @@ const funcs = {
 
         function generatePrismPolygon(start_x, start_y, start_z, geometry_points, rot, rot_inner, padding, debug_slice) {
             let rectanglePolygon = base.newPolygon(geometry_points);
-
             rectanglePolygon = rectanglePolygon.rotateXYsimple(rot); // simple translation (corner point equivalent on 0/0/0, so just simple rotate)
             rectanglePolygon = rectanglePolygon.rotateXY(rot_inner); // inner rotation (moving midpoint dead to 0/0/0 in function)
   
@@ -440,34 +439,17 @@ const funcs = {
             let prismPolygon = base.newPolygon(geometry_points2);
             prismPolygon.depth = 0;
             prismPolygon.area2 = prismPolygon.area(true);
-
             return prismPolygon;
         }
 
         function generatePrismPolygonCentered(start_x, start_y, start_z, geometry_points, rot, rot_inner, padding, debug_slice) {
-            // TODO: Do poly generation while loading, if the points-level details are not necessary.
-
-            // Must pad first, padding centers polygon as well somehow?
-
             const geometry_bounds_poly = base.newPolygon(geometry_points);
-            // console.log({geometry_points:geometry_points});
-            // console.log({geometry_bounds_poly:geometry_bounds_poly});
             const halfX = geometry_bounds_poly.bounds.maxx*0.5;
             const halfY = geometry_bounds_poly.bounds.maxy*0.5;
-            
-            // Translate based on try-out position
-            // for (let point_index = 0; point_index < geometry_points.length; point_index++) {
-            //     // geometry_points[point_index].x += halfX;
-            //     // geometry_points[point_index].y += halfY;
-            // }
 
             let rectanglePolygon = base.newPolygon(geometry_points);
-            //rectanglePolygon.parent = top.poly;
-            
-            // console.log({rectanglePolygon:rectanglePolygon});
             rectanglePolygon = rectanglePolygon.rotateXY(rot+rot_inner);
-            // console.log({rectanglePolygonP:rectanglePolygon});
-  
+
             let rectanglePolygon_padded = [];
             rectanglePolygon_padded = POLY.expand([rectanglePolygon], padding, start_z, rectanglePolygon_padded, 1); 
 
@@ -478,39 +460,26 @@ const funcs = {
             let prismPolygon = base.newPolygon(geometry_points2);
             prismPolygon.depth = 0;
             prismPolygon.area2 = prismPolygon.area(true);
-
-            // console.log({prismPolygon:prismPolygon});
-            
-            // if (!debug_slice.tops[0].fill_sparse) debug_slice.tops[0].fill_sparse = [];
-            // debug_slice.tops[0].fill_sparse.push(prismPolygon);
-            //debug_slice.tops[0].fill_sparse.push(rectanglePolygon);
-            //debug_slice.tops[0].fill_sparse.push(rectanglePolygon_padded[0]);
             return prismPolygon;
         }
         // make test object polygons
         function generateRectanglePolygon(start_x, start_y, start_z, length, width, rot, padding, debug_slice) {
             let rotation = rot * Math.PI / 180;
-            let point1 = newPoint(start_x, start_y, start_z);
-            let point2 = newPoint(start_x + length*Math.cos(rotation), start_y + length*Math.sin(rotation), start_z);
-            let point3 = newPoint(point2.x + width*Math.sin(-rotation), point2.y + width*Math.cos(-rotation), start_z);
-            let point4 = newPoint(start_x + width*Math.sin(-rotation), start_y + width*Math.cos(-rotation), start_z);
+            let point1 = newPoint(start_x - padding*Math.cos(rotation) - padding*Math.sin(-rotation), start_y - padding*Math.sin(rotation) - padding*Math.cos(-rotation), start_z);
+            let point2 = newPoint(point1.x + (length+2*padding)*Math.cos(rotation), point1.y + (length+2*padding)*Math.sin(rotation), start_z);
+            let point3 = newPoint(point2.x + (width+2*padding)*Math.sin(-rotation), point2.y + (width+2*padding)*Math.cos(-rotation), start_z);
+            let point4 = newPoint(point1.x + (width+2*padding)*Math.sin(-rotation), point1.y + (width+2*padding)*Math.cos(-rotation), start_z);
             let rect_points = [point1, point2, point3, point4];
             let rectanglePolygon = base.newPolygon(rect_points);
-            //rectanglePolygon.parent = top.poly;
             rectanglePolygon.depth = 0;
-            // rectanglePolygon.area2 = length * width * 2;
-            let rectanglePolygon_padded = [];
-            rectanglePolygon_padded = POLY.expand([rectanglePolygon], padding, start_z, rectanglePolygon_padded, 1); 
-            // console.log({rectanglePolygon:rectanglePolygon});
-            // if (!debug_slice.tops[0].fill_sparse) debug_slice.tops[0].fill_sparse = [];
-            // debug_slice.tops[0].fill_sparse.push(rectanglePolygon_padded[0]);
-            return rectanglePolygon_padded[0];
+            rectanglePolygon.area2 = (length+padding*2)*(width+padding*2)*-2;
+            return rectanglePolygon;
         }
 
         // make test object polygons
         function generateRectanglePolygonCentered(start_x, start_y, start_z, length, width, rot, padding, debug_slice) {
-            const halfLength = length*0.5;
-            const halfWidth = width*0.5;
+            const halfLength = length*0.5+padding;
+            const halfWidth = width*0.5+padding;
             let point1 = newPoint(start_x - halfLength, start_y - halfWidth, start_z);
             let point2 = newPoint(start_x + halfLength, start_y - halfWidth, start_z);
             let point3 = newPoint(start_x + halfLength, start_y + halfWidth, start_z);
@@ -518,16 +487,9 @@ const funcs = {
             let rect_points = [point1, point2, point3, point4];
             let rectanglePolygon = base.newPolygon(rect_points);
             rectanglePolygon = rectanglePolygon.rotateXY(rot);
-            //rectanglePolygon.parent = top.poly;
             rectanglePolygon.depth = 0;
-            rectanglePolygon.area2 = length * width * -2; // This winding direction is negative
-            
-            let rectanglePolygon_padded = [];
-            rectanglePolygon_padded = POLY.expand([rectanglePolygon], padding, start_z, rectanglePolygon_padded, 1); 
-            // console.log({rectanglePolygon:rectanglePolygon});
-            // if (!debug_slice.tops[0].fill_sparse) debug_slice.tops[0].fill_sparse = [];
-            // debug_slice.tops[0].fill_sparse.push(rectanglePolygon_padded[0]);
-            return rectanglePolygon_padded[0];
+            rectanglePolygon.area2 = (length+padding*2)*(width+padding*2)*-2; // This winding direction is negative
+            return rectanglePolygon;
         }
 
         function getSliceIndexList(precomputed_slice_heights, startHeight, endHeight) {
