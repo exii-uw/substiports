@@ -975,7 +975,9 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             // prisms_obj.push({geometry_points:parseSVGFromText(val[1]), name:"blue_jack", ini_height:48.9, extension_range:35})
             let view = null; // TODO
 
-            let [ support_pointsDB, support_points_simpleDB ] = getSupportPointsDebug(bottom_slice, process, settings);
+            console.log({prisms_obj:prisms_obj});
+            let surrogate_library = getSurrogateLibrary(prisms_obj);
+            let [ support_pointsDB, support_points_simpleDB ] = getSupportPointsDebug(bottom_slice, process, settings, surrogate_library);
 
             let [ support_points, support_points_simple ] = getSupportPoints(bottom_slice, process, settings);
 
@@ -1072,7 +1074,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                 await Promise.all(cluster_promises);
             }
 
-            let surrogate_library = getSurrogateLibrary(prisms_obj);
+            // let surrogate_library = getSurrogateLibrary(prisms_obj);
 
             let [ prepared_slices, surrogate_settings ] = prepareSurrogating(surrogate_library, highest_slice, process, settings);
             // let surrogate_settings = {};
@@ -1236,7 +1238,6 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                     // }
                 }
                 worker_number++;
-
                 // combined_susu.candidate_list.push(...susu_data.candidate_list);
             }
 
@@ -1299,7 +1300,6 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             // TODO: decode candidates
             // TODO: Combine minion verify and validate calls, OR make verfiy run with extra threads
             // TODO: Increase min fitness for low quality search
-            // TODO: Fix prism search
             // TODO: Adjust surrogate settings // Particle size generation
       
             let validate_promises = [];
@@ -1334,6 +1334,16 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             }
 
             console.log({global_selection_list:global_selection_list});
+            for (let data_obj of susu_data_objs) {
+                for (let candidate of data_obj.candidate_list) {
+                    if (candidate.candidate_details.candidate_obj.surro.type == "prism"){
+                        console.log({candidate:candidate});
+                    }
+                    else {
+                        console.log({boringCandidate:candidate});
+                    }
+                }
+            }
             
             // let index_array = [ ...Array(candidate_list.length).keys() ];
 
@@ -1569,8 +1579,9 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         return [ valid_points, simple_valid_p ];
     }
 
-    function getSupportPointsDebug(slice, proc, settings) {
+    function getSupportPointsDebug(slice, proc, settings, surrogates) {
 
+        console.log({surrogates:surrogates});
         let bottom_slice = slice;
         // let last_bottom_slice;
         // while (bottom_slice) {
@@ -1751,6 +1762,115 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                 return rectanglePolygon_padded[0];
             }
 
+            function generatePrismPolygonDEBUG(start_x, start_y, start_z, geometry_points, rot, rot_inner, padding, debug_slice) {
+                // TODO: Do poly generation while loading, if the points-level details are not necessary.
+
+                // Must pad first, padding centers polygon as well somehow?
+
+                // const geometry_bounds_poly = base.newPolygon(geometry_points);
+                
+                // console.log({geometry_points:geometry_points});
+                // console.log({geometry_bounds_poly:geometry_bounds_poly});
+                // const halfX2 = (geometry_bounds_poly.bounds.maxx-geometry_bounds_poly.bounds.minx)*0.5;
+                // const halfY2 = (geometry_bounds_poly.bounds.maxy-geometry_bounds_poly.bounds.miny)*0.5;
+                // const halfX = (geometry_bounds_poly.bounds.maxx)*0.5;
+                // const halfY = (geometry_bounds_poly.bounds.maxy)*0.5;
+                // console.log({halfX:halfX, halfX2:halfX2, halfY:halfY, halfY2:halfY2});
+                
+                // let geometry_points_copy = [...geometry_points];
+                // // Translate based on try-out position
+                // for (let point_index = 0; point_index < geometry_points_copy.length; point_index++) {
+                //     // geometry_points_copy[point_index].x += halfX2;
+                //     // geometry_points_copy[point_index].y += halfY2;
+                // }
+                // let geometry_points3 = geometry_bounds_poly.translatePoints(geometry_points_copy, {x:0, y:0, z:0});
+                
+                // debug_slice.tops[0].fill_sparse.push(rectanglePolygon);
+
+                //rectanglePolygon.parent = top.poly;
+                
+                // console.log({rectanglePolygon:rectanglePolygon});
+                let rectanglePolygon = base.newPolygon(geometry_points);
+                rectanglePolygon = rectanglePolygon.rotateXYsimple(rot); // simple translation (corner point equivalent on 0/0/0, so just simple rotate)
+                rectanglePolygon = rectanglePolygon.rotateXY(rot_inner); // inner rotation (moving midpoint dead to 0/0/0 in function)
+
+                // let rectanglePolygon_points = rectanglePolygon.points.clone();
+
+                // let geometry_points4 = geometry_bounds_poly.translatePoints(rectanglePolygon_points, {x:-0, y:-0, z:0});
+                // console.log({rectanglePolygonP:rectanglePolygon});
+
+
+                // for (let point_index = 0; point_index < rectanglePolygon.points.length; point_index++) {
+                //     rectanglePolygon.points[point_index].x -= halfX2;
+                //     rectanglePolygon.points[point_index].y -= halfY2;
+                // }
+
+                // let rectanglePolygon4 = base.newPolygon(geometry_points4);
+    
+                let rectanglePolygon_padded = [];
+                rectanglePolygon_padded = POLY.expand([rectanglePolygon], padding, start_z, rectanglePolygon_padded, 1); 
+
+                let translation_points_copy = rectanglePolygon_padded[0].points.clone();
+                let after_padding_poly = base.newPolygon(translation_points_copy);
+                let geometry_points2 = after_padding_poly.translatePoints(translation_points_copy, {x:start_x, y:start_y, z:start_z});
+
+                let prismPolygon = base.newPolygon(geometry_points2);
+                // prismPolygon = prismPolygon.rotateXY(rot_inner); // Perform LOCAL/INNER rotation (not?) here
+                prismPolygon.depth = 0;
+                prismPolygon.area2 = prismPolygon.area(true);
+
+                // console.log({prismPolygon:prismPolygon});
+                
+                // if (!debug_slice.tops[0].fill_sparse) debug_slice.tops[0].fill_sparse = [];
+                // debug_slice.tops[0].fill_sparse.push(prismPolygon);
+                //debug_slice.tops[0].fill_sparse.push(rectanglePolygon);
+                //debug_slice.tops[0].fill_sparse.push(rectanglePolygon_padded[0]);
+                return prismPolygon;
+            }
+
+            function generatePrismPolygonCenteredDEBUG(start_x, start_y, start_z, geometry_points, rot, rot_inner, padding, debug_slice) {
+                // TODO: Do poly generation while loading, if the points-level details are not necessary.
+    
+                // Must pad first, padding centers polygon as well somehow?
+    
+                const geometry_bounds_poly = base.newPolygon(geometry_points);
+                // console.log({geometry_points:geometry_points});
+                // console.log({geometry_bounds_poly:geometry_bounds_poly});
+                const halfX = geometry_bounds_poly.bounds.maxx*0.5;
+                const halfY = geometry_bounds_poly.bounds.maxy*0.5;
+                
+                // Translate based on try-out position
+                // for (let point_index = 0; point_index < geometry_points.length; point_index++) {
+                //     // geometry_points[point_index].x += halfX;
+                //     // geometry_points[point_index].y += halfY;
+                // }
+    
+                let rectanglePolygon = base.newPolygon(geometry_points);
+                //rectanglePolygon.parent = top.poly;
+                
+                // console.log({rectanglePolygon:rectanglePolygon});
+                rectanglePolygon = rectanglePolygon.rotateXY(rot+rot_inner);
+                // console.log({rectanglePolygonP:rectanglePolygon});
+      
+                let rectanglePolygon_padded = [];
+                rectanglePolygon_padded = POLY.expand([rectanglePolygon], padding, start_z, rectanglePolygon_padded, 1); 
+    
+                let translation_points_copy = rectanglePolygon_padded[0].points.clone();
+                let after_padding_poly = base.newPolygon(translation_points_copy);
+                let geometry_points2 = after_padding_poly.translatePoints(translation_points_copy, {x:start_x-halfX, y:start_y-halfY, z:start_z});
+    
+                let prismPolygon = base.newPolygon(geometry_points2);
+                prismPolygon.depth = 0;
+                prismPolygon.area2 = prismPolygon.area(true);
+    
+                // console.log({prismPolygon:prismPolygon});
+                
+                // if (!debug_slice.tops[0].fill_sparse) debug_slice.tops[0].fill_sparse = [];
+                // debug_slice.tops[0].fill_sparse.push(prismPolygon);
+                //debug_slice.tops[0].fill_sparse.push(rectanglePolygon);
+                //debug_slice.tops[0].fill_sparse.push(rectanglePolygon_padded[0]);
+                return prismPolygon;
+            }
 
             let debugint = Math.floor(Math.random()*(debug_outline_poly.length-1))+1;
             // for (let debugint = 1; debugint < debug_outline_poly.length; debugint++) {
@@ -1774,11 +1894,35 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
             let hull_rot_90 = hull_rot + 90;
 
-            let one_candidate = generateRectangleDEBUG(hull_points[debugint-1].x, hull_points[debugint-1].y, bottom_slice.z, 20, 10, hull_rot, 0.4, bottom_slice);
-            bottom_slice.tops[0].fill_sparse.push(one_candidate);
+            let one_candidate = generateRectangleDEBUG(hull_points[debugint-1].x, hull_points[debugint-1].y, bottom_slice.z, 100, 80, hull_rot, 0.4, bottom_slice);
+            let one_prism = generatePrismPolygonDEBUG(hull_points[debugint-1].x, hull_points[debugint-1].y, bottom_slice.z, surrogates[7].prism_geometry, hull_rot, 0, 0.4, bottom_slice);
+            
+            // let debug_rot_list = [0, 10, 20, 30, 35, 40, 45, 50, 55, 60, 65, 70, 95, 100, 105, 110, 115, 120, 130, 140, 150, 160, 170];
+            let debug_rot_list = [0, 5, 10, 15, 20, 60, 61, 62, 91, 92, 93, 150];
+            for (let debug_rot = 0;  debug_rot < 360; debug_rot = debug_rot +90){
+                let one_prismx = generatePrismPolygonDEBUG(hull_points[debugint-1].x, hull_points[debugint-1].y, bottom_slice.z, surrogates[7].prism_geometry, hull_rot, 180-debug_rot, 0.4, bottom_slice);
+                let one_candidatex = generateRectangleDEBUG(hull_points[debugint-1].x, hull_points[debugint-1].y, bottom_slice.z, 100, 80, hull_rot, 0.4, bottom_slice);
+                // bottom_slice.tops[0].fill_sparse.push(one_prismx);
+                // bottom_slice.tops[0].fill_sparse.push(one_candidatex);
+
+            }
+
+            // bottom_slice.tops[0].fill_sparse.push(one_candidate);
+            // bottom_slice.tops[0].fill_sparse.push(one_prism);
             let one_candidate2 = generateRectangleDEBUG(hull_points[debugint].x, hull_points[debugint].y, bottom_slice.z, 20, 10, hull_rot_90, 0.4, bottom_slice);
-            bottom_slice.tops[0].fill_sparse.push(one_candidate2);
+            let one_prism2 = generatePrismPolygonDEBUG(hull_points[debugint].x, hull_points[debugint].y, bottom_slice.z, surrogates[7].prism_geometry, hull_rot_90, 0,  0.4, bottom_slice);
+
+            for (let debug_rot = 0;  debug_rot < 360; debug_rot = debug_rot +90){
+                let one_prismx = generatePrismPolygonCenteredDEBUG(hull_points[debugint].x, hull_points[debugint].y, bottom_slice.z, surrogates[7].prism_geometry, hull_rot_90, 180-debug_rot, 0.4, bottom_slice);
+                let one_candidatex = generateRectangleDEBUG(hull_points[debugint].x, hull_points[debugint].y, bottom_slice.z, 100, 80, hull_rot_90, 0.4, bottom_slice);
+                bottom_slice.tops[0].fill_sparse.push(one_prismx);
+                bottom_slice.tops[0].fill_sparse.push(one_candidatex);
+
+            }
+            // bottom_slice.tops[0].fill_sparse.push(one_candidate2);
+            // bottom_slice.tops[0].fill_sparse.push(one_prism2);
             // }
+            
         }
 
         let slice_debug_counter = 0;
@@ -1917,9 +2061,31 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
     }
 
     function getSurrogateLibrary(prisms) {
+        console.log({prisms:prisms});
         let surrogates = [];
         // surrogates.push({width:100.5, length:152.7, height:10.9});
         // surrogates.push({width:136.8, length:190.1, height:24.1});
+
+        function generatePrismPolygonSize(start_x, start_y, start_z, geometry_points, padding, debug_slice) {
+            const geometry_bounds_poly = base.newPolygon(geometry_points);
+            const halfX = geometry_bounds_poly.bounds.maxx*0.5;
+            const halfY = geometry_bounds_poly.bounds.maxy*0.5;
+            
+            console.log({geometry_points:geometry_points});
+            let rectanglePolygon = base.newPolygon(geometry_points);
+
+            let rectanglePolygon_padded = [];
+            rectanglePolygon_padded = POLY.expand([rectanglePolygon], padding, start_z, rectanglePolygon_padded, 1); 
+            console.log({rectanglePolygon_padded:rectanglePolygon_padded});
+
+            let translation_points_copy = rectanglePolygon_padded[0].points.clone();
+            let after_padding_poly = base.newPolygon(translation_points_copy);
+            let geometry_points2 = after_padding_poly.translatePoints(translation_points_copy, {x:start_x-halfX, y:start_y-halfY, z:start_z});
+
+            let prismPolygon = base.newPolygon(geometry_points2);
+            prismPolygon.depth = 0;
+            return prismPolygon;
+        }
 
 
         function addOption(listOfOptions, length, width, height, title) {
@@ -1938,7 +2104,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         }
 
         function addPrism(listOfOptions, prism_bottom_obj, prism_obj) {
-            const getPrismSize = generatePrismPolygon(0, 0, 0, prism_obj.geometry_points, 0, 0.1);
+            const getPrismSize = generatePrismPolygonSize(0, 0, 0, prism_obj.geometry_points, 0, 0.1);
             const PrismWidth = getPrismSize.bounds.maxy - getPrismSize.bounds.miny;
             const PrismLength = getPrismSize.bounds.maxx - getPrismSize.bounds.minx;
 
@@ -2010,7 +2176,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         // // addOption(surrogates, 63.77, 31.85, 44.55, "Lego 8x4x4.3");
 
         addOption(surrogates, 63.77, 31.85, 63.65, "Lego 8x4x6.3");
-        // addPrism(surrogates, prisms[0], prisms[1]);
+        addPrism(surrogates, prisms[0], prisms[1]);
         // addPrism(surrogates, prisms[0], prisms[1]);
 
         // addStackableOptions(surrogates, 12.75, 9.55, 4, 31.85, 15.9, "Lego 4x2");
@@ -2822,7 +2988,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             return [old_volume, new_volume, delta_area];
         }
 
-        function generatePrismPolygon(start_x, start_y, start_z, geometry_points, rot, padding, debug_slice) {
+        function generatePrismPolygonCentered(start_x, start_y, start_z, geometry_points, rot, padding, debug_slice) {
             // TODO: Do poly generation while loading, if the points-level details are not necessary.
 
             // Must pad first, padding centers polygon as well somehow?
@@ -2834,10 +3000,10 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             const halfY = geometry_bounds_poly.bounds.maxy*0.5;
             
             // Translate based on try-out position
-            for (let point_index = 0; point_index < geometry_points.length; point_index++) {
-                // geometry_points[point_index].x += halfX;
-                // geometry_points[point_index].y += halfY;
-            }
+            // for (let point_index = 0; point_index < geometry_points.length; point_index++) {
+            //     // geometry_points[point_index].x += halfX;
+            //     // geometry_points[point_index].y += halfY;
+            // }
 
             let rectanglePolygon = base.newPolygon(geometry_points);
             //rectanglePolygon.parent = top.poly;
@@ -2857,7 +3023,6 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             prismPolygon.depth = 0;
             prismPolygon.area2 = prismPolygon.area(true);
 
-
             // console.log({prismPolygon:prismPolygon});
             
             // if (!debug_slice.tops[0].fill_sparse) debug_slice.tops[0].fill_sparse = [];
@@ -2865,7 +3030,6 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             //debug_slice.tops[0].fill_sparse.push(rectanglePolygon);
             //debug_slice.tops[0].fill_sparse.push(rectanglePolygon_padded[0]);
             return prismPolygon;
-
         }
 
         // make test object polygons
@@ -3942,7 +4106,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         //                 pso_polygons_list = [generateRectanglePolygonCentered(var_and_settings[0][iteration_number*var_and_settings[1].number_of_vars + 1], var_and_settings[0][iteration_number*var_and_settings[1].number_of_vars + 2], var_and_settings[1].start_slice.z, pso_surrogate.length, pso_surrogate.width, var_and_settings[0][iteration_number*var_and_settings[1].number_of_vars + 4], surrogate_settings.surrogate_padding, var_and_settings[1].start_slice)];
         //             }
         //             else if (pso_surrogate.type == "prism") {
-        //                 pso_polygons_list = [generatePrismPolygon(var_and_settings[0][iteration_number*var_and_settings[1].number_of_vars + 1], var_and_settings[0][iteration_number*var_and_settings[1].number_of_vars + 2], var_and_settings[1].start_slice.z, pso_surrogate.prism_geometry, var_and_settings[0][iteration_number*var_and_settings[1].number_of_vars + 4], surrogate_settings.surrogate_padding, var_and_settings[1].start_slice)];
+        //                 pso_polygons_list = [generatePrismPolygonCentered(var_and_settings[0][iteration_number*var_and_settings[1].number_of_vars + 1], var_and_settings[0][iteration_number*var_and_settings[1].number_of_vars + 2], var_and_settings[1].start_slice.z, pso_surrogate.prism_geometry, var_and_settings[0][iteration_number*var_and_settings[1].number_of_vars + 4], surrogate_settings.surrogate_padding, var_and_settings[1].start_slice)];
         //             }
 
 
@@ -4914,7 +5078,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                         try_surro_polygons_list = [generateRectanglePolygonCentered(try_x, try_y, up.z, try_surro.length, try_surro.width, try_rotation, surrogate_settings.surrogate_padding, bottom_slice)];
                     }
                     else if (try_surro.type == "prism") {
-                        try_surro_polygons_list = [generatePrismPolygon(try_x, try_y, up.z, try_surro.prism_geometry, try_rotation, surrogate_settings.surrogate_padding, bottom_slice)];
+                        try_surro_polygons_list = [generatePrismPolygonCentered(try_x, try_y, up.z, try_surro.prism_geometry, try_rotation, surrogate_settings.surrogate_padding, bottom_slice)];
                     }
                     let collision = false;
                     let overextended = false;
@@ -4943,7 +5107,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                     //     try_surro_polygons_list = [generateRectanglePolygonCentered(try_x, try_y, up.z, try_surro.length, try_surro.width, try_rotation, surrogate_settings.surrogate_padding, bottom_slice)];
                     // }
                     // else if (try_surro.type == "prism") {
-                    //     try_surro_polygons_list = [generatePrismPolygon(try_x, try_y, up.z, try_surro.prism_geometry, try_rotation, surrogate_settings.surrogate_padding, bottom_slice)];
+                    //     try_surro_polygons_list = [generatePrismPolygonCentered(try_x, try_y, up.z, try_surro.prism_geometry, try_rotation, surrogate_settings.surrogate_padding, bottom_slice)];
                     // }
 
 
@@ -4960,7 +5124,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                     //         if (rotation < 130) {
                     //             console.log({rotation:rotation});
                     //             // let rot_test_geometry_list = [generateRectanglePolygonCentered(try_x, try_y, 0, 50, 100, rotation, surrogate_settings.surrogate_padding, bottom_slice)];
-                    //             let rot_test_geometry_list = [generatePrismPolygon(try_x, try_y, up.z, try_surro.prism_geometry, rotation, surrogate_settings.surrogate_padding, bottom_slice)];
+                    //             let rot_test_geometry_list = [generatePrismPolygonCentered(try_x, try_y, up.z, try_surro.prism_geometry, rotation, surrogate_settings.surrogate_padding, bottom_slice)];
                     //             bottom_slice.tops[0].shells.push(rot_test_geometry_list[0]);
                     //         }
 
@@ -5368,7 +5532,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                 //                 pso_polygons_list = [generateRectanglePolygonCentered(var_list[iteration_number*this.surrogate_settings.number_of_vars + 1], var_list[iteration_number*this.surrogate_settings.number_of_vars + 2], this.surrogate_settings.start_slice.z, pso_surrogate.length, pso_surrogate.width, var_list[iteration_number*this.surrogate_settings.number_of_vars + 4], surrogate_settings.surrogate_padding, this.surrogate_settings.start_slice)];
                 //             }
                 //             else if (pso_surrogate.type == "prism") {
-                //                 pso_polygons_list = [generatePrismPolygon(var_list[iteration_number*this.surrogate_settings.number_of_vars + 1], var_list[iteration_number*this.surrogate_settings.number_of_vars + 2], this.surrogate_settings.start_slice.z, pso_surrogate.prism_geometry, var_list[iteration_number*this.surrogate_settings.number_of_vars + 4], surrogate_settings.surrogate_padding, this.surrogate_settings.start_slice)];
+                //                 pso_polygons_list = [generatePrismPolygonCentered(var_list[iteration_number*this.surrogate_settings.number_of_vars + 1], var_list[iteration_number*this.surrogate_settings.number_of_vars + 2], this.surrogate_settings.start_slice.z, pso_surrogate.prism_geometry, var_list[iteration_number*this.surrogate_settings.number_of_vars + 4], surrogate_settings.surrogate_padding, this.surrogate_settings.start_slice)];
                 //             }
 
 
@@ -5731,7 +5895,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                                             pso_temp_polygons_list = [generateRectanglePolygonCentered(chosen_x, chosen_y, pso_z, pso_surrogate.length, pso_surrogate.width, chosen_rotation, surrogate_settings.surrogate_padding, this.surrogate_settings.start_slice)];
                                         }
                                         else if (pso_surrogate.type == "prism") {
-                                            pso_temp_polygons_list = [generatePrismPolygon(chosen_x, chosen_y, pso_z, pso_surrogate.prism_geometry, chosen_rotation, surrogate_settings.surrogate_padding, this.surrogate_settings.start_slice)];
+                                            pso_temp_polygons_list = [generatePrismPolygonCentered(chosen_x, chosen_y, pso_z, pso_surrogate.prism_geometry, chosen_rotation, surrogate_settings.surrogate_padding, this.surrogate_settings.start_slice)];
                                         }
 
                                         POLY.subtract(pso_temp_polygons_list, all_surrogates[tower_library_index].geometry, unsupported_polygons, null, this.surrogate_settings.start_slice.z, min);
@@ -5750,7 +5914,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                                                 pso_temp_polygons_list = [generateRectanglePolygonCentered(chosen_x, chosen_y, pso_z, pso_surrogate.length, pso_surrogate.width, chosen_rotation, surrogate_settings.surrogate_padding, this.surrogate_settings.start_slice)];
                                             }
                                             else if (pso_surrogate.type == "prism") {
-                                                pso_temp_polygons_list = [generatePrismPolygon(chosen_x, chosen_y, pso_z, pso_surrogate.prism_geometry, chosen_rotation, surrogate_settings.surrogate_padding, this.surrogate_settings.start_slice)];
+                                                pso_temp_polygons_list = [generatePrismPolygonCentered(chosen_x, chosen_y, pso_z, pso_surrogate.prism_geometry, chosen_rotation, surrogate_settings.surrogate_padding, this.surrogate_settings.start_slice)];
                                             }
 
                                             POLY.subtract(pso_temp_polygons_list, all_surrogates[tower_library_index].geometry, unsupported_polygons, null, this.surrogate_settings.start_slice.z, min);
@@ -5813,7 +5977,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                                 pso_polygons_list = [generateRectanglePolygonCentered(chosen_x, chosen_y, pso_z, pso_surrogate.length, pso_surrogate.width, chosen_rotation, surrogate_settings.surrogate_padding, this.surrogate_settings.start_slice)];
                             }
                             else if (pso_surrogate.type == "prism") {
-                                pso_polygons_list = [generatePrismPolygon(chosen_x, chosen_y, pso_z, pso_surrogate.prism_geometry, chosen_rotation, surrogate_settings.surrogate_padding, this.surrogate_settings.start_slice)];
+                                pso_polygons_list = [generatePrismPolygonCentered(chosen_x, chosen_y, pso_z, pso_surrogate.prism_geometry, chosen_rotation, surrogate_settings.surrogate_padding, this.surrogate_settings.start_slice)];
                             }
 
 
@@ -6363,12 +6527,12 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                             pso_polygons_list = [generateRectanglePolygonCentered(try_x, try_y, try_z, try_surro.length, try_surro.width, try_rotation, surrogate_settings.surrogate_padding, bottom_slice)];
                         }
                         else if (try_surro.type == "prism") {
-                            pso_polygons_list = [generatePrismPolygon(try_x, try_y, try_z, try_surro.prism_geometry, try_rotation, surrogate_settings.surrogate_padding, bottom_slice)];
+                            pso_polygons_list = [generatePrismPolygonCentered(try_x, try_y, try_z, try_surro.prism_geometry, try_rotation, surrogate_settings.surrogate_padding, bottom_slice)];
                             // const deg = try_rotation * Math.PI / 180;
                             // const alignX = Math.cos(deg)*5 - Math.sin(deg)*5;
                             // const alignY = Math.sin(deg)*5 + Math.cos(deg)*5;
                             // const alignX = 0; const alignY = 0;
-                            prism_bottoms = [generatePrismPolygon(try_x, try_y, try_z, try_surro.bottom_geometry, try_rotation, surrogate_settings.surrogate_padding, bottom_slice)]; // TODO align these using SVG viewbox
+                            prism_bottoms = [generatePrismPolygonCentered(try_x, try_y, try_z, try_surro.bottom_geometry, try_rotation, surrogate_settings.surrogate_padding, bottom_slice)]; // TODO align these using SVG viewbox
                             const extensionIndexList = getSliceIndexList(surrogate_settings.precomputed_slice_heights, try_z + try_surro.minHeight, try_z + try_surro.maxHeight);
                             const extensionData = checkVolumeAndCollisionsExtend(surrogate_settings.all_slices, extensionIndexList, pso_polygons_list, finalHeight);
                             finalHeight = extensionData[0];
@@ -6458,7 +6622,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                             // let baseYAfter = try_y + global_y_dist;
 
 
-                            // let pso_polygons_listDB = [generatePrismPolygon(try_x, try_y, up.z, prisms[0].geometry_points, debugint, surrogate_settings.surrogate_padding, bottom_slice)];
+                            // let pso_polygons_listDB = [generatePrismPolygonCentered(try_x, try_y, up.z, prisms[0].geometry_points, debugint, surrogate_settings.surrogate_padding, bottom_slice)];
                             // let pso_polygons_listDB2 = [generateRectanglePolygonCentered(baseXAfter, baseYAfter, up.z, testLength, testWidth, try_rotation, surrogate_settings.surrogate_padding, bottom_slice)];
                             // let candidateDB2 = {
                             //     geometry:pso_polygons_listDB2, 
@@ -6475,11 +6639,11 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
                             // surrogates_placed.push(candidateDB2);
                             
-                            // let pso_polygons_listDB = [generatePrismPolygon(try_x+debugint*3, try_y, up.z, try_surro.geometry, debugint, surrogate_settings.surrogate_padding, bottom_slice)];
+                            // let pso_polygons_listDB = [generatePrismPolygonCentered(try_x+debugint*3, try_y, up.z, try_surro.geometry, debugint, surrogate_settings.surrogate_padding, bottom_slice)];
                             let pso_polygons_listDB = [generateRectanglePolygonCentered(0, 0, up.z, bedWidthArea*2, bedDepthArea*2, 0, surrogate_settings.surrogate_padding, bottom_slice)];
 
                             // const alignX = 0; const alignY = 0;
-                            // prism_bottoms = [generatePrismPolygon(try_x+debugint*3, try_y, try_z, try_surro.bottom_geometry, debugint, surrogate_settings.surrogate_padding, bottom_slice)]; // TODO align these using SVG viewbox
+                            // prism_bottoms = [generatePrismPolygonCentered(try_x+debugint*3, try_y, try_z, try_surro.bottom_geometry, debugint, surrogate_settings.surrogate_padding, bottom_slice)]; // TODO align these using SVG viewbox
 
                             let candidateDB = {
                                 geometry:pso_polygons_listDB, 

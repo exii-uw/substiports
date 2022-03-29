@@ -324,6 +324,17 @@ const funcs = {
         let surros = surrogate_library;
         let surrogate_settings = susu_settings;
 
+        for (let surro of surros) {
+            if (surro.type == "prism") {
+                let point_list = [];
+                for (let geometry_point of surro.prism_geometry) {
+                    let new_point = newPoint(geometry_point.x, geometry_point.y, geometry_point.z);
+                    point_list.push(new_point);
+                }
+                surro.prism_geometry = point_list;
+            }
+        }
+
         console.log({surrogate_settings:surrogate_settings});
 
 
@@ -413,7 +424,27 @@ const funcs = {
             return [old_volume, new_volume, delta_area];
         }
 
-        function generatePrismPolygon(start_x, start_y, start_z, geometry_points, rot, padding, debug_slice) {
+        function generatePrismPolygon(start_x, start_y, start_z, geometry_points, rot, rot_inner, padding, debug_slice) {
+            let rectanglePolygon = base.newPolygon(geometry_points);
+
+            rectanglePolygon = rectanglePolygon.rotateXYsimple(rot); // simple translation (corner point equivalent on 0/0/0, so just simple rotate)
+            rectanglePolygon = rectanglePolygon.rotateXY(rot_inner); // inner rotation (moving midpoint dead to 0/0/0 in function)
+  
+            let rectanglePolygon_padded = [];
+            rectanglePolygon_padded = POLY.expand([rectanglePolygon], padding, start_z, rectanglePolygon_padded, 1); 
+
+            let translation_points_copy = rectanglePolygon_padded[0].points.clone();
+            let after_padding_poly = base.newPolygon(translation_points_copy);
+            let geometry_points2 = after_padding_poly.translatePoints(translation_points_copy, {x:start_x, y:start_y, z:start_z});
+
+            let prismPolygon = base.newPolygon(geometry_points2);
+            prismPolygon.depth = 0;
+            prismPolygon.area2 = prismPolygon.area(true);
+
+            return prismPolygon;
+        }
+
+        function generatePrismPolygonCentered(start_x, start_y, start_z, geometry_points, rot, rot_inner, padding, debug_slice) {
             // TODO: Do poly generation while loading, if the points-level details are not necessary.
 
             // Must pad first, padding centers polygon as well somehow?
@@ -425,16 +456,16 @@ const funcs = {
             const halfY = geometry_bounds_poly.bounds.maxy*0.5;
             
             // Translate based on try-out position
-            for (let point_index = 0; point_index < geometry_points.length; point_index++) {
-                // geometry_points[point_index].x += halfX;
-                // geometry_points[point_index].y += halfY;
-            }
+            // for (let point_index = 0; point_index < geometry_points.length; point_index++) {
+            //     // geometry_points[point_index].x += halfX;
+            //     // geometry_points[point_index].y += halfY;
+            // }
 
             let rectanglePolygon = base.newPolygon(geometry_points);
             //rectanglePolygon.parent = top.poly;
             
             // console.log({rectanglePolygon:rectanglePolygon});
-            rectanglePolygon = rectanglePolygon.rotateXY(rot);
+            rectanglePolygon = rectanglePolygon.rotateXY(rot+rot_inner);
             // console.log({rectanglePolygonP:rectanglePolygon});
   
             let rectanglePolygon_padded = [];
@@ -448,7 +479,6 @@ const funcs = {
             prismPolygon.depth = 0;
             prismPolygon.area2 = prismPolygon.area(true);
 
-
             // console.log({prismPolygon:prismPolygon});
             
             // if (!debug_slice.tops[0].fill_sparse) debug_slice.tops[0].fill_sparse = [];
@@ -456,9 +486,7 @@ const funcs = {
             //debug_slice.tops[0].fill_sparse.push(rectanglePolygon);
             //debug_slice.tops[0].fill_sparse.push(rectanglePolygon_padded[0]);
             return prismPolygon;
-
         }
-
         // make test object polygons
         function generateRectanglePolygon(start_x, start_y, start_z, length, width, rot, padding, debug_slice) {
             let rotation = rot * Math.PI / 180;
@@ -1293,6 +1321,7 @@ const funcs = {
         // Optimizer area ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         let valid_answers = [];
         var optimizer = new kiri.Optimizer();
+        console.log({surros:surros});
         optimizer.surrogate_library = surros;
         optimizer.surrogate_settings = surrogate_settings;
         console.log({optSet:optimizer.surrogate_settings});
@@ -1315,7 +1344,7 @@ const funcs = {
             let results_meta_data = {valid:false, candidate_details:null, fitness:Number.NEGATIVE_INFINITY, tower_fitness:[], tower_size:1, below:null, aboves:[]};
 
             let pso_use_this_surrogate = 0;
-            let tower_details = {tower_x:null, tower_y:null};
+            let tower_details = {tower_x:null, tower_y:null, tower_rot:null};
 
             // Name parameters for easy handling
             let chosen_x = var_list[0];
@@ -1324,6 +1353,7 @@ const funcs = {
             let pso_desired_length = var_list[3];
             let pso_desired_width = var_list[4];
             let pso_desired_height = var_list[5];
+            let pso_inner_rot = var_list[6];
 
             let [ pso_surrogate, pso_idx ] = getBestFittingSurrogateL2(this.surrogate_library, pso_desired_length, pso_desired_width, pso_desired_height);
 
@@ -1335,7 +1365,7 @@ const funcs = {
                 pso_polygons_list = [generateRectanglePolygon(chosen_x, chosen_y, pso_z, pso_surrogate.length, pso_surrogate.width, chosen_rotation, surrogate_settings.surrogate_padding, this.surrogate_settings.start_slice)];
             }
             else if (pso_surrogate.type == "prism") {
-                pso_polygons_list = [generatePrismPolygon(chosen_x, chosen_y, pso_z, pso_surrogate.prism_geometry, chosen_rotation, surrogate_settings.surrogate_padding, this.surrogate_settings.start_slice)];
+                pso_polygons_list = [generatePrismPolygon(chosen_x, chosen_y, pso_z, pso_surrogate.prism_geometry, chosen_rotation, pso_inner_rot, surrogate_settings.surrogate_padding, this.surrogate_settings.start_slice)];
             }
 
             let oob = false;
@@ -1564,6 +1594,7 @@ const funcs = {
         pso_variable_list.push({ start: surrogate_settings.smallest_length, end: surrogate_settings.biggest_length});  // 3: Desired length of ideal surrogate, mapped from smallest to biggest available lengths                                                   
         pso_variable_list.push({ start: surrogate_settings.smallest_width, end: surrogate_settings.biggest_width});  // 4 {10}: Desired length of ideal surrogate, mapped from smallest to biggest available lengths                                                   
         pso_variable_list.push({ start: surrogate_settings.smallest_height, end: surrogate_settings.biggest_height});  // 5 {11}: Desired length of ideal surrogate, mapped from smallest to biggest available lengths                                                   
+        pso_variable_list.push({ start: 0, end: 360});          // 6: Inner rotation in degrees
         // pso_variable_list.push({ start: 0, end: 1});            // 6: Target extension for height-varying surrogates, 0 = min_height, 1 = max_height
         // pso_variable_list.push({ start: 0, end: 0});            // 7: local meta variable: if this surrogate data should be used or not
         // pso_variable_list.push({ start: 0, end: 0});            // 8: local meta variable: Post-tower X position
@@ -1727,12 +1758,13 @@ const funcs = {
             let results_meta_data = {valid:false, candidate_details:null, fitness:Number.NEGATIVE_INFINITY, tower_fitness:[], tower_size:ts, below:lower_full, aboves:[]};
 
             let pso_use_this_surrogate = 0;
-            let tower_details = {tower_x:null, tower_y:null};
+            let tower_details = {tower_x:null, tower_y:null, tower_rot:null};
             let pso_x = var_list[0];
             let pso_y = var_list[1];
             let pso_desired_length = var_list[2];
             let pso_desired_width = var_list[3];
             let pso_desired_height = var_list[4];
+            let pso_inner_rot = var_list[5];
 
             let [ pso_surrogate, pso_idx ] = getBestFittingSurrogateL2(this.surrogate_library, pso_desired_length, pso_desired_width, pso_desired_height);
 
@@ -1809,7 +1841,7 @@ const funcs = {
                         pso_temp_polygons_list = [generateRectanglePolygonCentered(chosen_x, chosen_y, pso_z, pso_surrogate.length, pso_surrogate.width, chosen_rotation, surrogate_settings.surrogate_padding, this.surrogate_settings.start_slice)];
                     }
                     else if (pso_surrogate.type == "prism") {
-                        pso_temp_polygons_list = [generatePrismPolygon(chosen_x, chosen_y, pso_z, pso_surrogate.prism_geometry, chosen_rotation, surrogate_settings.surrogate_padding, this.surrogate_settings.start_slice)];
+                        pso_temp_polygons_list = [generatePrismPolygonCentered(chosen_x, chosen_y, pso_z, pso_surrogate.prism_geometry, chosen_rotation, pso_inner_rot, surrogate_settings.surrogate_padding, this.surrogate_settings.start_slice)];
                     }
 
                     POLY.subtract(pso_temp_polygons_list, lower_surr.geometry, unsupported_polygons, null, this.surrogate_settings.start_slice.z, min);
@@ -1828,7 +1860,7 @@ const funcs = {
                             pso_temp_polygons_list = [generateRectanglePolygonCentered(chosen_x, chosen_y, pso_z, pso_surrogate.length, pso_surrogate.width, chosen_rotation, surrogate_settings.surrogate_padding, this.surrogate_settings.start_slice)];
                         }
                         else if (pso_surrogate.type == "prism") {
-                            pso_temp_polygons_list = [generatePrismPolygon(chosen_x, chosen_y, pso_z, pso_surrogate.prism_geometry, chosen_rotation, surrogate_settings.surrogate_padding, this.surrogate_settings.start_slice)];
+                            pso_temp_polygons_list = [generatePrismPolygonCentered(chosen_x, chosen_y, pso_z, pso_surrogate.prism_geometry, chosen_rotation, pso_inner_rot, surrogate_settings.surrogate_padding, this.surrogate_settings.start_slice)];
                         }
 
                         POLY.subtract(pso_temp_polygons_list, lower_surr.geometry, unsupported_polygons, null, this.surrogate_settings.start_slice.z, min);
@@ -1874,7 +1906,7 @@ const funcs = {
                     pso_polygons_list = [generateRectanglePolygonCentered(chosen_x, chosen_y, pso_z, pso_surrogate.length, pso_surrogate.width, chosen_rotation, surrogate_settings.surrogate_padding, this.surrogate_settings.start_slice)];
                 }
                 else if (pso_surrogate.type == "prism") {
-                    pso_polygons_list = [generatePrismPolygon(chosen_x, chosen_y, pso_z, pso_surrogate.prism_geometry, chosen_rotation, surrogate_settings.surrogate_padding, this.surrogate_settings.start_slice)];
+                    pso_polygons_list = [generatePrismPolygonCentered(chosen_x, chosen_y, pso_z, pso_surrogate.prism_geometry, chosen_rotation, pso_inner_rot, surrogate_settings.surrogate_padding, this.surrogate_settings.start_slice)];
                 }
 
                 let oob = false;
@@ -2049,6 +2081,7 @@ const funcs = {
                     let current_details = [...var_list];
                     tower_details.tower_x = chosen_x;
                     tower_details.tower_y = chosen_y;
+                    tower_details.tower_rot = chosen_rotation;
                     results_meta_data.candidate_details = {pso_details:current_details, pso_idx:pso_idx, candidate_obj:candidate, use_me:pso_use_this_surrogate, tower_details:tower_details};                    // }
 
                     let valid_combination = true;
@@ -2130,7 +2163,7 @@ const funcs = {
         pso_tower_var_list.push({ start: surrogate_settings.smallest_length, end: surrogate_settings.biggest_length});  // 2: Desired length of ideal surrogate, mapped from smallest to biggest available lengths                                                   
         pso_tower_var_list.push({ start: surrogate_settings.smallest_width, end: surrogate_settings.biggest_width});  // 3 {10}: Desired length of ideal surrogate, mapped from smallest to biggest available lengths                                                   
         pso_tower_var_list.push({ start: surrogate_settings.smallest_height, end: surrogate_settings.biggest_height});  // 4 {11}: Desired length of ideal surrogate, mapped from smallest to biggest available lengths                                                   
-
+        pso_tower_var_list.push({ start: 0, end: 360});          // 6: Inner rotation in degrees
 
         function removeEquivalentSolutions(solution_list) {
             if (solution_list.length < 2) return solution_list;
