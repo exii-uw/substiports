@@ -1076,7 +1076,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
             // let surrogate_library = getSurrogateLibrary(prisms_obj);
 
-            let [ prepared_slices, surrogate_settings ] = prepareSurrogating(surrogate_library, highest_slice, process, settings);
+            let [ prepared_slices, surrogate_settings, pre_surrogate_support_amounts ] = prepareSurrogating(surrogate_library, highest_slice, process, settings);
             // let surrogate_settings = {};
 
             let sliceStackData = getEncodedData(bottom_slice);
@@ -1133,6 +1133,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             // }
 
             let optimizer_promises = [];
+            let all_slices_save = [...surrogate_settings.all_slices];
             surrogate_settings.start_slice = null;
             surrogate_settings.all_slices = null;
             // optimizer_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, cluster_list[0].concave_cluster_hulls[0], surrogate_settings, settings.device, bottom_slice.widget, cluster_list[0].kn));
@@ -1182,15 +1183,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
             if (optimizer_promises) {
                 for (let p of optimizer_promises) {
-                    p.then(data => {
-
-                        // tracker(count++, promises.length, data);
-                        console.log({data:data});
-                        // let numberBig = false;
-                        // if (data.output[0] > 200) numberBig = true;
-                        // // if (p[0][0] > 200) numberBig = true;
-                        // console.log({numberBig:numberBig});
-                        // candidate_lists[data.kn].push(...data.return_list); // TODO: Potentially keep sublists for starting one verification thread per cluster thread  
+                    p.then(data => { 
                         susu_data_objs[data.kn].candidate_list.push(...data.return_list);
                         let t_height = 0;
                         for (let return_obj of data.return_list) {
@@ -1297,7 +1290,6 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             console.log("Starting validation of combinations");
 
             // TODO TODO
-            // TODO: decode candidates
             // TODO: Combine minion verify and validate calls, OR make verfiy run with extra threads
             // TODO: Increase min fitness for low quality search
             // TODO: Adjust surrogate settings // Particle size generation
@@ -1334,16 +1326,29 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             }
 
             console.log({global_selection_list:global_selection_list});
-            for (let data_obj of susu_data_objs) {
-                for (let candidate of data_obj.candidate_list) {
-                    if (candidate.candidate_details.candidate_obj.surro.type == "prism"){
-                        console.log({candidate:candidate});
-                    }
-                    else {
-                        console.log({boringCandidate:candidate});
-                    }
-                }
-            }
+            // for (let data_obj of susu_data_objs) {
+            //     for (let candidate of data_obj.candidate_list) {
+            //         if (candidate.candidate_details.candidate_obj.surro.type == "prism"){
+            //             console.log({candidate:candidate});
+            //         }
+            //         else {
+            //             console.log({boringCandidate:candidate});
+            //         }
+            //     }
+            // }
+
+            // Making surrogate objects from search result
+
+            surrogate_settings.all_slices = all_slices_save; // re-enter slices after encoding no longer required
+            let surrogates_placed = [];
+            let placed_surrogates = placeSurrogates(global_selection_list, surrogate_settings, surrogate_library, bottom_slice, surrogates_placed);
+
+            console.log({surrogates_placed_list:surrogates_placed});
+            console.log({placed_surrogates:placed_surrogates});
+
+
+            applySurrogatesToSlices(surrogates_placed, surrogate_settings, bottom_slice, process, view, surrogate_settings.all_slices, pre_surrogate_support_amounts);
+
             
             // let index_array = [ ...Array(candidate_list.length).keys() ];
 
@@ -2056,7 +2061,6 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                 const duration2 = performance.now() - start2;
                 console.log({normal_runtime:duration2});
             }
-            
         }
 
         let slice_debug_counter = 0;
@@ -2070,6 +2074,1001 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
         return [ valid_points, simple_valid_p ];
 
+    }
+
+    function placeSurrogates(global_selection_list, surrogate_settings, surrogate_library, bottom_slice, surrogates_placed) {
+        console.log("Placing surrogates");
+
+        function generatePrismPolygon(start_x, start_y, start_z, geometry_points, rot, rot_inner, padding, debug_slice) {
+            let rectanglePolygon = base.newPolygon(geometry_points);
+            rectanglePolygon = rectanglePolygon.rotateXYsimple(rot); // simple translation (corner point equivalent on 0/0/0, so just simple rotate)
+            rectanglePolygon = rectanglePolygon.rotateXY(rot_inner); // inner rotation (moving midpoint dead to 0/0/0 in function)
+  
+            let rectanglePolygon_padded = [];
+            rectanglePolygon_padded = POLY.expand([rectanglePolygon], padding, start_z, rectanglePolygon_padded, 1); 
+
+            let translation_points_copy = rectanglePolygon_padded[0].points.clone();
+            let after_padding_poly = base.newPolygon(translation_points_copy);
+            let geometry_points2 = after_padding_poly.translatePoints(translation_points_copy, {x:start_x, y:start_y, z:start_z});
+
+            let prismPolygon = base.newPolygon(geometry_points2);
+            prismPolygon.depth = 0;
+            prismPolygon.area2 = prismPolygon.area(true);
+            return prismPolygon;
+        }
+
+        function generatePrismPolygonCentered(start_x, start_y, start_z, geometry_points, rot, rot_inner, padding, debug_slice) {
+            const geometry_bounds_poly = base.newPolygon(geometry_points);
+            const halfX = geometry_bounds_poly.bounds.maxx*0.5;
+            const halfY = geometry_bounds_poly.bounds.maxy*0.5;
+
+            let rectanglePolygon = base.newPolygon(geometry_points);
+            rectanglePolygon = rectanglePolygon.rotateXY(rot+rot_inner);
+
+            let rectanglePolygon_padded = [];
+            rectanglePolygon_padded = POLY.expand([rectanglePolygon], padding, start_z, rectanglePolygon_padded, 1); 
+
+            let translation_points_copy = rectanglePolygon_padded[0].points.clone();
+            let after_padding_poly = base.newPolygon(translation_points_copy);
+            let geometry_points2 = after_padding_poly.translatePoints(translation_points_copy, {x:start_x-halfX, y:start_y-halfY, z:start_z});
+
+            let prismPolygon = base.newPolygon(geometry_points2);
+            prismPolygon.depth = 0;
+            prismPolygon.area2 = prismPolygon.area(true);
+            return prismPolygon;
+        }
+        // make test object polygons
+        function generateRectanglePolygon(start_x, start_y, start_z, length, width, rot, padding, debug_slice) {
+            let rotation = rot * Math.PI / 180;
+            let point1 = newPoint(start_x - padding*Math.cos(rotation) - padding*Math.sin(-rotation), start_y - padding*Math.sin(rotation) - padding*Math.cos(-rotation), start_z);
+            let point2 = newPoint(point1.x + (length+2*padding)*Math.cos(rotation), point1.y + (length+2*padding)*Math.sin(rotation), start_z);
+            let point3 = newPoint(point2.x + (width+2*padding)*Math.sin(-rotation), point2.y + (width+2*padding)*Math.cos(-rotation), start_z);
+            let point4 = newPoint(point1.x + (width+2*padding)*Math.sin(-rotation), point1.y + (width+2*padding)*Math.cos(-rotation), start_z);
+            let rect_points = [point1, point2, point3, point4];
+            let rectanglePolygon = base.newPolygon(rect_points);
+            rectanglePolygon.depth = 0;
+            rectanglePolygon.area2 = (length+padding*2)*(width+padding*2)*-2;
+            return rectanglePolygon;
+        }
+
+        // make test object polygons
+        function generateRectanglePolygonCentered(start_x, start_y, start_z, length, width, rot, padding, debug_slice) {
+            const halfLength = length*0.5+padding;
+            const halfWidth = width*0.5+padding;
+            let point1 = newPoint(start_x - halfLength, start_y - halfWidth, start_z);
+            let point2 = newPoint(start_x + halfLength, start_y - halfWidth, start_z);
+            let point3 = newPoint(start_x + halfLength, start_y + halfWidth, start_z);
+            let point4 = newPoint(start_x - halfLength, start_y + halfWidth, start_z);
+            let rect_points = [point1, point2, point3, point4];
+            let rectanglePolygon = base.newPolygon(rect_points);
+            rectanglePolygon = rectanglePolygon.rotateXY(rot);
+            rectanglePolygon.depth = 0;
+            rectanglePolygon.area2 = (length+padding*2)*(width+padding*2)*-2; // This winding direction is negative
+            return rectanglePolygon;
+        }
+
+        function getSliceIndexList(precomputed_slice_heights, startHeight, endHeight) {
+            let sliceIndexList = [];
+            let skip = true;
+
+            for (let sliceIndex = 0; sliceIndex < precomputed_slice_heights.length-1; sliceIndex++){
+                if (skip && precomputed_slice_heights[sliceIndex].skipBelow >= startHeight) skip = false; // Start checking 
+                if (precomputed_slice_heights[sliceIndex].stopAbove >= endHeight) break;
+                if (!skip) sliceIndexList.push(sliceIndex);
+            }
+            // console.log({startHeight:startHeight, endHeight:endHeight});
+            // console.log(sliceIndexList);
+            return sliceIndexList;
+        }
+
+        function makeCandidate(cd) {
+            let candidate_detail = cd.candidate_details;
+
+            counter++;
+            console.log({candidate_number:counter, useOrIgnore:candidate_detail.use_me});
+
+            console.log({surrogate_library:surrogate_library});
+            for (let surro of surrogate_library) { // Update surrogate reference
+                if (surro.id == candidate_detail.candidate_obj.surro.id) {
+                    candidate_detail.candidate_obj.surro = surro;
+                    break;
+                }
+            }
+
+            let is_tower = false;
+
+            if (candidate_detail.use_me) { // If surrogate was placed without problem by PSO
+
+                let decoded_geometry = kiri.codec.decode(candidate_detail.candidate_obj.geometry, {full: true});
+                candidate_detail.candidate_obj.geometry = decoded_geometry;
+                
+                // console.log({candidate:candidate});
+                check_surrogate_insertion_case(candidate_detail.candidate_obj, bottom_slice, surrogate_settings);
+
+                // Check if it is on a consecutive layer from a previous surrogate
+                let consecutive = false;
+                surrogates_placed.forEach(function(surrogate) {
+                    if (Math.abs(candidate_detail.candidate_obj.insertion_data.index - surrogate.insertion_data.index) === 1) {
+                        consecutive = true;
+                    }
+                });
+                if (consecutive) {
+                    console.log({Warning_note:"Two surrogates placed on conecutive layers."})
+                }
+
+                // Check if surrogate is available
+                if (candidate_detail.candidate_obj.surro.available === false) {
+                    console.log({Warning_note:"A surro has been chosen that was not available."});
+                }
+
+                surrogates_placed.push(candidate_detail.candidate_obj);
+                candidate_detail.candidate_obj.surro.available = false; // Mark surro as used
+
+                console.log({placed_surro_name:candidate_detail.candidate_obj.surro.id});
+
+                // Try skipping this stuff and using delivered details instead
+                // if (candidate_detail.candidate_obj.surro.type !== "simpleRectangle") {
+
+                let try_x = candidate_detail.pso_details[0];
+                let try_y = candidate_detail.pso_details[1];
+                let try_rotation = candidate_detail.candidate_obj.rotation;
+                let try_inner_rot = candidate_detail.pso_details[6];
+
+                // console.log({try_rotation:try_rotation, saved_rotation:candidate_detail.candidate_obj.rotation});
+
+                // let pso_desired_length = candidate_detail.pso_details[3];
+                // let pso_desired_width = candidate_detail.pso_details[4];
+                // let pso_desired_height = candidate_detail.pso_details[5];
+
+                // try_surro = getBestFittingSurrogateL2(surros, pso_desired_length, pso_desired_width, pso_desired_height);
+                let try_surro = candidate_detail.candidate_obj.surro;
+
+                let try_z = candidate_detail.candidate_obj.starting_height;
+
+                // Adjust position/rotation to lower surrogate in tower
+                if (candidate_detail.tower_details.tower_x !== null) {
+                    is_tower = true;
+                    console.log({tower_details:candidate_detail.tower_details});
+                    try_rotation = candidate_detail.tower_details.tower_rot;
+                    try_x = candidate_detail.tower_details.tower_x;
+                    try_y = candidate_detail.tower_details.tower_y;
+                }
+
+                let pso_polygons_list = [];
+                let prism_bottoms = [];
+                // let finalHeight = try_z + try_surro.height;
+                let id_extension;
+
+                // TODO Switch to tower/non-tower variants of the functions respectively
+                if (try_surro.type == "simpleRectangle") {
+                    if (is_tower) pso_polygons_list = [generateRectanglePolygonCentered(try_x, try_y, try_z, try_surro.length, try_surro.width, try_rotation, surrogate_settings.surrogate_padding, bottom_slice)];
+                    else pso_polygons_list = [generateRectanglePolygon(try_x, try_y, try_z, try_surro.length, try_surro.width, try_rotation, surrogate_settings.surrogate_padding, bottom_slice)];
+                }
+                else if (try_surro.type == "prism") {
+                    if (is_tower) pso_polygons_list = [generatePrismPolygonCentered(try_x, try_y, try_z, try_surro.prism_geometry, try_rotation, try_inner_rot, surrogate_settings.surrogate_padding, bottom_slice)];
+                    else pso_polygons_list = [generatePrismPolygon(try_x, try_y, try_z, try_surro.prism_geometry, try_rotation, try_inner_rot, surrogate_settings.surrogate_padding, bottom_slice)];
+                    // const deg = try_rotation * Math.PI / 180;
+                    // const alignX = Math.cos(deg)*5 - Math.sin(deg)*5;
+                    // const alignY = Math.sin(deg)*5 + Math.cos(deg)*5;
+                    // const alignX = 0; const alignY = 0;
+
+                    if (is_tower) prism_bottoms = [generatePrismPolygonCentered(try_x, try_y, try_z, try_surro.bottom_geometry, try_rotation, try_inner_rot, surrogate_settings.surrogate_padding, bottom_slice)]; // TODO align these using SVG viewbox
+                    else prism_bottoms = [generatePrismPolygon(try_x, try_y, try_z, try_surro.bottom_geometry, try_rotation, try_inner_rot, surrogate_settings.surrogate_padding, bottom_slice)]; // TODO align these using SVG viewbox
+                    const extensionIndexList = getSliceIndexList(surrogate_settings.precomputed_slice_heights, try_z + try_surro.minHeight, try_z + try_surro.maxHeight);
+                    const extensionData = checkVolumeAndCollisionsExtend(surrogate_settings.all_slices, extensionIndexList, pso_polygons_list, finalHeight);
+                    finalHeight = extensionData[0];
+                } else {
+                    if (is_tower) pso_polygons_list = [generateRectanglePolygonCentered(try_x, try_y, try_z, try_surro.length, try_surro.width, try_rotation, surrogate_settings.surrogate_padding, bottom_slice)];
+                    else pso_polygons_list = [generateRectanglePolygon(try_x, try_y, try_z, try_surro.length, try_surro.width, try_rotation, surrogate_settings.surrogate_padding, bottom_slice)];
+                    const stackIndexList = getStackableIndexList(surrogate_settings.precomputed_slice_heights, try_z + try_surro.minHeight, try_surro.addMaxNumber, try_surro.addHeight);
+                    const stackingData = checkVolumeAndCollisionsStack(surrogate_settings.all_slices, stackIndexList, pso_polygons_list, finalHeight, try_surro.addHeight);
+                    finalHeight = stackingData[0];
+                    id_extension = stackingData[2];
+                }
+
+                // generate candidate and validation insertion case and layer
+                // let lower_surro = [];
+                // let empty_array = [];
+                // let data_array = {insertion_case:"unknown"};
+                // if (tower_library_index >= 0) {
+                //     lower_surro.push(surrogates_placed[tower_library_index]);
+                // }
+                // let end_height = finalHeight;
+                // console.log({try_z:try_z});
+                // console.log({finalHeight:finalHeight});
+                // let candidate = {
+                //     geometry:pso_polygons_list, 
+                //     rotation:try_rotation,
+                //     surro:try_surro, starting_height:try_z, 
+                //     end_height:end_height, 
+                //     down_surrogate:lower_surro, 
+                //     up_surrogate:empty_array, 
+                //     outlines_drawn:0, 
+                //     insertion_data:data_array,
+                //     bottom_geometry:prism_bottoms,
+                //     id_extension:id_extension
+                // };
+
+                // Fill in the blanks
+                candidate_detail.candidate_obj.id_extension = id_extension;
+                candidate_detail.candidate_obj.bottom_geometry = prism_bottoms;
+                candidate_detail.candidate_obj.outlines_drawn = 0;
+
+                // if (tower_library_index >= 0) {
+                //     surrogates_placed[tower_library_index].up_surrogate.push(candidate); // Add backwards reference for tower
+                // }
+                return cd;
+                // }
+
+            } else {
+                console.log("SURRO SET TO NOT USE??????");
+            }
+        }
+
+        let all_candidates = [];
+        let counter = 0;
+        let selection_index = 0;
+        if (surrogate_settings.surrogateInteraction == "medium") selection_index = 1;
+        else if (surrogate_settings.surrogateInteraction == "high") selection_index = 2;
+        let selection = global_selection_list[selection_index];
+        for (let candidate of selection.used_candidates) {
+            let single_candidate = makeCandidate(candidate.cd);
+            let tower_candidates = [];
+            tower_candidates.push(single_candidate);
+            console.log({candidate:candidate});
+            if (candidate.tower_step_selection > 0) {
+                for (let above_cd of candidate.cd.aboves[candidate.tower_step_selection]) {
+                    let above_candidate = makeCandidate(above_cd);
+                    tower_candidates.push(above_candidate);
+                }
+            }
+            tower_candidates.sort(function(a, b) { // Sort by end height
+                var keyA = a.candidate_details.candidate_obj.end_height,
+                    keyB = b.candidate_details.candidate_obj.end_height;
+                if (keyA < keyB) return -1;
+                if (keyA > keyB) return 1;
+                return 0;
+            });
+
+            console.log({tower_candidates:tower_candidates});
+            
+            if (tower_candidates.length > 1) {
+                for (let tower_candidate = 0; tower_candidate < tower_candidates.length; tower_candidate++) {
+                    console.log({tower_candidate:tower_candidate});
+                    if (tower_candidate > 0) {
+                        tower_candidates[tower_candidate-1].candidate_details.candidate_obj.up_surrogate.push(tower_candidates[tower_candidate].candidate_details.candidate_obj);
+                        tower_candidates[tower_candidate].candidate_details.candidate_obj.down_surrogate.push(tower_candidates[tower_candidate-1].candidate_details.candidate_obj);
+                    }
+                }
+            }
+            
+
+            all_candidates.push(...tower_candidates);
+        }
+
+        console.log({all_candidates:all_candidates});
+        return all_candidates;
+    }
+
+    function applySurrogatesToSlices(surrogates_placed, surrogate_settings, bottom_slice, proc, view, all_slices, pre_surrogate_support_amounts) {
+
+        let minArea = proc.supportMinArea;
+        let min = minArea || 0.01;
+
+        function addPauseLayer(insertion_layer_index, settings, surrogate_settings) {
+            if (settings.process.gcodePauseLayers == null) settings.process.gcodePauseLayers = "";
+            if (settings.process.gcodePauseLayers != "") settings.process.gcodePauseLayers += ",";
+            settings.process.gcodePauseLayers += insertion_layer_index.toString();
+            console.log({pauselayer:insertion_layer_index});
+            console.log({pause_layers:settings.process.gcodePauseLayers});
+            surrogate_settings.pauseLayers.push(insertion_layer_index);
+            surrogate_settings.pauseLayers.sort(function(a, b) {
+                return a - b;
+            });
+            console.log({pauseLayers:surrogate_settings.pauseLayers});
+        }
+
+        function getTotalSupportVolume(bottom_slice) {
+            let iterate_layers_support = bottom_slice;
+            let total_support_volume = 0;
+            let total_support_area = 0;
+            while (iterate_layers_support) {
+                if (iterate_layers_support.supports) {
+                    iterate_layers_support.supports.forEach(function(supp) {
+                        total_support_area += supp.areaDeep();
+                        total_support_volume += Math.abs((supp.areaDeep() * iterate_layers_support.height));
+                    });
+                }
+                iterate_layers_support = iterate_layers_support.up;
+            }
+            return [total_support_volume, total_support_area];
+        }
+
+        function getSurrogateGeometryAtIndexHeight(surrogate, z_height, index) {
+            if (true) { // If surrogate is simple rectangular geometry
+                if (z_height >= surrogate.starting_height && z_height <= surrogate.end_height) {
+                    // let surrogate_larger = [];
+                    // surrogate_larger = POLY.expand(surrogate.geometry, expansion_width, z_height, surrogate_larger, 1);
+                    // return surrogate_larger;
+                    return surrogate.geometry;
+                }
+                else return [];
+            }
+        }
+
+                // generate text polygon
+                function generateAsciiPolygons(text, start_x, start_y, text_rotation, text_size) {
+                    function finishPoly(points) {
+                        let asciiPolygon = base.newPolygon(points);
+                        asciiPolygon.depth = 0;
+                        asciiPolygon.open = true;
+                        return asciiPolygon;
+                    }
+        
+                    let singleAsciiPolyList = [];
+        
+                    let rotation = text_rotation;
+                    let angular_rotation = rotation * Math.PI / 180;
+                    let distance_iterator = 0; 
+                    let combined_division_pos_counter = 0;
+                    let combined_division_list = [0];
+                    for (let char of text) {
+                        let char_int = char.charCodeAt(0);
+                        if (char_int == 32) {
+                            distance_iterator += ascii_text_points[char_int][2]*1.25;
+                            continue;
+                        }
+                        let char_pos = char_int-32;
+        
+                        let ascii_location_array = ascii_text_points[char_pos][5];
+                        let division_pos_counter = 0;
+                        let division_list = [0];
+                        let temp_points = [];
+                        let scale_factor = text_size/20 * 0.3;
+                        
+                        // Collect all and rotate as combination
+                        for (let point_idx = 0; point_idx < ascii_location_array.length; point_idx = point_idx + 2) {
+                            if (ascii_location_array[point_idx] == -1) {
+                                division_list.push(division_pos_counter); // Start of next segment location
+                                combined_division_list.push(combined_division_pos_counter); // Start of next word location
+                            }
+                            else {
+                                let point_ascii = newPoint(scale_factor*(
+                                                                ascii_location_array[point_idx] +  // X-location
+                                                                ascii_text_points[char_pos][3] + // X-location adjustment
+                                                                (distance_iterator)*Math.cos(angular_rotation)) + 
+                                                            start_x, 
+        
+                                                            scale_factor*(
+                                                                ascii_location_array[point_idx+1] + // Y-location
+                                                                //ascii_text_points[char_pos][4] + // Y-location adjustment
+                                                                (distance_iterator)*Math.sin(angular_rotation)) + 
+                                                                
+                                                            start_y, 
+        
+                                                            0);
+                                let point_ascii2 = newPoint(scale_factor*(
+                                                                ascii_location_array[point_idx] +  // X-location
+                                                                ascii_text_points[char_pos][3] + // X-location adjustment
+                                                                (distance_iterator)*1 ) + //Math.cos(angular_rotation)) + 
+                                                            start_x, 
+        
+                                                            scale_factor*(
+                                                                ascii_location_array[point_idx+1] + // Y-location
+                                                                //ascii_text_points[char_pos][4] + // Y-location adjustment
+                                                                0*(distance_iterator)*Math.sin(angular_rotation)) + 
+                                                                
+                                                            start_y, 
+        
+                                                            0);
+                                temp_points.push(point_ascii);
+                                singleAsciiPolyList.push(point_ascii2);
+                                division_pos_counter++;
+                                combined_division_pos_counter++;
+                            }
+                        }
+                        division_list.push(division_pos_counter); 
+                        combined_division_list.push(combined_division_pos_counter); 
+    
+                        distance_iterator += ascii_text_points[char_pos][2]*1.25;
+                    }
+        
+                    let singleAsciiPoly = finishPoly(singleAsciiPolyList);
+                    let midpoint = newPoint(start_x, start_y, 0);
+                    let inverse_midpoint_vector = newPoint(0-start_x, 0-start_y, 0);
+            
+                    let translation_poly_copyx = singleAsciiPoly.points.clone();
+                    singleAsciiPoly.points = singleAsciiPoly.translatePoints(translation_poly_copyx, inverse_midpoint_vector);
+                    
+                    singleAsciiPoly = singleAsciiPoly.rotateXYsimple(rotation);
+        
+                    let translation_poly_copy2x = singleAsciiPoly.points.clone();
+                    singleAsciiPoly.points = singleAsciiPoly.translatePoints(translation_poly_copy2x, midpoint);
+        
+                    let combinedAsciiPolyList = [];
+        
+                    for (let division_idx = 0; division_idx < combined_division_list.length-1; division_idx++){
+                        let yet_another_temp_point_list = [];
+                        for (let point_idx = combined_division_list[division_idx]; point_idx < combined_division_list[division_idx+1]; point_idx++) {
+                            yet_another_temp_point_list.push(singleAsciiPoly.points[point_idx]);
+                        }
+                        combinedAsciiPolyList.push(finishPoly(yet_another_temp_point_list));
+                    }
+        
+                    return combinedAsciiPolyList;
+                }
+
+        // Remove supports based on surrogates placed
+        let up = bottom_slice;
+        let top_slice = bottom_slice;
+        // For all slices
+        if (surrogate_settings.surrogateInteraction !== "off") {
+            while (up) {
+                // If supports exist
+                if (up.supports && up.supports.length > 0) {
+
+                    // if (!up.tops[0].fill_sparse) up.tops[0].fill_sparse = [];
+                    // let rand_supp = up.supports[Math.floor(Math.random() * up.supports.length)];
+                    // up.tops[0].fill_sparse.push(rand_supp);
+
+                    // For every surro, surrogate the support
+                    for (let idx = 0; idx < surrogates_placed.length; idx++) {
+                        let surrogate = surrogates_placed[idx];
+                        
+                        if (surrogate.insertion_data.insertion_case === "Insert_new_support_layer") {
+                            let up_height_range = get_height_range(up);
+                            // (surrogate.surro.height + surrogate.starting_height)
+                            if (up_height_range.bottom_height < (surrogate.end_height) && up.z >= surrogate.starting_height) {
+                                let surrogated_supports = [];
+                                POLY.subtract(up.supports, surrogate.geometry, surrogated_supports, null, up.z, min); // TODO: Collect surro polygons and do it only once
+                                up.supports = surrogated_supports;
+                            }
+                        }
+                        // If the surro is at this height
+                        // (surrogate.surro.height + surrogate.starting_height)
+                        else if (up.z < (surrogate.end_height) && up.z >= surrogate.starting_height) {
+                            let surrogated_supports = [];
+                            POLY.subtract(up.supports, surrogate.geometry, surrogated_supports, null, up.z, min); // TODO: Collect surro polygons and do it only once
+                            up.supports = surrogated_supports;
+                        }
+                    }
+                } else {
+                    up.supports = [];
+                }
+
+                // After surrogating all supports, draw their outlines
+                for (let draw_outline_idx = 0; draw_outline_idx < surrogates_placed.length; draw_outline_idx++) {
+                    let surrogate = surrogates_placed[draw_outline_idx];
+                    // If the surro is at this height
+                    if (up.z < (surrogate.end_height) && up.z >= surrogate.starting_height) {
+                        if (surrogate.outlines_drawn < 5) {
+
+                            let geometry_to_use;
+                            if (surrogate.surro.type == "prism") geometry_to_use = surrogate.bottom_geometry;
+                            else geometry_to_use = surrogate.geometry;
+
+                            // make surrogate bigger
+                            // let surrogate_enlarged_more = [];
+                            // let surrogate_enlarged = [];
+                            // surrogate_enlarged_more = POLY.expand(surrogate.geometry, 0.4 + surrogate_enlargement, up.z, surrogate_enlarged_more, 1); // For a less tight fit
+                            // surrogate_enlarged = POLY.expand(surrogate.geometry, surrogate_enlargement, up.z, surrogate_enlarged, 1); // For a less tight fit
+                            let surrogate_enlarged = [];
+                            let surrogate_double_enlarged = [];
+                            surrogate_enlarged = POLY.expand(geometry_to_use, 0.4, up.z, surrogate_enlarged, 1);
+                            surrogate_double_enlarged = POLY.expand(surrogate_enlarged, 0.4, up.z, surrogate_double_enlarged, 1); 
+
+                            
+                            // subtract actual surrogate area to get only the outline
+                            let surrogate_outline_area_only = [];
+                            // POLY.subtract(surrogate_enlarged_more, surrogate_enlarged, surrogate_outline_area_only, null, up.z, min);
+                            POLY.subtract(surrogate_enlarged, geometry_to_use, surrogate_outline_area_only, null, up.z, min);
+
+                            // surrogate_outline_area_only[0].points.forEach(function (point) {
+                            //     point.z = point.z + 3.667686;
+                            // });
+
+                            // console.log({next_layer:up.up});
+                            // Add outline to supports (will still be a double outline for now)
+                            if (false) {
+                            //if (!first_placed) { // Switch mode for first outline
+                                up.tops[0].shells.push(surrogate_outline_area_only[0]);
+                                first_placed = true;
+                            } else {
+                                //up.supports.push(surrogate_outline_area_only[0]);
+                                if (!(up.tops[0].fill_sparse)) {
+                                    up.tops[0].fill_sparse = [];
+                                }
+                                if (!(up.virtual_support)) {
+                                    up.virtual_support = [];
+                                } 
+                                surrogate_outline_area_only[0].points.push(surrogate_outline_area_only[0].points[0]);
+                                // console.log({points_poly:surrogate_outline_area_only[0]});
+                                // up.tops[0].fill_sparse.push(surrogate_outline_area_only[0]);
+                                up.tops[0].fill_sparse.push(surrogate_outline_area_only[0]);
+                                up.tops[0].fill_sparse.push(surrogate_outline_area_only[0]);
+                                up.virtual_support.push(surrogate_outline_area_only[0]);
+                                
+                                let supp_minus_outlines = [];
+
+                                if (surrogate.outlines_drawn < 1 && surrogate.surro.type == "prism") {
+                                    let surrogate_enlarged2 = [];
+                                    let surrogate_double_enlarged2 = [];
+                                    surrogate_enlarged2 = POLY.expand(surrogate.geometry, 0.4, up.z, surrogate_enlarged2, 1);
+                                    surrogate_double_enlarged2 = POLY.expand(surrogate_enlarged, 0.4, up.z, surrogate_double_enlarged2, 1); 
+                                    let surrogate_outline_area_only2 = [];
+                                    // POLY.subtract(surrogate_enlarged_more, surrogate_enlarged, surrogate_outline_area_only, null, up.z, min);
+                                    POLY.subtract(surrogate_enlarged2, surrogate.geometry, surrogate_outline_area_only2, null, up.z, min);
+                                    surrogate_outline_area_only2[0].points.push(surrogate_outline_area_only2[0].points[0]);
+                                    up.tops[0].fill_sparse.push(surrogate_outline_area_only2[0]);
+                                    up.tops[0].fill_sparse.push(surrogate_outline_area_only2[0]);
+                                    up.virtual_support.push(surrogate_outline_area_only2[0]);
+                                }
+
+                                // Prevent overlap of outlines and support // LWW TODO: Try adding to support and combine the two
+                                up.supports = POLY.subtract(up.supports, surrogate_double_enlarged, supp_minus_outlines, null, up.z, min);
+
+
+                                surrogate.text_posX = (surrogate_outline_area_only[0].bounds.maxx + surrogate_outline_area_only[0].bounds.minx)/2;
+                                surrogate.text_posY = (surrogate_outline_area_only[0].bounds.maxy + surrogate_outline_area_only[0].bounds.miny)/2;                                
+                            }
+                            
+                            // console.log({surrogate_outline_area_only:surrogate_outline_area_only});
+
+                            //console.log({up_support:up.supports});
+                            //up.supports.push(surrogate.geometry[0]);
+                            //console.log({geometry:surrogate.geometry});
+
+
+
+
+                            surrogate.outlines_drawn++;
+                        }
+
+                        // Trying to add outlines directly
+                        if (false) { //(surrogate.outlines_drawn >= 2 && surrogate.outlines_drawn <= 3) {
+                            let surrogate_outline = [];
+                            let surrogate_outline2 = [];
+                            surrogate_outline = POLY.expand(surrogate.geometry, 0.1, up.z, surrogate_outline, 1);
+
+                            let surrogate_outline_area_only = [];
+                            POLY.subtract(surrogate_outline, surrogate.geometry, surrogate_outline_area_only, null, slice.z, min);
+                            //POLY.expand(surrogate_outline, -0.2, up.z, surrogate_outline2);
+                            //surrogate_outline[0].setOpen(true);
+                            //surrogate_outline[0].points = surrogate_outline[0].points.slice(0, 3);
+                            console.log({surrogate_outline_area_only:surrogate_outline_area_only});
+                            //surrogate_outline[0].area2 = 0;
+                            
+                            //console.log({surrogate_outline2:surrogate_outline2});
+                            up.supports.push(surrogate_outline_area_only[0]);
+                            surrogate.outlines_drawn++;
+                            let up_top_zero = up.tops[0];
+                            if (!up_top_zero.fill_sparse) up_top_zero.fill_sparse = [];
+                            //up_top_zero.fill_sparse.appendAll(surrogate_outline);
+                        }
+                    }
+                }
+                top_slice = up;
+                up = up.up; 
+            } // top_slice should now be at the top
+        
+
+            // LWW TODO: Remove this warning check if insertion layers are too close
+            let iterating_down = top_slice;
+            surrogates_placed.sort((a, b) => (a.insertion_data.new_layer_index > b.insertion_data.new_layer_index) ? 1 : -1);
+            let last_surrogate;
+            surrogates_placed.forEach(function(surrogate) {
+                if (last_surrogate && Math.abs(surrogate.insertion_data.new_layer_index - last_surrogate.insertion_data.new_layer_index) === 1) {
+                    console.log({WARNING:"Surrogates are on consecutive layers!"});
+                }
+                last_surrogate = surrogate;
+            });
+
+
+            // Adjust layer heights and slide in new layers at surrogate top ends
+            while (iterating_down) {
+                let surrogates_at_this_index = [];
+                let all_other_surrogates = [];
+                surrogates_placed.forEach(function(surrogate) {
+                    if (surrogate.insertion_data.new_layer_index === iterating_down.index) {
+                        surrogates_at_this_index.push(surrogate);
+                    }
+                    else {
+                        all_other_surrogates.push(surrogate);
+                    }
+                });
+                
+                if (surrogates_at_this_index.length >= 1) {
+                    // Add pause layer at index of already printed layer
+                    addPauseLayer(surrogates_at_this_index[0].insertion_data.printed_layer_index, settings, surrogate_settings);
+
+                    console.log({surrogates_at_this_index:surrogates_at_this_index});
+                    let new_layer_height_range = get_height_range(iterating_down);
+                    let printed_layer_height_range = get_height_range(iterating_down.down);
+                    let new_layer_new_height_values;
+                    let printed_layer_new_height_values;
+                    let change_slices = true;
+
+                    // Special case: Multiple surrogates on one slice
+                    if (surrogates_at_this_index.length > 1) {
+                        console.log({Status:"Multiple surrogates."});
+                        
+                        let only_simple_case = true;
+                        let lowest_height = Number.POSITIVE_INFINITY;
+                        let highest_height = -1;
+                        // Check which cases are present
+                        surrogates_at_this_index.forEach(function(surrogate) {
+                            if (highest_height < surrogate.insertion_data.max_height) highest_height = surrogate.insertion_data.max_height;
+                            if (lowest_height > surrogate.insertion_data.min_height) lowest_height = surrogate.insertion_data.min_height;
+                            if (surrogate.insertion_data.insertion_case != "extend_printed_layer") only_simple_case = false;         
+                        });
+
+                        if (only_simple_case) {
+                            // set bot of new layer and top of printed layer to found max height == Extend both up
+                            new_layer_new_height_values = get_slice_height_values(new_layer_height_range.top_height, highest_height);
+                            printed_layer_new_height_values = get_slice_height_values(highest_height, printed_layer_height_range.bottom_height);
+                            
+                        }
+                        else {
+                            // set bot of new layer and top of printed layer to found min height (extrude down a lot) // LWW TODO: make sure z is high enough for all surrogates, droop as much as necessary
+                            new_layer_new_height_values = get_slice_height_values(new_layer_height_range.top_height, lowest_height);
+                            printed_layer_new_height_values = get_slice_height_values(lowest_height, printed_layer_height_range.bottom_height);
+                        }
+                        
+                    }
+                    // Simple cases: One surrogate on the slice
+                    else if (surrogates_at_this_index.length === 1) {
+                        if (surrogates_at_this_index[0].insertion_data.insertion_case === "Insert_new_support_layer") {
+                            change_slices = false;
+                            let original_supports = surrogates_at_this_index[0].insertion_data.original_supports;
+                            let only_support_above_this_surrogate = [];
+                            let only_support_above_this_surrogate_2 = [];
+                            // console.log({slideInSlice:surrogates_at_this_index[0]});
+                            // console.log({iterating_down:iterating_down});
+                            // console.log({iterating_down_DOWN:iterating_down.down});
+                            
+                            // Get only the diff of supports (after surrogating) from the printed slice
+                            if (false) {
+                                original_supports.forEach(function(original_supp) {
+                                    console.log({original_supp:original_supp});
+                                    let support_diff = original_supp;
+                                    if (iterating_down.down.supports) {
+                                        iterating_down.down.supports.forEach(function(supp) {
+                                            let full_arr = support_diff;
+                                            let subtract_arr = supp;
+                                            let out_arr = [];
+                                            support_diff = POLY.subtract(full_arr, subtract_arr, out_arr, null, new_layer_height_range.bottom_height, min);
+                                        });
+                                    }
+                                    // support_diff.forEach(function(diff) {
+                                    //     only_support_above_this_surrogate.push(diff);
+                                    // });
+                                    only_support_above_this_surrogate.push(support_diff);
+                                });
+                            }
+
+
+                            // Support on the new slide-in slice are: 
+                            //      - The original supports MINUS
+                            //          - remaining supports
+                            //          - other surrogate geometriues
+                            // First collect all geometries that should be removed from original supports 
+                            let collect_all_polygons_removed_from_support = [];
+                            let collect_all_surrogate_geometries_removed_from_support = [];
+
+                            // There will be overlap unless we expand the remaining supports
+                            let support_enlarged = []
+                            support_enlarged = POLY.expand(iterating_down.down.supports, 0.4, iterating_down.down.z, support_enlarged, 1);
+                            support_enlarged.forEach(function(supp) {
+                                collect_all_polygons_removed_from_support.push(supp);
+                            });
+
+
+                            all_other_surrogates.forEach(function(surrogate) {
+                                collect_all_surrogate_geometries_removed_from_support = collect_all_surrogate_geometries_removed_from_support.concat(getSurrogateGeometryAtIndexHeight(surrogate, iterating_down.down.z));
+                                // console.log({other_surrogate_geometries:getSurrogateGeometryAtIndexHeight(surrogate, iterating_down.down.z)});
+                            });
+
+
+                            console.log({collected_polygons:collect_all_polygons_removed_from_support});
+                            console.log({collected_surrogate_geometries:collect_all_surrogate_geometries_removed_from_support});
+                            // Get only the support on top of the current surrogate by subtracting original supports minus remaining supports/surrogates
+                            // Must do this in two separate steps, otherwise the subtract function adds a new polygon where support/surrogate outlines meet
+                            if (collect_all_polygons_removed_from_support.length > 0) {
+                                POLY.subtract(original_supports, collect_all_polygons_removed_from_support, only_support_above_this_surrogate_2, null, new_layer_height_range.bottom_height, min);
+                            } else {
+                                only_support_above_this_surrogate_2 = original_supports;
+                            }
+                            if (only_support_above_this_surrogate_2.length > 0) {
+                                POLY.subtract(only_support_above_this_surrogate_2, collect_all_surrogate_geometries_removed_from_support, only_support_above_this_surrogate, null, new_layer_height_range.bottom_height, min);
+                            } else {
+                                only_support_above_this_surrogate = only_support_above_this_surrogate_2;
+                            }
+
+
+                            // console.log({original_supports:original_supports});
+                            // console.log({down_supports:iterating_down.down.supports});
+                            // console.log({only_support_above_this_surrogate:only_support_above_this_surrogate});
+                            
+                            // Testing
+                            // iterating_down.down.supports.forEach(function(supp) {
+                            //     only_support_above_this_surrogate.push(supp);
+                            // });
+
+                            let slide_in_slice_height_values = get_slice_height_values(new_layer_height_range.bottom_height + surrogate_settings.minimum_clearance_height, surrogates_at_this_index[0].end_height, false);
+                            let slide_in_slice = newSlice(slide_in_slice_height_values.z, view);
+                            slide_in_slice.height = slide_in_slice_height_values.height;
+                            slide_in_slice.widget = iterating_down.widget; 
+                            slide_in_slice.extruder = iterating_down.extruder; 
+                            slide_in_slice.isSparseFill = iterating_down.isSparseFill;
+                            slide_in_slice.isSolidLayer = iterating_down.isSolidLayer;
+                            slide_in_slice.offsets = iterating_down.offsets;
+                            //slide_in_slice.finger = iterating_down.finger;
+                            slide_in_slice.supports = only_support_above_this_surrogate;
+
+                            slide_in_slice.down = iterating_down.down;
+                            slide_in_slice.up = iterating_down;
+                            iterating_down.down.up = slide_in_slice;
+                            iterating_down.down = slide_in_slice;
+                            slide_in_slice.index = iterating_down.index;
+
+                            // Adjust all slice indexes above
+                            iterating_down.index = iterating_down.index + 1;
+                            let correcting_chain = iterating_down;
+                            while (correcting_chain.up) {
+                                correcting_chain = correcting_chain.up;
+                                correcting_chain.index = correcting_chain.index + 1;
+                            }
+
+                            console.log({slide_in_slice:slide_in_slice});
+                            console.log({iterating_down:iterating_down.index});
+                            console.log({Case:"Insert_new_support_layer"})
+
+                            // Now skip the newly added slice
+                            iterating_down = iterating_down.down;
+                        } 
+                        else if (surrogates_at_this_index[0].insertion_data.insertion_case === "extend_printed_layer") {
+                            let highest_height = surrogates_at_this_index[0].insertion_data.max_height;
+                            new_layer_new_height_values = get_slice_height_values(new_layer_height_range.top_height, highest_height);
+                            printed_layer_new_height_values = get_slice_height_values(highest_height, printed_layer_height_range.bottom_height);
+                            console.log({iterating_down:iterating_down.index});
+                            console.log({Case:"extend_printed_layer"})
+                            console.log({highest_height:highest_height});
+                        }
+                        else if (surrogates_at_this_index[0].insertion_data.insertion_case === "extend_new_layer") {
+                            let lowest_height = surrogates_at_this_index[0].insertion_data.min_height;
+                            new_layer_new_height_values = get_slice_height_values(new_layer_height_range.top_height, lowest_height);
+                            printed_layer_new_height_values = get_slice_height_values(lowest_height, printed_layer_height_range.bottom_height);
+                            console.log({iterating_down:iterating_down.index});
+                            console.log({Case:"extend_new_layer"})
+                            console.log({lowest_height:lowest_height});
+                        }
+                    }
+                    if (change_slices) {
+                        iterating_down.z = new_layer_new_height_values.z;
+                        iterating_down.height = new_layer_new_height_values.height;
+                        iterating_down.down.z = printed_layer_new_height_values.z;
+                        iterating_down.down.height = printed_layer_new_height_values.height;
+
+                        
+                        
+                        console.log({printed_layer_height_range:printed_layer_height_range});
+                        console.log({changed_slice:iterating_down});
+                        console.log({all_slices:all_slices});
+                        console.log({insertion_case:surrogates_at_this_index[0].insertion_data.insertion_case});
+                    }
+                }
+
+                iterating_down = iterating_down.down;
+                
+            }
+
+            // Add pauses text and ID
+
+            for (let draw_pause_text_idx = 0; draw_pause_text_idx < surrogates_placed.length; draw_pause_text_idx++) {
+                let currentSurrogate = surrogates_placed[draw_pause_text_idx];
+                // let iterateSurrogate = surrogates_placed[draw_pause_text_idx];
+                console.log({insertData:currentSurrogate});
+                if (currentSurrogate.starting_height > 0) continue;
+
+                let text_rotation = currentSurrogate.rotation;
+                let out_rotation = text_rotation;
+                let text_rot_ang;
+
+                let text_posX = currentSurrogate.text_posX;
+                let text_posY = currentSurrogate.text_posY;
+                let text_posX_alt = currentSurrogate.text_posX;
+                let text_posY_alt = currentSurrogate.text_posY;
+                
+                if (currentSurrogate.surro.type == "prismNOO") {
+                    console.log({surrogate_enlarged_bounds:surrogate_outline_area_only[0].bounds});
+                    console.log({outline_points:surrogate_outline_area_only[0]});
+                    text_posX = surrogate_outline_area_only[0].points[0].x;
+                    text_posY = surrogate_outline_area_only[0].points[0].y;
+                }
+
+                text_rotation = text_rotation % 360; // Rotate until within 360°
+                // Rotate values below 0 by one full rotation
+                if (text_rotation <= 0) {
+                    text_rotation = text_rotation + 360;
+                }
+
+                let topOrBottom = true;
+                
+                // if (currentSurrogate.surro.type != "prism") { 
+                if (true) { 
+
+                    if (text_rotation > 90 && text_rotation <= 270) { // Top-left + Bottom Left --> Flip text
+                        out_rotation = text_rotation + 180;
+                    } else {
+
+                    }
+
+                    text_rot_ang = out_rotation * Math.PI / 180;
+                    text_posX = text_posX - Math.cos(text_rot_ang)*currentSurrogate.surro.length*0.5 + Math.sin(text_rot_ang)*(-currentSurrogate.surro.width*0.5-3); // sin angle was minus, but also minus the whole term
+                    text_posY = text_posY - Math.sin(text_rot_ang)*currentSurrogate.surro.length*0.5 - Math.cos(text_rot_ang)*(-currentSurrogate.surro.width*0.5-3);
+
+                    text_posX_alt = text_posX_alt - Math.cos(text_rot_ang)*(currentSurrogate.surro.length*0.5) + Math.sin(text_rot_ang)*(currentSurrogate.surro.width*0.5+surrogate_settings.char_size+3.5);
+                    text_posY_alt = text_posY_alt - Math.sin(text_rot_ang)*(currentSurrogate.surro.length*0.5) - Math.cos(text_rot_ang)*(currentSurrogate.surro.width*0.5+surrogate_settings.char_size+3.5);
+
+                    let textOption1 = newPoint(text_posX, text_posY, 0.0);
+                    let textOption2 = newPoint(text_posX_alt, text_posY_alt, 0.0);
+                    let midPoint = newPoint(0.0, 0.0, 0.0);
+
+                    if (midPoint.distTo2D(textOption1) < midPoint.distTo2D(textOption2)) {
+                        text_posX = text_posX_alt;
+                        text_posY = text_posY_alt;
+                        topOrBottom = false;
+                    }
+
+                    
+
+                    console.log({Dist1:midPoint.distTo2D(textOption1)});
+                    console.log({Dist2:midPoint.distTo2D(textOption2)});
+
+                }
+
+                let tower_surrogates = get_all_surrogates_on_top(currentSurrogate, []);
+
+                if (!topOrBottom && tower_surrogates.length > 0) {
+                    text_posX = text_posX + Math.sin(text_rot_ang)*(surrogate_settings.char_size*2)*(tower_surrogates.length);
+                    text_posY = text_posY - Math.cos(text_rot_ang)*(surrogate_settings.char_size*2)*(tower_surrogates.length);
+                }
+
+                const firstString = "P" + (surrogate_settings.pauseLayers.indexOf(currentSurrogate.insertion_data.printed_layer_index) + 1).toString() + " " +currentSurrogate.surro.id;
+
+                let ascii_poly_list2 = generateAsciiPolygons(firstString, text_posX, text_posY, out_rotation, surrogate_settings.text_size);
+
+                // let textTop = bottom_slice.tops[0].clone(true);
+                // textTop.poly = undefined;
+                // console.log({textTop:textTop});
+                // if (!textTop.fill_sparse) textTop.fill_sparse = [];
+
+                for (let ascii_poly of ascii_poly_list2)  {
+                    bottom_slice.tops[0].fill_sparse.push(ascii_poly);
+                    bottom_slice.tops[0].fill_sparse.push(ascii_poly);
+                    // bottom_slice.up.tops[0].fill_sparse.push(ascii_poly);
+                    // bottom_slice.up.tops[0].fill_sparse.push(ascii_poly);
+                    bottom_slice.virtual_support.push(ascii_poly);
+                    
+                    // textTop.fill_sparse.push(ascii_poly);
+                    // bottom_slice.tops.push(textTop);
+                }
+
+                for (let iterText = 0; iterText < 3; iterText++) {
+
+                }
+
+                console.log({pauseLayers:surrogate_settings.pauseLayers});
+                console.log({thisSurrogateLayer:currentSurrogate.insertion_data.printed_layer_index});
+                console.log({pauseLayersIndex:surrogate_settings.pauseLayers.indexOf(Math.floor(currentSurrogate.insertion_data.printed_layer_index))}); 
+
+                
+
+                console.log({towersurrs:tower_surrogates});
+
+                tower_surrogates.forEach(function(upSupp) {
+                    if (true) {
+                        text_posX = text_posX + Math.sin(text_rot_ang)*(-surrogate_settings.char_size*2);
+                        text_posY = text_posY - Math.cos(text_rot_ang)*(-surrogate_settings.char_size*2);
+                        
+                    } else {
+                        text_posX = text_posX + Math.sin(text_rot_ang)*(-surrogate_settings.char_size*2);
+                        text_posY = text_posY - Math.cos(text_rot_ang)*(-surrogate_settings.char_size*2);
+                    }
+                    const additionalString = "P" + (surrogate_settings.pauseLayers.indexOf(upSupp.insertion_data.printed_layer_index) + 1).toString() + " " +upSupp.surro.id;
+                    let ascii_poly_l = generateAsciiPolygons(additionalString, text_posX, text_posY, out_rotation, surrogate_settings.text_size);
+                    for (let ascii_poly of ascii_poly_l)  {
+                        bottom_slice.tops[0].fill_sparse.push(ascii_poly);
+                        bottom_slice.tops[0].fill_sparse.push(ascii_poly);
+                        // bottom_slice.up.tops[0].fill_sparse.push(ascii_poly);
+                        // bottom_slice.up.tops[0].fill_sparse.push(ascii_poly);
+                        bottom_slice.virtual_support.push(ascii_poly);
+                    }
+                });
+            }
+        }
+
+        let post_surrogate_support_amounts = getTotalSupportVolume(bottom_slice);
+        console.log({post_surrogate_support_amounts:post_surrogate_support_amounts});
+
+        let volume_saved = pre_surrogate_support_amounts[0] - post_surrogate_support_amounts[0];
+        let volume_percentage_saved = volume_saved / pre_surrogate_support_amounts[0];
+        if (isNaN(volume_percentage_saved)) volume_percentage_saved = 0;
+
+        
+        bottom_slice.handled = true;
+        let all_out_slices = [];
+        up = bottom_slice;
+        // For all slices
+        while (up) {
+            up.replaced_volume = volume_saved;
+            all_out_slices.push(up);
+            up = up.up;
+        }
+
+        // function download(filename, text) {
+        //     var pom = document.createElement('a');
+        //     pom.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
+        //     pom.setAttribute('download', filename);
+        
+        //     if (document.createEvent) {
+        //         var event = document.createEvent('MouseEvents');
+        //         event.initEvent('click', true, true);
+        //         pom.dispatchEvent(event);
+        //     }
+        //     else {
+        //         pom.click();
+        //     }
+        // }
+        // let timestamp = Date.now();
+        // let csv_log = "";
+
+        // // Header
+        // csv_log += "stl_name,surrogating_duration,empty1,empty2,empty3,empty4,empty5,total_time,total_number_of_files";
+
+        // console.log(bottom_slice.widget);
+        // download(bottom_slice.widget.stats.timestamp+"_"+bottom_slice.widget.id+".txt", csv_log);
+
+        // API.event.emit('log.file', {any:"thing"});
+
+
+        // API.event.emit('log.fileDetail', {timestamp:bottom_slice.widget.surrogate_data.timestamp, id:bottom_slice.widget.id, previous_volume:pre_surrogate_support_amounts[0], new_volume:post_surrogate_support_amounts[0], volume_percentage_saved:volume_percentage_saved});
+
+        var startTime = new Date().getTime();
+        var endTime = new Date().getTime();
+        var sTime = endTime - startTime;
+
+        // More logging for research purposes
+
+        const efficiencyData = {numberPauses: surrogate_settings.pauseLayers.length, numberSurrogates: surrogates_placed.length, materialWeightEstimateTube: 0, materialWeightEstimateBar: 0, materialWeightEstimateEllipse: 0, timestamp:bottom_slice.widget.surrogate_data.timestamp, id:bottom_slice.widget.id, previous_volume:pre_surrogate_support_amounts[0], new_volume:post_surrogate_support_amounts[0], volume_percentage_saved:volume_percentage_saved, sTime:sTime};
+
+        console.log({efficiencyData:efficiencyData});
+
+        // TODO: Make this not super ugly, return properly
+        bottom_slice.efficiencyData = efficiencyData;
+
+        // function download(filename, text) {
+        //     var pom = document.createElement('a');
+        //     pom.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
+        //     pom.setAttribute('download', filename);
+        
+        //     if (document.createEvent) {
+        //         var event = document.createEvent('MouseEvents');
+        //         event.initEvent('click', true, true);
+        //         pom.dispatchEvent(event);
+        //     }
+        //     else {
+        //         pom.click();
+        //     }
+        // }
+        // let csv_log = "";
+
+        // csv_log += ","+efficiencyData.id+",,"+efficiencyData.previous_volume+","+efficiencyData.new_volume+","+efficiencyData.volume_percentage_saved+",,,,";
+
+        // download(efficiencyData.timestamp+"_"+efficiencyData.id+".txt", csv_log);
+        console.log({slicing_results_obj:efficiencyData});
+        // console.log({theWidget:bottom_slice.widget});
+        console.log({surrogate_all_slices:all_out_slices});
     }
 
     /**
@@ -2704,6 +3703,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         surrogate_settings.leniency = 1.0;
 
         surrogate_settings.text_size = proc.surrogateTextSize;
+        surrogate_settings.char_size = surrogate_settings.text_size/20*4.5;
 
         // surrogate_settings.minVolume = 10;
         surrogate_settings.skimPercentage = 0.05;
@@ -2987,7 +3987,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         console.log({min_y:min_y});
         console.log({max_y:max_y});
 
-        return [ all_slices, surrogate_settings ];
+        return [ all_slices, surrogate_settings, pre_surrogate_support_amounts ];
     }
 
     function doSurrogates(library_in, suse, slice, proc, shadow, settings, view, prisms) {
