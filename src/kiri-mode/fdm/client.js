@@ -543,6 +543,99 @@ FDM.init = function(kiri, api) {
             console.log(msg, poly);
         }
     });
+
+    // Logging for research purposes
+    api.event.on("log.file", (timingData) => {
+        function download(filename, text) {
+            var pom = document.createElement('a');
+            pom.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
+            pom.setAttribute('download', filename);
+        
+            if (document.createEvent) {
+                var event = document.createEvent('MouseEvents');
+                event.initEvent('click', true, true);
+                pom.dispatchEvent(event);
+            }
+            else {
+                pom.click();
+            }
+        }
+
+        console.log({eventDataTimingLog:timingData});
+        let csv_log = "";
+
+        // Header
+        csv_log += "stl_name,id,surrogating_duration_ms,previous_support_volume_mm3,new_support_volume_mm3,volume_percentage_saved,support_material_weight_estimate_g,total_material_weight_estimate_g,printing_time_estimate_s,number_of_surrogates,number_of_pauses,start_timestamp_ms,end_timestamp_ms";
+
+        // const overall_time = timingData.segtimes.total;
+        // const overall_number = timingData.surrogating_times.length;
+        
+
+        // timingData.surrogating_times.forEach(function(timeObj) {
+        //     csv_log += "\n"+timeObj.filename+","+timeObj.id+","+timeObj.duration+",,,,,,,,"+overall_time+","+overall_number;
+        // });
+
+        // 0, 1, 11
+        csv_log += "\n"+timingData.surrogating_times[0].filename+","+timingData.surrogating_times[0].id+",,,,,,,,,,"+timingData.startStamp.toString()+",";
+
+        // download("SurrogateSupport_timings_"+timingData.timestamp+".txt", csv_log);
+    });
+
+
+    // More logging for research purposes
+    api.event.on("log.fileDetail", (efficiencyData) => {
+        function download2(filename, text) {
+            var pom = document.createElement('a');
+            pom.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
+            pom.setAttribute('download', filename);
+        
+            if (document.createEvent) {
+                var event = document.createEvent('MouseEvents');
+                event.initEvent('click', true, true);
+                pom.dispatchEvent(event);
+            }
+            else {
+                pom.click();
+            }
+        }
+        let csv_log = "";
+
+
+        // 1, 2, 3, 4, 5, 6, 9, 10
+        csv_log += ","+efficiencyData.id+","+efficiencyData.sTime+","+efficiencyData.previous_volume+","+efficiencyData.new_volume+","+efficiencyData.volume_percentage_saved+","+efficiencyData.materialWeightEstimateEllipse.toString()+",,,"+efficiencyData.numberSurrogates.toString()+","+efficiencyData.numberPauses.toString()+",,";
+
+        // download2("SuSu_"+efficiencyData.id+".txt", csv_log);
+
+        console.log({eventDataDetailLog:efficiencyData});
+    });
+
+    // More logging for research purposes
+    api.event.on("log.fileTime", (timeData) => {
+        function download2(filename, text) {
+            var pom = document.createElement('a');
+            pom.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
+            pom.setAttribute('download', filename);
+        
+            if (document.createEvent) {
+                var event = document.createEvent('MouseEvents');
+                event.initEvent('click', true, true);
+                pom.dispatchEvent(event);
+            }
+            else {
+                pom.click();
+            }
+        }
+        let csv_log = "";
+
+        let endTime = Date.now();
+        // 1, 7, 8, 12
+        csv_log += ","+timeData.id+",,,,,,"+timeData.total_weight_estimate.toString()+","+ timeData.time.toString() +",,,,"+endTime.toString();
+
+        // download2("SuSt_"+timeData.id+".txt", csv_log);
+
+        console.log({eventDataTimeLog:timeData});
+    });
+
 }
 
 let xpdebug;
