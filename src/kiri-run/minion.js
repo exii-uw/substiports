@@ -2291,7 +2291,7 @@ const funcs = {
     },
 
     verifyCandidateOverlap: (data, seq) => {
-        let { verify_list, candidate_list } = data; 
+        let { verify_list, candidate_list, allow_duplicates } = data; 
         for (let candidate of candidate_list) {
             let decoded_geometry = kiri.codec.decode(candidate.candidate_details.candidate_obj.geometry);
             decoded_geometry[0].area2 = candidate.candidate_details.candidate_obj.area2;
@@ -2311,6 +2311,12 @@ const funcs = {
             for (let other_candidate_index = 0; other_candidate_index < candidate_list.length; other_candidate_index++) {
                 if (index == other_candidate_index) {}// Do nothing, this is added later //no_overlap_combinations.add(other_candidate_index);
                 else {
+                    if (!allow_duplicates) {
+                        if (candidate_list[index].candidate_details.candidate_obj.surro.id == candidate_list[other_candidate_index].candidate_details.candidate_obj.surro.id) {
+                            // Don't use the same object twice
+                            continue;
+                        }
+                    }
                     let collision_detection = [];
                     POLY.subtract(candidate_list[index].candidate_details.candidate_obj.geometry, candidate_list[other_candidate_index].candidate_details.candidate_obj.geometry, collision_detection, null, 0, 0.05); // TODO: Check if Z matters //candidate_list[index].candidate_details.candidate_obj.geometry[0].points[0].z
                     

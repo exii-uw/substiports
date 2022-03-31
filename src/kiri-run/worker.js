@@ -303,7 +303,7 @@ kiri.minions = {
         });
     },
 
-    verifyCandidateOverlap(verify_list, candidate_list, kn) {
+    verifyCandidateOverlap(verify_list, candidate_list, allow_duplicates, kn) {
         return new Promise((resolve, reject) => {
             if (concurrent < 2) {
                 console.log("OVERLAP VERIFICATION FAILED!");
@@ -312,7 +312,8 @@ kiri.minions = {
             minwork.queue({
                 cmd: "verifyCandidateOverlap",
                 verify_list: verify_list,
-                candidate_list: candidate_list
+                candidate_list: candidate_list,
+                allow_duplicates: allow_duplicates
             }, data => { // This handles the data returned by the minion function 
                 console.log({overlapLists:data.graph_edges_sets});
                 console.log({prune_list:data.prune_list});

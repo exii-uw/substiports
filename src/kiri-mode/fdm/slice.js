@@ -9,6 +9,7 @@
 // dep: kiri.consts
 // dep: kiri-mode.fdm.driver
 // dep: kiri-mode.fdm.post
+// dep: kiri.api
 // use: kiri-mode.fdm.fill
 // use: ext.clip2
 // use: add.three
@@ -16,10 +17,11 @@
 // use: kiri.hull
 // use: kiri.pso
 // use: kiri.codec
+
 gapp.register("kiri-mode.fdm.slice", [], (root, exports) => {
 
 const { base, kiri, noop } = root;
-const { consts, driver, fill, fill_fixed, newSlice, utils, newKMeans, KMeans, Optimizer, hull, codec, parallelenv} = kiri;
+const { api, consts, driver, fill, fill_fixed, newSlice, utils, newKMeans, KMeans, Optimizer, hull, codec, parallelenv} = kiri;
 const { config, polygons, util, newPoint } = base;
 const { fillArea } = polygons;
 const { beltfact } = consts;
@@ -1260,7 +1262,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             // let just_one = true;
             // for (let verify_list of verify_lists) {
             for (let susu_data of susu_data_objs) {
-                verify_promises.push(kiri.minions.verifyCandidateOverlap(susu_data.verify_list, susu_data.candidate_list, susu_data.kn));
+                verify_promises.push(kiri.minions.verifyCandidateOverlap(susu_data.verify_list, susu_data.candidate_list, surrogate_settings.allow_duplicates, susu_data.kn));
                 // if (just_one) verify_promises.push(kiri.minions.verifyCandidateOverlap(verify_list, candidate_list, kn));
                 // just_one = false;
             }
@@ -1349,6 +1351,8 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
             applySurrogatesToSlices(surrogates_placed, surrogate_settings, bottom_slice, process, view, surrogate_settings.all_slices, pre_surrogate_support_amounts);
 
+            console.log({outer_api:api});
+            console.log({outer_kiri_api:kiri.api});
             
             // let index_array = [ ...Array(candidate_list.length).keys() ];
 
@@ -2147,6 +2151,153 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             return rectanglePolygon;
         }
 
+        function getSurrogateReplacedVolumes(old_volume, new_volume, current_slice, surrogate_rectangle_list) {
+            let supports_after_surrogates = [];
+            POLY.subtract(current_slice.supports, surrogate_rectangle_list, supports_after_surrogates, null, current_slice.z, 0);
+
+            let new_area = 0;
+            let old_area = 0;
+
+            supports_after_surrogates.forEach(function(supp) {
+                new_volume += Math.abs((supp.areaDeep() * current_slice.height));
+                new_area += Math.abs(supp.areaDeep());
+            });
+            
+            current_slice.supports.forEach(function(supp) {
+                old_volume += Math.abs((supp.areaDeep() * current_slice.height));
+                old_area += Math.abs(supp.areaDeep());
+            });
+            let delta_area = old_area - new_area;
+            return [old_volume, new_volume, delta_area];
+        }
+
+        function checkVolumeAndCollisionsExtend(all_slices, sliceIndexList, try_surro_polygons_list, defaultHeight) {
+            let new_volume = 0;
+            let old_volume = 0;
+
+            let current_slice = undefined;
+            let lastSlice = undefined;
+
+            let foundMaxHeight = defaultHeight;
+
+            for (let indexIndex = 0; indexIndex < sliceIndexList.length; indexIndex++) {
+                lastSlice = current_slice;
+                current_slice = all_slices[sliceIndexList[indexIndex]];
+
+                // Stop extending if there is no support
+                if (!current_slice.supports || current_slice.supports.length === 0) {
+                    break;
+                }
+             
+                const volumes = getSurrogateReplacedVolumes(old_volume, new_volume, current_slice, try_surro_polygons_list);
+                old_volume = volumes[0];
+                new_volume = volumes[1];
+
+                // console.log(current_slice.index);
+                let collision_detection = [];
+                POLY.subtract(current_slice.topPolys(), try_surro_polygons_list, collision_detection, null, current_slice.z, 0.05);
+                // console.log({try_surro_polygons_list:try_surro_polygons_list});
+                
+                let post_collision_area = 0, pre_collision_area = 0;
+                current_slice.topPolys().forEach(function(top_poly) {
+                    pre_collision_area += Math.abs(top_poly.areaDeep());
+                });
+                collision_detection.forEach(function(top_poly) {
+                    post_collision_area += Math.abs(top_poly.areaDeep());
+                });
+
+                const collision_area = pre_collision_area - post_collision_area;
+                if (collision_area < -0.00000001) {
+                    console.log({WARNING:"AAAAAAAAAAA ABS NEEDED"});
+                    console.log({collision_area:collision_area});
+                }
+                
+                if ((collision_area) > 0.001) { // rounded the same 
+                    break;
+                }
+            }
+
+            if (lastSlice) {
+                foundMaxHeight = lastSlice.z + (lastSlice.height * 0.49); // TODO make it directly on the layer intersection? Check for case handling issues
+            }
+
+            const delta_volume = old_volume - new_volume;
+
+            // console.log({checked_layers:checked_layers});
+            // console.log({delta_volume_remaining:delta_volume});
+       
+            return [foundMaxHeight, delta_volume];
+        }
+
+        function checkVolumeAndCollisionsStack(all_slices, sliceIndexListList, try_surro_polygons_list, defaultHeight, addHeight) {
+            let new_volume = 0;
+            let old_volume = 0;
+
+            let foundMaxHeight = defaultHeight;
+
+            let counter = 1;
+            for (let indexIndexI = 0; indexIndexI < sliceIndexListList.length; indexIndexI++) {
+                const sliceIndexList = sliceIndexListList[indexIndexI];
+                let issueFound = false;
+                let extraVolOld = 0;
+                let extraVolNew = 0;
+                for (let indexIndex = 0; indexIndex < sliceIndexList.length; indexIndex++) {
+                    let current_slice = all_slices[sliceIndexList[indexIndex]];
+
+                    // Stop extending if there is no support
+                    if (!current_slice.supports || current_slice.supports.length === 0) {
+                        issueFound = true;
+                        break;
+                    }
+                
+                    const volumes = getSurrogateReplacedVolumes(extraVolOld, extraVolNew, current_slice, try_surro_polygons_list);
+                    extraVolOld = volumes[0];
+                    extraVolNew = volumes[1];
+
+                    // console.log(current_slice.index);
+                    let collision_detection = [];
+                    POLY.subtract(current_slice.topPolys(), try_surro_polygons_list, collision_detection, null, current_slice.z, 0.05);
+                    // console.log({try_surro_polygons_list:try_surro_polygons_list});
+                    
+                    let post_collision_area = 0, pre_collision_area = 0;
+                    current_slice.topPolys().forEach(function(top_poly) {
+                        pre_collision_area += Math.abs(top_poly.areaDeep());
+                    });
+                    collision_detection.forEach(function(top_poly) {
+                        post_collision_area += Math.abs(top_poly.areaDeep());
+                    });
+
+                    const collision_area = pre_collision_area - post_collision_area;
+                    if (collision_area < -0.00000001) {
+                        console.log({WARNING:"AAAAAAAAAAA ABS NEEDED"});
+                        console.log({collision_area:collision_area});
+                    }
+                    
+                    if ((collision_area) > 0.001) { // rounded the same 
+                        issueFound = true;
+                        break;
+                    }
+
+                }
+                if (issueFound) { // This iteration had a problem, stop going higher
+                    break;
+                }
+                else { // Add successfull stack addition to data
+                    foundMaxHeight += addHeight; // For next iteration
+                    counter += 1; // For next iteration
+                    old_volume += extraVolOld; // This iteration
+                    new_volume += extraVolNew; // This iteration
+                }
+            }
+
+            const delta_volume = old_volume - new_volume;
+
+            // console.log({checked_layers:checked_layers});
+            // console.log({delta_volume_remaining:delta_volume});
+       
+            return [foundMaxHeight, delta_volume, counter];
+        }
+
         function getSliceIndexList(precomputed_slice_heights, startHeight, endHeight) {
             let sliceIndexList = [];
             let skip = true;
@@ -2237,6 +2388,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                 let pso_polygons_list = [];
                 let prism_bottoms = [];
                 // let finalHeight = try_z + try_surro.height;
+                let finalHeight = candidate_detail.candidate_obj.end_height;
                 let id_extension;
 
                 // TODO Switch to tower/non-tower variants of the functions respectively
@@ -2257,6 +2409,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                     const extensionIndexList = getSliceIndexList(surrogate_settings.precomputed_slice_heights, try_z + try_surro.minHeight, try_z + try_surro.maxHeight);
                     const extensionData = checkVolumeAndCollisionsExtend(surrogate_settings.all_slices, extensionIndexList, pso_polygons_list, finalHeight);
                     finalHeight = extensionData[0];
+                    console.log({note:"ComparePrism", finalHeight:finalHeight, end_height:candidate_detail.candidate_obj.end_height});
                 } else {
                     if (is_tower) pso_polygons_list = [generateRectanglePolygonCentered(try_x, try_y, try_z, try_surro.length, try_surro.width, try_rotation, surrogate_settings.surrogate_padding, bottom_slice)];
                     else pso_polygons_list = [generateRectanglePolygon(try_x, try_y, try_z, try_surro.length, try_surro.width, try_rotation, surrogate_settings.surrogate_padding, bottom_slice)];
@@ -2264,6 +2417,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                     const stackingData = checkVolumeAndCollisionsStack(surrogate_settings.all_slices, stackIndexList, pso_polygons_list, finalHeight, try_surro.addHeight);
                     finalHeight = stackingData[0];
                     id_extension = stackingData[2];
+                    console.log({note:"CompareStack", finalHeight:finalHeight, end_height:candidate_detail.candidate_obj.end_height});
                 }
 
                 // generate candidate and validation insertion case and layer
@@ -3031,8 +3185,12 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
         // API.event.emit('log.file', {any:"thing"});
 
+        console.log({kiri:kiri});
+        console.log({kiriapi:kiri.api});
+        console.log({api:api});
 
-        // API.event.emit('log.fileDetail', {timestamp:bottom_slice.widget.surrogate_data.timestamp, id:bottom_slice.widget.id, previous_volume:pre_surrogate_support_amounts[0], new_volume:post_surrogate_support_amounts[0], volume_percentage_saved:volume_percentage_saved});
+
+        // kiri.api.event.emit('log.fileDetail', {timestamp:bottom_slice.widget.surrogate_data.timestamp, id:bottom_slice.widget.id, previous_volume:pre_surrogate_support_amounts[0], new_volume:post_surrogate_support_amounts[0], volume_percentage_saved:volume_percentage_saved});
 
         var startTime = new Date().getTime();
         var endTime = new Date().getTime();
@@ -3046,6 +3204,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
         // TODO: Make this not super ugly, return properly
         bottom_slice.efficiencyData = efficiencyData;
+        bottom_slice.widget.efficiencyData = efficiencyData;
 
         // function download(filename, text) {
         //     var pom = document.createElement('a');
@@ -3711,6 +3870,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         surrogate_settings.allow_towers = proc.surrogateTowers;
         // surrogate_settings.allow_height_variable = true;
         // surrogate_settings.allow_stackable = true;
+        surrogate_settings.allow_duplicates = false;
         
 
         let all_slices = [];

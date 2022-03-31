@@ -254,7 +254,10 @@ function prepareSlices(callback, scale = 1, offset = 0) {
             if (firstWidget === null) {
                 firstWidget = widget;
             }
+            console.log({one_slicing_widget:widget});
         }
+        console.log({renderapi:api});
+
         api.event.emit('log.file', {surrogating_times:surrogating_times, segtimes:segtimes, timestamp:firstWidget.surrogate_data.timestamp, startStamp:alwaysStartTime});
 
         if (callback && typeof callback === 'function') {
