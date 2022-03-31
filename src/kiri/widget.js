@@ -395,16 +395,15 @@ class Widget {
     }
 
 
-    // LWW
-    /**
-     * @param {number} surrogate_duration
-     * @param {number} total_combined_duration
-     */
-    setSurrogateData = function(surrogate_duration,total_combined_duration) {
-        this.surrogate_data.surrogating_duration = surrogate_duration;
-        this.surrogate_data.combined_total_duration = total_combined_duration;
-    };
-
+    // // LWW
+    // /**
+    //  * @param {number} surrogate_duration
+    //  * @param {number} total_combined_duration
+    //  */
+    // setSurrogateData = function(surrogate_duration,total_combined_duration) {
+    //     this.surrogate_data.surrogating_duration = surrogate_duration;
+    //     this.surrogate_data.combined_total_duration = total_combined_duration;
+    // };
 
     // LWW
     /**
@@ -791,6 +790,9 @@ class Widget {
                 }
                 if (reply.error) {
                     ondone(false, reply.error);
+                }
+                if (reply.log) {
+                    api.event.emit('log.fileDetail', reply.log);
                 }
             });
         }

@@ -59,13 +59,15 @@ function callExport(callback, mode, names) {
         } else {
             exportGCodeDialog(gcode, mode === 'CAM' ? sections : undefined, output, names);
         }
+
+        const material_estimate = (Math.PI * util.sqr(output.settings.device.extruders[0].extFilament / 2)) *output.distance *  1.25 / 1000;
+
+        console.log({material_estimate:material_estimate});
+        let timeData = {time:output.time, id:foundId, total_weight_estimate:material_estimate};
+        api.event.emit('log.fileTime', timeData);
     });
     
-    const material_estimate = (Math.PI * UTIL.sqr(output.settings.device.extruders[0].extFilament / 2)) *output.distance *  1.25 / 1000;
-
-    console.log({material_estimate:material_estimate});
-    let timeData = {time:output.time, id:foundId, total_weight_estimate:material_estimate};
-    api.event.emit('log.fileTime', timeData);
+    
 }
 
 function callExportLaser(options, names) {

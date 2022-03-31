@@ -578,7 +578,7 @@ FDM.init = function(kiri, api) {
         // 0, 1, 11
         csv_log += "\n"+timingData.surrogating_times[0].filename+","+timingData.surrogating_times[0].id+",,,,,,,,,,"+timingData.startStamp.toString()+",";
 
-        // download("SurrogateSupport_timings_"+timingData.timestamp+".txt", csv_log);
+        download("SurrogateSupport_timings_"+timingData.timestamp+".txt", csv_log);
     });
 
 
@@ -604,7 +604,7 @@ FDM.init = function(kiri, api) {
         // 1, 2, 3, 4, 5, 6, 9, 10
         csv_log += ","+efficiencyData.id+","+efficiencyData.sTime+","+efficiencyData.previous_volume+","+efficiencyData.new_volume+","+efficiencyData.volume_percentage_saved+","+efficiencyData.materialWeightEstimateEllipse.toString()+",,,"+efficiencyData.numberSurrogates.toString()+","+efficiencyData.numberPauses.toString()+",,";
 
-        // download2("SuSu_"+efficiencyData.id+".txt", csv_log);
+        download2("SuSu_"+efficiencyData.id+".txt2", csv_log);
 
         console.log({eventDataDetailLog:efficiencyData});
     });
@@ -631,9 +631,9 @@ FDM.init = function(kiri, api) {
         // 1, 7, 8, 12
         csv_log += ","+timeData.id+",,,,,,"+timeData.total_weight_estimate.toString()+","+ timeData.time.toString() +",,,,"+endTime.toString();
 
-        // download2("SuSt_"+timeData.id+".txt", csv_log);
+        download2("SuSt_"+timeData.id+".txt", csv_log);
 
-        console.log({eventDataTimeLog:timeData});
+        console.log({eventDataTimeLogFile:timeData});
     });
 
 }

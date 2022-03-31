@@ -1354,6 +1354,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             console.log({outer_api:api});
             console.log({outer_kiri_api:kiri.api});
             
+            
             // let index_array = [ ...Array(candidate_list.length).keys() ];
 
             // console.log({index_array:index_array});
@@ -3205,6 +3206,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         // TODO: Make this not super ugly, return properly
         bottom_slice.efficiencyData = efficiencyData;
         bottom_slice.widget.efficiencyData = efficiencyData;
+        api.efficiencyData = efficiencyData;
 
         // function download(filename, text) {
         //     var pom = document.createElement('a');
@@ -3228,6 +3230,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         console.log({slicing_results_obj:efficiencyData});
         // console.log({theWidget:bottom_slice.widget});
         console.log({surrogate_all_slices:all_out_slices});
+
     }
 
     /**
