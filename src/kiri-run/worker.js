@@ -549,6 +549,11 @@ kiri.worker = {
                 send.data({error: error});
             } else {
                 const slices = widget.slices || [];
+                console.log({widgetslices:widget.slices});
+                console.log({settingsaaa:settings});
+
+                send.data({log:widget.slices[0].efficiencyData});
+
                 send.data({send_start: time()});
                 send.data({
                     stats: widget.stats,

@@ -332,6 +332,13 @@ const funcs = {
                     point_list.push(new_point);
                 }
                 surro.prism_geometry = point_list;
+
+                let bottom_point_list = [];
+                for (let geometry_point of surro.bottom_geometry) {
+                    let new_point = newPoint(geometry_point.x, geometry_point.y, geometry_point.z);
+                    bottom_point_list.push(new_point);
+                }
+                surro.bottom_geometry = bottom_point_list;
             }
         }
 
@@ -425,7 +432,9 @@ const funcs = {
         }
 
         function generatePrismPolygon(start_x, start_y, start_z, geometry_points, rot, rot_inner, padding, debug_slice) {
-            let rectanglePolygon = base.newPolygon(geometry_points);
+            // console.log({geometry_points:geometry_points});
+            let geo_p_copy = geometry_points.clone();
+            let rectanglePolygon = base.newPolygon(geo_p_copy);
             rectanglePolygon = rectanglePolygon.rotateXYsimple(rot); // simple translation (corner point equivalent on 0/0/0, so just simple rotate)
             rectanglePolygon = rectanglePolygon.rotateXY(rot_inner); // inner rotation (moving midpoint dead to 0/0/0 in function)
   
@@ -447,7 +456,8 @@ const funcs = {
             const halfX = geometry_bounds_poly.bounds.maxx*0.5;
             const halfY = geometry_bounds_poly.bounds.maxy*0.5;
 
-            let rectanglePolygon = base.newPolygon(geometry_points);
+            let geo_p_copy = geometry_points.clone();
+            let rectanglePolygon = base.newPolygon(geo_p_copy);
             rectanglePolygon = rectanglePolygon.rotateXY(rot+rot_inner);
 
             let rectanglePolygon_padded = [];
@@ -1323,11 +1333,13 @@ const funcs = {
             
             // generate polygons // TODO: Is it faster to make one poly for the surrogate and then rotate+translate /modify the points directly?
             let pso_polygons_list = [];
+            let pso_polygons_list_bottom = [];
             if (pso_surrogate.type == "simpleRectangle" || pso_surrogate.type == "stackable") {
                 pso_polygons_list = [generateRectanglePolygon(chosen_x, chosen_y, pso_z, pso_surrogate.length, pso_surrogate.width, chosen_rotation, surrogate_settings.surrogate_padding, this.surrogate_settings.start_slice)];
             }
             else if (pso_surrogate.type == "prism") {
                 pso_polygons_list = [generatePrismPolygon(chosen_x, chosen_y, pso_z, pso_surrogate.prism_geometry, chosen_rotation, pso_inner_rot, surrogate_settings.surrogate_padding, this.surrogate_settings.start_slice)];
+                pso_polygons_list_bottom = [generatePrismPolygon(chosen_x, chosen_y, pso_z, pso_surrogate.bottom_geometry, chosen_rotation, pso_inner_rot, surrogate_settings.surrogate_padding, this.surrogate_settings.start_slice)];
             }
 
             let oob = false;
@@ -1446,7 +1458,8 @@ const funcs = {
                                 let rotation = chosen_rotation; 
                                 let end_height = finalHeight;
                                 candidate = {
-                                    geometry:pso_polygons_list, 
+                                    geometry:pso_polygons_list,
+                                    bottom_geometry: pso_polygons_list_bottom,
                                     rotation:rotation,
                                     surro:pso_surrogate, starting_height:pso_z, 
                                     end_height:end_height, 
@@ -2276,13 +2289,17 @@ const funcs = {
         
         for (let return_obj of return_list) {
             let encoded_geometry = kiri.codec.encode(return_obj.candidate_details.candidate_obj.geometry);
+            let encoded_geometry_bottom = kiri.codec.encode(return_obj.candidate_details.candidate_obj.bottom_geometry);
             return_obj.candidate_details.candidate_obj.area2 = return_obj.candidate_details.candidate_obj.geometry[0].area2;
             return_obj.candidate_details.candidate_obj.geometry = encoded_geometry;
+            return_obj.candidate_details.candidate_obj.bottom_geometry = encoded_geometry_bottom;
             for (let above_idx = 1; above_idx < return_obj.aboves.length; above_idx++) {
                 for (let above of return_obj.aboves[above_idx]) {
                     let decoded_geometry_a = kiri.codec.encode(above.candidate_details.candidate_obj.geometry);
+                    let encoded_geometry_bottom_a = kiri.codec.encode(above.candidate_details.candidate_obj.bottom_geometry);
                     above.candidate_details.candidate_obj.area2 = above.candidate_details.candidate_obj.geometry[0].area2;
                     above.candidate_details.candidate_obj.geometry = decoded_geometry_a;
+                    above.candidate_details.candidate_obj.bottom_geometry = encoded_geometry_bottom_a;
                     above.below = null; // get rid of data no longer needed for encoding
                 }
             }
@@ -2567,10 +2584,10 @@ const funcs = {
                         }
                     }
 
-                    let tower_counter = 1;
+                    let tower_counter = 0;
                     for (let tower_f of candidate.tower_fitness) {
                         let candidate_selection_list = [{cd:candidate, tower_step_selection:tower_counter}];
-                        validateResults(final_selection_list, tower_f, tower_counter, tower_counter, candidate_selection_list);
+                        validateResults(final_selection_list, tower_f, tower_counter+1, tower_counter+1, candidate_selection_list);
                         tower_counter++;
                     }
                 }
