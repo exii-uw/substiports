@@ -56,18 +56,37 @@ function callExport(callback, mode, names) {
             api.show.alert(error, 5);
         } else if (callback) {
             callback(gcode.join('\r\n'), output);
+            console.log({output1:output});
         } else {
             exportGCodeDialog(gcode, mode === 'CAM' ? sections : undefined, output, names);
+            console.log({output2:output});
+            let foundId;
+            for (const [key, value] of Object.entries(output.settings.widget)) {
+                if (value.file) {
+                    if (value.file.length > 0) {
+                        foundId = key;
+                    }
+                }
+                console.log(`${key}: ${value}`);
+                console.log({key:key});
+                console.log({value:value});
+            }
+            if (!foundId) {
+                foundId = api.widgets.all()[0].id;
+            }
+
+            console.log({api_widgets:api.widgets.all()});
+
+            const material_estimate = (Math.PI * util.sqr(output.settings.device.extruders[0].extFilament / 2)) *output.distance *  1.25 / 1000;
+
+            console.log({material_estimate:material_estimate});
+            console.log({names:names});
+            console.log({mode:mode});
+            console.log({callback:callback});
+            let timeData = {time:output.time, id:foundId, total_weight_estimate:material_estimate};
+            api.event.emit('log.fileTime', timeData);
         }
-
-        const material_estimate = (Math.PI * util.sqr(output.settings.device.extruders[0].extFilament / 2)) *output.distance *  1.25 / 1000;
-
-        console.log({material_estimate:material_estimate});
-        let timeData = {time:output.time, id:foundId, total_weight_estimate:material_estimate};
-        api.event.emit('log.fileTime', timeData);
     });
-    
-    
 }
 
 function callExportLaser(options, names) {
