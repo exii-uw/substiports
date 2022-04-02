@@ -432,11 +432,11 @@ const funcs = {
         }
 
         function generatePrismPolygon(start_x, start_y, start_z, geometry_points, rot, rot_inner, padding, debug_slice) {
-            // console.log({geometry_points:geometry_points});
             let geo_p_copy = geometry_points.clone();
             let rectanglePolygon = base.newPolygon(geo_p_copy);
+            rectanglePolygon = rectanglePolygon.rotateXY(rot_inner - rot); // inner rotation (moving midpoint dead to 0/0/0 in function)
             rectanglePolygon = rectanglePolygon.rotateXYsimple(rot); // simple translation (corner point equivalent on 0/0/0, so just simple rotate)
-            rectanglePolygon = rectanglePolygon.rotateXY(rot_inner); // inner rotation (moving midpoint dead to 0/0/0 in function)
+
   
             let rectanglePolygon_padded = [];
             rectanglePolygon_padded = POLY.expand([rectanglePolygon], padding, start_z, rectanglePolygon_padded, 1); 
@@ -458,7 +458,7 @@ const funcs = {
 
             let geo_p_copy = geometry_points.clone();
             let rectanglePolygon = base.newPolygon(geo_p_copy);
-            rectanglePolygon = rectanglePolygon.rotateXY(rot+rot_inner);
+            rectanglePolygon = rectanglePolygon.rotateXY(rot_inner);
 
             let rectanglePolygon_padded = [];
             rectanglePolygon_padded = POLY.expand([rectanglePolygon], padding, start_z, rectanglePolygon_padded, 1); 
@@ -2203,45 +2203,50 @@ const funcs = {
             let tower_list = [];
             let hightest_tower_found = 0;
             for (let valid_answer of valid_answers) {
-                t_optimizer.init(20, pso_tower_var_list);
-                
-                t_optimizer.surrogate_settings.lower_surr = valid_answer; 
-                t_optimizer.valid_answers = [];
-
-                t_iterations = 0;
-                stepFitness = 0;
-                lastFitness = 0;
-                t_loop();
-                let o_valid_answers = t_optimizer.valid_answers;
-
-                if (o_valid_answers.length > 0) {
-                    if (hightest_tower_found < o_valid_answers[0].tower_size) hightest_tower_found = o_valid_answers[0].tower_size;
-                    o_valid_answers = sortSL(o_valid_answers, true);
-                    o_valid_answers = removeEquivalentSolutions(o_valid_answers);
+                if (surrogate_settings.allow_towers) {
+                    t_optimizer.init(20, pso_tower_var_list);
                     
-                    // let best_tower = getBestResult(o_valid_answers);
-                    let best_tower = o_valid_answers[o_valid_answers.length-1];
-                    valid_answers.push(...o_valid_answers);
-                    // if (t_optimizer.valid_answers.length > 0) console.log({tower_valid_answers:t_optimizer.valid_answers});
-                    let lower_answer = valid_answer;
+                    t_optimizer.surrogate_settings.lower_surr = valid_answer; 
+                    t_optimizer.valid_answers = [];
+
+                    t_iterations = 0;
+                    stepFitness = 0;
+                    lastFitness = 0;
+                    t_loop();
+                    let o_valid_answers = t_optimizer.valid_answers;
+
+                    if (o_valid_answers.length > 0) {
+                        if (hightest_tower_found < o_valid_answers[0].tower_size) hightest_tower_found = o_valid_answers[0].tower_size;
+                        o_valid_answers = sortSL(o_valid_answers, true);
+                        o_valid_answers = removeEquivalentSolutions(o_valid_answers);
                         
-                    let lowest;
-                    let relevant_candidates = [best_tower];
-                    while (lower_answer) {
-                        if (lower_answer.tower_size > 1) relevant_candidates.push(lower_answer);
-                        // lower_answer.aboves.push(best_tower);
-                        // lower_answer.tower_fitness = best_tower.fitness;
-                        lowest = lower_answer;
-                        lower_answer = lower_answer.below;
+                        // let best_tower = getBestResult(o_valid_answers);
+                        let best_tower = o_valid_answers[o_valid_answers.length-1];
+                        valid_answers.push(...o_valid_answers);
+                        // if (t_optimizer.valid_answers.length > 0) console.log({tower_valid_answers:t_optimizer.valid_answers});
+                        let lower_answer = valid_answer;
+                            
+                        let lowest;
+                        let relevant_candidates = [best_tower];
+                        while (lower_answer) {
+                            if (lower_answer.tower_size > 1) relevant_candidates.push(lower_answer);
+                            // lower_answer.aboves.push(best_tower);
+                            // lower_answer.tower_fitness = best_tower.fitness;
+                            lowest = lower_answer;
+                            lower_answer = lower_answer.below;
+                        }
+                        if (!lowest.tower_fitness[best_tower.tower_size-1] || lowest.tower_fitness[valid_answer.tower_size-1] < best_tower.fitness) { // new best tower at this height
+                            lowest.tower_fitness[best_tower.tower_size-1] = best_tower.fitness;
+                            lowest.aboves[best_tower.tower_size-1] = relevant_candidates;
+                        }
+                        if (valid_answer.tower_size == 1) tower_list.push(valid_answer);
+                        
+                    } else {
+                        if (valid_answer.tower_size == 1) simple_list.push(valid_answer); // Avoid adding higher levels of a tower again
                     }
-                    if (!lowest.tower_fitness[best_tower.tower_size-1] || lowest.tower_fitness[valid_answer.tower_size-1] < best_tower.fitness) { // new best tower at this height
-                        lowest.tower_fitness[best_tower.tower_size-1] = best_tower.fitness;
-                        lowest.aboves[best_tower.tower_size-1] = relevant_candidates;
-                    }
-                    if (valid_answer.tower_size == 1) tower_list.push(valid_answer);
-                    
-                } else {
-                    if (valid_answer.tower_size == 1) simple_list.push(valid_answer); // Avoid adding higher levels of a tower again
+                }
+                else {
+                    simple_list.push(valid_answer);
                 }
             }
 
@@ -2289,17 +2294,17 @@ const funcs = {
         
         for (let return_obj of return_list) {
             let encoded_geometry = kiri.codec.encode(return_obj.candidate_details.candidate_obj.geometry);
-            let encoded_geometry_bottom = kiri.codec.encode(return_obj.candidate_details.candidate_obj.bottom_geometry);
+            // let encoded_geometry_bottom = kiri.codec.encode(return_obj.candidate_details.candidate_obj.bottom_geometry);
             return_obj.candidate_details.candidate_obj.area2 = return_obj.candidate_details.candidate_obj.geometry[0].area2;
             return_obj.candidate_details.candidate_obj.geometry = encoded_geometry;
-            return_obj.candidate_details.candidate_obj.bottom_geometry = encoded_geometry_bottom;
+            // return_obj.candidate_details.candidate_obj.bottom_geometry = encoded_geometry_bottom;
             for (let above_idx = 1; above_idx < return_obj.aboves.length; above_idx++) {
                 for (let above of return_obj.aboves[above_idx]) {
                     let decoded_geometry_a = kiri.codec.encode(above.candidate_details.candidate_obj.geometry);
-                    let encoded_geometry_bottom_a = kiri.codec.encode(above.candidate_details.candidate_obj.bottom_geometry);
+                    // let encoded_geometry_bottom_a = kiri.codec.encode(above.candidate_details.candidate_obj.bottom_geometry);
                     above.candidate_details.candidate_obj.area2 = above.candidate_details.candidate_obj.geometry[0].area2;
                     above.candidate_details.candidate_obj.geometry = decoded_geometry_a;
-                    above.candidate_details.candidate_obj.bottom_geometry = encoded_geometry_bottom_a;
+                    // above.candidate_details.candidate_obj.bottom_geometry = encoded_geometry_bottom_a;
                     above.below = null; // get rid of data no longer needed for encoding
                 }
             }
@@ -2531,9 +2536,11 @@ const funcs = {
             for (let i = 0; i < 3; i++) {
                 if (final_selection_list[i].final_fitness < fifi_list[i]) {
                     final_selection_list[i] = {
-                        final_fitness:fifi_list[i],
+                        final_fitness: fifi_list[i],
                         result_fitness: result_fitness,
-                        used_candidates: candidate_selection_list
+                        used_candidates: candidate_selection_list,
+                        number_of_surrogates: number_of_surrogates,
+                        number_of_interactions: number_of_interactions
                     };
                 }
             }

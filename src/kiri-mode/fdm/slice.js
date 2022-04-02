@@ -1313,6 +1313,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
 
             let global_selection_list = [{final_fitness:0}, {final_fitness:0}, {final_fitness:0}]; // low, med, high interaction
+            
 
             for (let data_obj of susu_data_objs) {
                 for (let i = 0; i < 3; i++) {
@@ -1321,6 +1322,8 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                             final_fitness: data_obj.selection_list[i].final_fitness,
                             result_fitness: data_obj.selection_list[i].result_fitness,
                             used_candidates: data_obj.selection_list[i].used_candidates,
+                            number_of_surrogates: data_obj.selection_list[i].number_of_surrogates,
+                            number_of_interactions: data_obj.selection_list[i].number_of_interactions,
                             best_kn: data_obj.kn
                         };
                     }
@@ -1343,13 +1346,15 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
             surrogate_settings.all_slices = all_slices_save; // re-enter slices after encoding no longer required
             let surrogates_placed = [];
-            let placed_surrogates = placeSurrogates(global_selection_list, surrogate_settings, surrogate_library, bottom_slice, surrogates_placed);
+            
+            let placed_surrogates;
+            if (surrogate_settings.surrogateInteraction != "off") placed_surrogates = placeSurrogates(global_selection_list, surrogate_settings, surrogate_library, bottom_slice, surrogates_placed);
 
             console.log({surrogates_placed_list:surrogates_placed});
             console.log({placed_surrogates:placed_surrogates});
 
 
-            applySurrogatesToSlices(surrogates_placed, surrogate_settings, bottom_slice, process, view, surrogate_settings.all_slices, pre_surrogate_support_amounts);
+            applySurrogatesToSlices(surrogates_placed, surrogate_settings, bottom_slice, process, view, surrogate_settings.all_slices, pre_surrogate_support_amounts, global_selection_list);
 
             console.log({outer_api:api});
             console.log({outer_kiri_api:kiri.api});
@@ -1907,8 +1912,8 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                 
                 // console.log({rectanglePolygon:rectanglePolygon});
                 let rectanglePolygon = base.newPolygon(geometry_points);
+                rectanglePolygon = rectanglePolygon.rotateXY(rot_inner - rot); // inner rotation first (moving midpoint dead to 0/0/0 in function)
                 rectanglePolygon = rectanglePolygon.rotateXYsimple(rot); // simple translation (corner point equivalent on 0/0/0, so just simple rotate)
-                rectanglePolygon = rectanglePolygon.rotateXY(rot_inner); // inner rotation (moving midpoint dead to 0/0/0 in function)
 
                 // let rectanglePolygon_points = rectanglePolygon.points.clone();
 
@@ -2013,12 +2018,12 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                 let hull_rot_90 = hull_rot + 90;
 
                 let one_candidate = generateRectanglePolygonDEBUG(hull_points[debugint-1].x, hull_points[debugint-1].y, bottom_slice.z, 100, 80, hull_rot, 0.4, bottom_slice);
-                let one_prism = generatePrismPolygonDEBUG(hull_points[debugint-1].x, hull_points[debugint-1].y, bottom_slice.z, surrogates[7].prism_geometry, hull_rot, 0, 0.4, bottom_slice);
+                let one_prism = generatePrismPolygonDEBUG(hull_points[debugint-1].x, hull_points[debugint-1].y, bottom_slice.z, surrogates[0].prism_geometry, hull_rot, 0, 0.4, bottom_slice);
                 
                 // let debug_rot_list = [0, 10, 20, 30, 35, 40, 45, 50, 55, 60, 65, 70, 95, 100, 105, 110, 115, 120, 130, 140, 150, 160, 170];
                 let debug_rot_list = [0, 5, 10, 15, 20, 60, 61, 62, 91, 92, 93, 150];
-                for (let debug_rot = 0;  debug_rot < 360; debug_rot = debug_rot +90){
-                    let one_prismx = generatePrismPolygonDEBUG(hull_points[debugint-1].x, hull_points[debugint-1].y, bottom_slice.z, surrogates[7].prism_geometry, hull_rot, 180-debug_rot, 0.4, bottom_slice);
+                for (let debug_rot = 0;  debug_rot < 46; debug_rot = debug_rot +40){
+                    let one_prismx = generatePrismPolygonDEBUG(hull_points[debugint-1].x, hull_points[debugint-1].y, bottom_slice.z, surrogates[0].prism_geometry, hull_rot, 180-debug_rot, 0.4, bottom_slice);
                     let one_candidatex = generateRectanglePolygonDEBUG(hull_points[debugint-1].x, hull_points[debugint-1].y, bottom_slice.z, 100, 80, hull_rot, 0.4, bottom_slice);
                     // bottom_slice.tops[0].fill_sparse.push(one_prismx);
                     // bottom_slice.tops[0].fill_sparse.push(one_candidatex);
@@ -2028,30 +2033,30 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                 // bottom_slice.tops[0].fill_sparse.push(one_candidate);
                 // bottom_slice.tops[0].fill_sparse.push(one_prism);
                 let one_candidate2 = generateRectanglePolygonDEBUG(hull_points[debugint].x, hull_points[debugint].y, bottom_slice.z, 20, 10, hull_rot_90, 0.4, bottom_slice);
-                let one_prism2 = generatePrismPolygonDEBUG(hull_points[debugint].x, hull_points[debugint].y, bottom_slice.z, surrogates[7].prism_geometry, hull_rot_90, 0,  0.4, bottom_slice);
+                let one_prism2 = generatePrismPolygonDEBUG(hull_points[debugint].x, hull_points[debugint].y, bottom_slice.z, surrogates[0].prism_geometry, hull_rot_90, 0,  0.4, bottom_slice);
 
                 // for (let debug_rot = 0;  debug_rot < 360; debug_rot = debug_rot +90){
-                for (let debug_rot = 0;  debug_rot < 1.6; debug_rot = debug_rot +0.8){
-                    // let one_prismx = generatePrismPolygonCenteredDEBUG(hull_points[debugint].x, hull_points[debugint].y, bottom_slice.z, surrogates[7].prism_geometry, hull_rot_90, 180-debug_rot, 0.4, bottom_slice);
-                    let one_candidatex = generateRectanglePolygonDEBUG(hull_points[debugint].x, hull_points[debugint].y, bottom_slice.z, 100, 80, hull_rot_90, 0.4, bottom_slice);
-                    // bottom_slice.tops[0].fill_sparse.push(one_prismx);
+                for (let debug_rot = 0;  debug_rot < 101; debug_rot = debug_rot +100){
+                    let one_prismx = generatePrismPolygonDEBUG(hull_points[debugint].x, hull_points[debugint].y, bottom_slice.z, surrogates[0].prism_geometry, hull_rot_90+debug_rot, 0, 0.4, bottom_slice);
+                    let one_candidatex = generateRectanglePolygonDEBUG(hull_points[debugint].x, hull_points[debugint].y, bottom_slice.z, 60, 60, hull_rot_90+debug_rot, 0.4, bottom_slice);
+                    bottom_slice.tops[0].fill_sparse.push(one_prismx);
                     bottom_slice.tops[0].fill_sparse.push(one_candidatex);
 
-                    let paded_cand = generateRectanglePolygonDEBUGPad(hull_points[debugint].x, hull_points[debugint].y, bottom_slice.z, 100, 80, hull_rot_90, 0.4+debug_rot, bottom_slice);
-                    bottom_slice.tops[0].fill_sparse.push(paded_cand);
+                    // let paded_cand = generateRectanglePolygonDEBUGPad(hull_points[debugint].x, hull_points[debugint].y, bottom_slice.z, 100, 80, hull_rot_90, 0.4, bottom_slice);
+                    // bottom_slice.tops[0].fill_sparse.push(paded_cand);
 
-                    let normal = generateRectanglePolygonCenteredDEBUG(hull_points[debugint].x, hull_points[debugint].y, bottom_slice.z, 100, 80, hull_rot_90, 0.4, bottom_slice);
-                    bottom_slice.tops[0].fill_sparse.push(normal);
+                    // let normal = generateRectanglePolygonCenteredDEBUG(hull_points[debugint].x, hull_points[debugint].y, bottom_slice.z, 100, 80, hull_rot_90, 0.4, bottom_slice);
+                    // bottom_slice.tops[0].fill_sparse.push(normal);
 
-                    let fast = generateRectanglePolygonCenteredDEBUGPad(hull_points[debugint].x, hull_points[debugint].y, bottom_slice.z, 100, 80, hull_rot_90, 0.4+debug_rot, bottom_slice);
-                    bottom_slice.tops[0].fill_sparse.push(fast);
+                    // let fast = generateRectanglePolygonCenteredDEBUGPad(hull_points[debugint].x, hull_points[debugint].y, bottom_slice.z, 100, 80, hull_rot_90, 0.4, bottom_slice);
+                    // bottom_slice.tops[0].fill_sparse.push(fast);
 
                 }
                 // bottom_slice.tops[0].fill_sparse.push(one_candidate2);
                 // bottom_slice.tops[0].fill_sparse.push(one_prism2);
                 // }
                 const start = performance.now();
-                for (let ri = 0; ri < 1000000; ri++) {
+                for (let ri = 0; ri < 1; ri++) {
                     // let paded_cand = generateRectangleDEBUGPad(hull_points[debugint].x, hull_points[debugint].y, bottom_slice.z, 100, 80, hull_rot_90, 0.4, bottom_slice);
                     let paded_cand2 = generateRectanglePolygonCenteredDEBUGPad2(hull_points[debugint].x, hull_points[debugint].y, bottom_slice.z, 100, 80, hull_rot_90, 0.4);
                     // console.log({paded_cand2:paded_cand2.area2});
@@ -2059,7 +2064,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                 const duration = performance.now() - start;
                 console.log({padded_runtime:duration});
                 const start2 = performance.now();
-                for (let ri = 0; ri < 1000000; ri++) {
+                for (let ri = 0; ri < 1; ri++) {
                     let paded_cand = generateRectanglePolygonCenteredDEBUGPad(hull_points[debugint].x, hull_points[debugint].y, bottom_slice.z, 100, 80, hull_rot_90, 0.4, bottom_slice);
                     // console.log({paded_cand:paded_cand.area2});
                 }
@@ -2087,7 +2092,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         function generatePrismPolygon(start_x, start_y, start_z, geometry_points, rot, rot_inner, padding, debug_slice) {
             let geo_p_copy = geometry_points.clone();
             let rectanglePolygon = base.newPolygon(geo_p_copy);
-            rectanglePolygon = rectanglePolygon.rotateXY(rot_inner); // inner rotation (moving midpoint dead to 0/0/0 in function)
+            rectanglePolygon = rectanglePolygon.rotateXY(rot_inner - rot); // inner rotation (moving midpoint dead to 0/0/0 in function)
             rectanglePolygon = rectanglePolygon.rotateXYsimple(rot); // simple translation (corner point equivalent on 0/0/0, so just simple rotate)
 
   
@@ -2111,7 +2116,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
             let geo_p_copy = geometry_points.clone();
             let rectanglePolygon = base.newPolygon(geo_p_copy);
-            rectanglePolygon = rectanglePolygon.rotateXY(rot+rot_inner);
+            rectanglePolygon = rectanglePolygon.rotateXY(rot_inner);
 
             let rectanglePolygon_padded = [];
             rectanglePolygon_padded = POLY.expand([rectanglePolygon], padding, start_z, rectanglePolygon_padded, 1); 
@@ -2325,10 +2330,10 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             console.log({surrogate_library:surrogate_library});
             for (let surro of surrogate_library) { // Update surrogate reference
                 if (surro.id == candidate_detail.candidate_obj.surro.id) {
-                    if (surro.type == "prism") {
-                        console.log({globalSurroGeometry: surro.prism_geometry});
-                        console.log({minionSurroGeometry: candidate_detail.candidate_obj.surro.prism_geometry});
-                    }
+                    // if (surro.type == "prism") {
+                    //     console.log({globalSurroGeometry: surro.prism_geometry});
+                    //     console.log({minionSurroGeometry: candidate_detail.candidate_obj.surro.prism_geometry});
+                    // }
                     candidate_detail.candidate_obj.surro = surro;
                     break;
                 }
@@ -2341,10 +2346,10 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                 let decoded_geometry = kiri.codec.decode(candidate_detail.candidate_obj.geometry, {full: true});
                 candidate_detail.candidate_obj.geometry = decoded_geometry;
 
-                if (candidate_detail.candidate_obj.surro.type == "prism") {
-                    let decoded_geometry_bottom = kiri.codec.decode(candidate_detail.candidate_obj.bottom_geometry, {full: true});
-                    candidate_detail.candidate_obj.bottom_geometry = decoded_geometry_bottom;
-                }
+                // if (candidate_detail.candidate_obj.surro.type == "prism") {
+                //     let decoded_geometry_bottom = kiri.codec.decode(candidate_detail.candidate_obj.bottom_geometry, {full: true});
+                //     candidate_detail.candidate_obj.bottom_geometry = decoded_geometry_bottom;
+                // }
                 
                 // console.log({candidate:candidate});
                 check_surrogate_insertion_case(candidate_detail.candidate_obj, bottom_slice, surrogate_settings);
@@ -2378,8 +2383,8 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                 let try_rotation = candidate_detail.candidate_obj.rotation;
                 let try_inner_rot = candidate_detail.pso_details[6];
                 
-                console.log({pso_rotation:candidate_detail.pso_details[2]});
-                console.log({saved_rotation:candidate_detail.candidate_obj.rotation});
+                // console.log({pso_rotation:candidate_detail.pso_details[2]});
+                // console.log({saved_rotation:candidate_detail.candidate_obj.rotation});
                 // console.log({try_rotation:try_rotation, saved_rotation:candidate_detail.candidate_obj.rotation});
 
                 // let pso_desired_length = candidate_detail.pso_details[3];
@@ -2431,7 +2436,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                     const extensionIndexList = getSliceIndexList(surrogate_settings.precomputed_slice_heights, try_z + try_surro.minHeight, try_z + try_surro.maxHeight);
                     const extensionData = checkVolumeAndCollisionsExtend(surrogate_settings.all_slices, extensionIndexList, pso_polygons_list, finalHeight);
                     finalHeight = extensionData[0];
-                    console.log({note:"ComparePrism", finalHeight:finalHeight, end_height:candidate_detail.candidate_obj.end_height});
+                    // console.log({note:"ComparePrism", finalHeight:finalHeight, end_height:candidate_detail.candidate_obj.end_height});
                 } else {
                     if (is_tower) pso_polygons_list = [generateRectanglePolygonCentered(try_x, try_y, try_z, try_surro.length, try_surro.width, try_rotation, surrogate_settings.surrogate_padding, bottom_slice)];
                     else pso_polygons_list = [generateRectanglePolygon(try_x, try_y, try_z, try_surro.length, try_surro.width, try_rotation, surrogate_settings.surrogate_padding, bottom_slice)];
@@ -2467,11 +2472,11 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
                 // Fill in the blanks
                 candidate_detail.candidate_obj.id_extension = id_extension;
-                // candidate_detail.candidate_obj.bottom_geometry = prism_bottoms;
+                candidate_detail.candidate_obj.bottom_geometry = prism_bottoms;
                 candidate_detail.candidate_obj.outlines_drawn = 0;
 
-                candidate_detail.candidate_obj.bottom_geometry_fresh = prism_bottoms;
-                candidate_detail.candidate_obj.geometry_fresh = pso_polygons_list;
+                // candidate_detail.candidate_obj.bottom_geometry_fresh = prism_bottoms;
+                // candidate_detail.candidate_obj.geometry_fresh = pso_polygons_list;
 
                 // if (tower_library_index >= 0) {
                 //     surrogates_placed[tower_library_index].up_surrogate.push(candidate); // Add backwards reference for tower
@@ -2529,7 +2534,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         return all_candidates;
     }
 
-    function applySurrogatesToSlices(surrogates_placed, surrogate_settings, bottom_slice, proc, view, all_slices, pre_surrogate_support_amounts) {
+    function applySurrogatesToSlices(surrogates_placed, surrogate_settings, bottom_slice, proc, view, all_slices, pre_surrogate_support_amounts, global_selection_list) {
 
         let minArea = proc.supportMinArea;
         let min = minArea || 0.01;
@@ -2763,7 +2768,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                                 surrogate_outline_area_only[0].points.push(surrogate_outline_area_only[0].points[0]);
                                 // console.log({points_poly:surrogate_outline_area_only[0]});
                                 // up.tops[0].fill_sparse.push(surrogate_outline_area_only[0]);
-                                up.tops[0].fill_sparse.push(surrogate_outline_area_only[0]);
+                                // up.tops[0].fill_sparse.push(surrogate_outline_area_only[0]); // DOUBLE-ADD
                                 up.tops[0].fill_sparse.push(surrogate_outline_area_only[0]);
                                 up.virtual_support.push(surrogate_outline_area_only[0]);
                                 
@@ -2778,35 +2783,8 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                                     // POLY.subtract(surrogate_enlarged_more, surrogate_enlarged, surrogate_outline_area_only, null, up.z, min);
                                     POLY.subtract(surrogate_enlarged2, surrogate.geometry, surrogate_outline_area_only2, null, up.z, min);
                                     surrogate_outline_area_only2[0].points.push(surrogate_outline_area_only2[0].points[0]);
-                                    up.tops[0].fill_sparse.push(surrogate_outline_area_only2[0]);
-                                    up.tops[0].fill_sparse.push(surrogate_outline_area_only2[0]);
-                                    up.virtual_support.push(surrogate_outline_area_only2[0]);
-                                }
-
-                                if (surrogate.outlines_drawn == 8 && surrogate.surro.type == "prism") {
-                                    let surrogate_enlarged2 = [];
-                                    let surrogate_double_enlarged2 = [];
-                                    surrogate_enlarged2 = POLY.expand(surrogate.geometry_fresh, 0.4, up.z, surrogate_enlarged2, 1);
-                                    surrogate_double_enlarged2 = POLY.expand(surrogate_enlarged, 0.4, up.z, surrogate_double_enlarged2, 1); 
-                                    let surrogate_outline_area_only2 = [];
-                                    // POLY.subtract(surrogate_enlarged_more, surrogate_enlarged, surrogate_outline_area_only, null, up.z, min);
-                                    POLY.subtract(surrogate_enlarged2, surrogate.geometry_fresh, surrogate_outline_area_only2, null, up.z, min);
-                                    surrogate_outline_area_only2[0].points.push(surrogate_outline_area_only2[0].points[0]);
-                                    up.tops[0].fill_sparse.push(surrogate_outline_area_only2[0]);
-                                    up.tops[0].fill_sparse.push(surrogate_outline_area_only2[0]);
-                                    up.virtual_support.push(surrogate_outline_area_only2[0]);
-                                }
-                                if (surrogate.outlines_drawn == 8 && surrogate.surro.type == "prism") {
-                                    let surrogate_enlarged2 = [];
-                                    let surrogate_double_enlarged2 = [];
-                                    surrogate_enlarged2 = POLY.expand(surrogate.bottom_geometry_fresh, 0.4, up.z, surrogate_enlarged2, 1);
-                                    surrogate_double_enlarged2 = POLY.expand(surrogate_enlarged, 0.4, up.z, surrogate_double_enlarged2, 1); 
-                                    let surrogate_outline_area_only2 = [];
-                                    // POLY.subtract(surrogate_enlarged_more, surrogate_enlarged, surrogate_outline_area_only, null, up.z, min);
-                                    POLY.subtract(surrogate_enlarged2, surrogate.bottom_geometry_fresh, surrogate_outline_area_only2, null, up.z, min);
-                                    surrogate_outline_area_only2[0].points.push(surrogate_outline_area_only2[0].points[0]);
-                                    up.tops[0].fill_sparse.push(surrogate_outline_area_only2[0]);
-                                    up.tops[0].fill_sparse.push(surrogate_outline_area_only2[0]);
+                                    up.tops[0].fill_sparse.push(surrogate_outline_area_only2[0]); // DOUBLE-ADD
+                                    // up.tops[0].fill_sparse.push(surrogate_outline_area_only2[0]);
                                     up.virtual_support.push(surrogate_outline_area_only2[0]);
                                 }
 
@@ -2828,88 +2806,89 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
 
                             surrogate.outlines_drawn++;
-                        } else if (surrogate.outlines_drawn < 12) {
-                            if (surrogate.outlines_drawn > 8) {
+                        } 
+                        // else if (surrogate.outlines_drawn < 12) {
+                        //     if (surrogate.outlines_drawn > 8) {
                                 
-                            let geometry_to_use;
-                            if (surrogate.surro.type == "prism") geometry_to_use = surrogate.bottom_geometry_fresh;
-                            else geometry_to_use = surrogate.geometry_fresh;
+                        //     let geometry_to_use;
+                        //     if (surrogate.surro.type == "prism") geometry_to_use = surrogate.bottom_geometry_fresh;
+                        //     else geometry_to_use = surrogate.geometry_fresh;
 
-                            // make surrogate bigger
-                            // let surrogate_enlarged_more = [];
-                            // let surrogate_enlarged = [];
-                            // surrogate_enlarged_more = POLY.expand(surrogate.geometry, 0.4 + surrogate_enlargement, up.z, surrogate_enlarged_more, 1); // For a less tight fit
-                            // surrogate_enlarged = POLY.expand(surrogate.geometry, surrogate_enlargement, up.z, surrogate_enlarged, 1); // For a less tight fit
-                            let surrogate_enlarged = [];
-                            let surrogate_double_enlarged = [];
-                            surrogate_enlarged = POLY.expand(geometry_to_use, 0.4, up.z, surrogate_enlarged, 1);
-                            surrogate_double_enlarged = POLY.expand(surrogate_enlarged, 0.4, up.z, surrogate_double_enlarged, 1); 
+                        //     // make surrogate bigger
+                        //     // let surrogate_enlarged_more = [];
+                        //     // let surrogate_enlarged = [];
+                        //     // surrogate_enlarged_more = POLY.expand(surrogate.geometry, 0.4 + surrogate_enlargement, up.z, surrogate_enlarged_more, 1); // For a less tight fit
+                        //     // surrogate_enlarged = POLY.expand(surrogate.geometry, surrogate_enlargement, up.z, surrogate_enlarged, 1); // For a less tight fit
+                        //     let surrogate_enlarged = [];
+                        //     let surrogate_double_enlarged = [];
+                        //     surrogate_enlarged = POLY.expand(geometry_to_use, 0.4, up.z, surrogate_enlarged, 1);
+                        //     surrogate_double_enlarged = POLY.expand(surrogate_enlarged, 0.4, up.z, surrogate_double_enlarged, 1); 
 
                             
-                            // subtract actual surrogate area to get only the outline
-                            let surrogate_outline_area_only = [];
-                            // POLY.subtract(surrogate_enlarged_more, surrogate_enlarged, surrogate_outline_area_only, null, up.z, min);
-                            POLY.subtract(surrogate_enlarged, geometry_to_use, surrogate_outline_area_only, null, up.z, min);
+                        //     // subtract actual surrogate area to get only the outline
+                        //     let surrogate_outline_area_only = [];
+                        //     // POLY.subtract(surrogate_enlarged_more, surrogate_enlarged, surrogate_outline_area_only, null, up.z, min);
+                        //     POLY.subtract(surrogate_enlarged, geometry_to_use, surrogate_outline_area_only, null, up.z, min);
 
-                            // surrogate_outline_area_only[0].points.forEach(function (point) {
-                            //     point.z = point.z + 3.667686;
-                            // });
+                        //     // surrogate_outline_area_only[0].points.forEach(function (point) {
+                        //     //     point.z = point.z + 3.667686;
+                        //     // });
 
-                            // console.log({next_layer:up.up});
-                            // Add outline to supports (will still be a double outline for now)
-                            if (false) {
-                            //if (!first_placed) { // Switch mode for first outline
-                                up.tops[0].shells.push(surrogate_outline_area_only[0]);
-                                first_placed = true;
-                            } else {
-                                //up.supports.push(surrogate_outline_area_only[0]);
-                                if (!(up.tops[0].fill_sparse)) {
-                                    up.tops[0].fill_sparse = [];
-                                }
-                                if (!(up.virtual_support)) {
-                                    up.virtual_support = [];
-                                } 
-                                surrogate_outline_area_only[0].points.push(surrogate_outline_area_only[0].points[0]);
-                                // console.log({points_poly:surrogate_outline_area_only[0]});
-                                // up.tops[0].fill_sparse.push(surrogate_outline_area_only[0]);
-                                up.tops[0].fill_sparse.push(surrogate_outline_area_only[0]);
-                                up.tops[0].fill_sparse.push(surrogate_outline_area_only[0]);
-                                up.virtual_support.push(surrogate_outline_area_only[0]);
+                        //     // console.log({next_layer:up.up});
+                        //     // Add outline to supports (will still be a double outline for now)
+                        //     if (false) {
+                        //     //if (!first_placed) { // Switch mode for first outline
+                        //         up.tops[0].shells.push(surrogate_outline_area_only[0]);
+                        //         first_placed = true;
+                        //     } else {
+                        //         //up.supports.push(surrogate_outline_area_only[0]);
+                        //         if (!(up.tops[0].fill_sparse)) {
+                        //             up.tops[0].fill_sparse = [];
+                        //         }
+                        //         if (!(up.virtual_support)) {
+                        //             up.virtual_support = [];
+                        //         } 
+                        //         surrogate_outline_area_only[0].points.push(surrogate_outline_area_only[0].points[0]);
+                        //         // console.log({points_poly:surrogate_outline_area_only[0]});
+                        //         // up.tops[0].fill_sparse.push(surrogate_outline_area_only[0]);
+                        //         up.tops[0].fill_sparse.push(surrogate_outline_area_only[0]);
+                        //         up.tops[0].fill_sparse.push(surrogate_outline_area_only[0]);
+                        //         up.virtual_support.push(surrogate_outline_area_only[0]);
                                 
-                                // let supp_minus_outlines = [];
+                        //         // let supp_minus_outlines = [];
 
-                                if (surrogate.outlines_drawn < 10 && surrogate.surro.type == "prism") {
-                                    let surrogate_enlarged2 = [];
-                                    let surrogate_double_enlarged2 = [];
-                                    surrogate_enlarged2 = POLY.expand(surrogate.geometry_fresh, 0.4, up.z, surrogate_enlarged2, 1);
-                                    surrogate_double_enlarged2 = POLY.expand(surrogate_enlarged, 0.4, up.z, surrogate_double_enlarged2, 1); 
-                                    let surrogate_outline_area_only2 = [];
-                                    // POLY.subtract(surrogate_enlarged_more, surrogate_enlarged, surrogate_outline_area_only, null, up.z, min);
-                                    POLY.subtract(surrogate_enlarged2, surrogate.geometry_fresh, surrogate_outline_area_only2, null, up.z, min);
-                                    surrogate_outline_area_only2[0].points.push(surrogate_outline_area_only2[0].points[0]);
-                                    up.tops[0].fill_sparse.push(surrogate_outline_area_only2[0]);
-                                    up.tops[0].fill_sparse.push(surrogate_outline_area_only2[0]);
-                                    up.virtual_support.push(surrogate_outline_area_only2[0]);
-                                }
-
-
-                                // Prevent overlap of outlines and support // LWW TODO: Try adding to support and combine the two
-                                // up.supports = POLY.subtract(up.supports, surrogate_double_enlarged, supp_minus_outlines, null, up.z, min);
+                        //         if (surrogate.outlines_drawn < 10 && surrogate.surro.type == "prism") {
+                        //             let surrogate_enlarged2 = [];
+                        //             let surrogate_double_enlarged2 = [];
+                        //             surrogate_enlarged2 = POLY.expand(surrogate.geometry_fresh, 0.4, up.z, surrogate_enlarged2, 1);
+                        //             surrogate_double_enlarged2 = POLY.expand(surrogate_enlarged, 0.4, up.z, surrogate_double_enlarged2, 1); 
+                        //             let surrogate_outline_area_only2 = [];
+                        //             // POLY.subtract(surrogate_enlarged_more, surrogate_enlarged, surrogate_outline_area_only, null, up.z, min);
+                        //             POLY.subtract(surrogate_enlarged2, surrogate.geometry_fresh, surrogate_outline_area_only2, null, up.z, min);
+                        //             surrogate_outline_area_only2[0].points.push(surrogate_outline_area_only2[0].points[0]);
+                        //             up.tops[0].fill_sparse.push(surrogate_outline_area_only2[0]);
+                        //             up.tops[0].fill_sparse.push(surrogate_outline_area_only2[0]);
+                        //             up.virtual_support.push(surrogate_outline_area_only2[0]);
+                        //         }
 
 
-                                // surrogate.text_posX = (surrogate_outline_area_only[0].bounds.maxx + surrogate_outline_area_only[0].bounds.minx)/2;
-                                // surrogate.text_posY = (surrogate_outline_area_only[0].bounds.maxy + surrogate_outline_area_only[0].bounds.miny)/2;                                
-                            }
+                        //         // Prevent overlap of outlines and support // LWW TODO: Try adding to support and combine the two
+                        //         // up.supports = POLY.subtract(up.supports, surrogate_double_enlarged, supp_minus_outlines, null, up.z, min);
+
+
+                        //         // surrogate.text_posX = (surrogate_outline_area_only[0].bounds.maxx + surrogate_outline_area_only[0].bounds.minx)/2;
+                        //         // surrogate.text_posY = (surrogate_outline_area_only[0].bounds.maxy + surrogate_outline_area_only[0].bounds.miny)/2;                                
+                        //     }
                             
-                            // console.log({surrogate_outline_area_only:surrogate_outline_area_only});
+                        //     // console.log({surrogate_outline_area_only:surrogate_outline_area_only});
 
-                            //console.log({up_support:up.supports});
-                            //up.supports.push(surrogate.geometry[0]);
-                            //console.log({geometry:surrogate.geometry});
+                        //     //console.log({up_support:up.supports});
+                        //     //up.supports.push(surrogate.geometry[0]);
+                        //     //console.log({geometry:surrogate.geometry});
                             
-                            }
-                            surrogate.outlines_drawn++;
-                        }
+                        //     }
+                        //     surrogate.outlines_drawn++;
+                        // }
 
                         // Trying to add outlines directly
                         if (false) { //(surrogate.outlines_drawn >= 2 && surrogate.outlines_drawn <= 3) {
@@ -3231,7 +3210,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                 // if (!textTop.fill_sparse) textTop.fill_sparse = [];
 
                 for (let ascii_poly of ascii_poly_list2)  {
-                    bottom_slice.tops[0].fill_sparse.push(ascii_poly);
+                    // bottom_slice.tops[0].fill_sparse.push(ascii_poly); // DOUBLE-ADD
                     bottom_slice.tops[0].fill_sparse.push(ascii_poly);
                     // bottom_slice.up.tops[0].fill_sparse.push(ascii_poly);
                     // bottom_slice.up.tops[0].fill_sparse.push(ascii_poly);
@@ -3265,7 +3244,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                     const additionalString = "P" + (surrogate_settings.pauseLayers.indexOf(upSupp.insertion_data.printed_layer_index) + 1).toString() + " " +upSupp.surro.id;
                     let ascii_poly_l = generateAsciiPolygons(additionalString, text_posX, text_posY, out_rotation, surrogate_settings.text_size);
                     for (let ascii_poly of ascii_poly_l)  {
-                        bottom_slice.tops[0].fill_sparse.push(ascii_poly);
+                        // bottom_slice.tops[0].fill_sparse.push(ascii_poly); // DOUBLE-ADD
                         bottom_slice.tops[0].fill_sparse.push(ascii_poly);
                         // bottom_slice.up.tops[0].fill_sparse.push(ascii_poly);
                         // bottom_slice.up.tops[0].fill_sparse.push(ascii_poly);
@@ -3331,7 +3310,21 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
         // More logging for research purposes
 
-        const efficiencyData = {numberPauses: surrogate_settings.pauseLayers.length, numberSurrogates: surrogates_placed.length, materialWeightEstimateTube: 0, materialWeightEstimateBar: 0, materialWeightEstimateEllipse: 0, timestamp:bottom_slice.widget.surrogate_data.timestamp, id:bottom_slice.widget.id, previous_volume:pre_surrogate_support_amounts[0], new_volume:post_surrogate_support_amounts[0], volume_percentage_saved:volume_percentage_saved, sTime:sTime};
+
+
+        
+
+        const efficiencyData = {numberPauses: surrogate_settings.pauseLayers.length, numberSurrogates: surrogates_placed.length, materialWeightEstimateTube: 0, materialWeightEstimateBar: 0, materialWeightEstimateEllipse: 0, timestamp:bottom_slice.widget.surrogate_data.timestamp, id:bottom_slice.widget.id, previous_volume:pre_surrogate_support_amounts[0], new_volume:post_surrogate_support_amounts[0], volume_percentage_saved:volume_percentage_saved, sTime:sTime,
+            numberSurrogatesHigh:global_selection_list[2].number_of_surrogates,
+            numberPausesHigh:global_selection_list[2].number_of_interactions,
+            FitnessHigh:global_selection_list[2].result_fitness,
+            numberSurrogatesMedium:global_selection_list[1].number_of_surrogates,
+            numberPausesMedium:global_selection_list[1].number_of_interactions,
+            FitnessMedium:global_selection_list[1].result_fitness,
+            numberSurrogatesLow:global_selection_list[0].number_of_surrogates,
+            numberPausesLow:global_selection_list[0].number_of_interactions,
+            FitnessLow:global_selection_list[0].result_fitness
+        };
 
         console.log({efficiencyData:efficiencyData});
 
@@ -4007,7 +4000,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         surrogate_settings.allow_towers = proc.surrogateTowers;
         // surrogate_settings.allow_height_variable = true;
         // surrogate_settings.allow_stackable = true;
-        surrogate_settings.allow_duplicates = false;
+        surrogate_settings.allow_duplicates = true;
         
 
         let all_slices = [];
@@ -4414,10 +4407,12 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
 
         function generatePrismPolygon(start_x, start_y, start_z, geometry_points, rot, rot_inner, padding, debug_slice) {
-            let rectanglePolygon = base.newPolygon(geometry_points);
+            let geo_p_copy = geometry_points.clone();
+            let rectanglePolygon = base.newPolygon(geo_p_copy);
+            rectanglePolygon = rectanglePolygon.rotateXY(rot_inner - rot); // inner rotation (moving midpoint dead to 0/0/0 in function)
             rectanglePolygon = rectanglePolygon.rotateXYsimple(rot); // simple translation (corner point equivalent on 0/0/0, so just simple rotate)
-            rectanglePolygon = rectanglePolygon.rotateXY(rot_inner); // inner rotation (moving midpoint dead to 0/0/0 in function)
 
+  
             let rectanglePolygon_padded = [];
             rectanglePolygon_padded = POLY.expand([rectanglePolygon], padding, start_z, rectanglePolygon_padded, 1); 
 
@@ -4436,8 +4431,9 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             const halfX = geometry_bounds_poly.bounds.maxx*0.5;
             const halfY = geometry_bounds_poly.bounds.maxy*0.5;
 
-            let rectanglePolygon = base.newPolygon(geometry_points);
-            rectanglePolygon = rectanglePolygon.rotateXY(rot+rot_inner);
+            let geo_p_copy = geometry_points.clone();
+            let rectanglePolygon = base.newPolygon(geo_p_copy);
+            rectanglePolygon = rectanglePolygon.rotateXY(rot_inner);
 
             let rectanglePolygon_padded = [];
             rectanglePolygon_padded = POLY.expand([rectanglePolygon], padding, start_z, rectanglePolygon_padded, 1); 
@@ -8203,7 +8199,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                                 surrogate_outline_area_only[0].points.push(surrogate_outline_area_only[0].points[0]);
                                 // console.log({points_poly:surrogate_outline_area_only[0]});
                                 // up.tops[0].fill_sparse.push(surrogate_outline_area_only[0]);
-                                up.tops[0].fill_sparse.push(surrogate_outline_area_only[0]);
+                                // up.tops[0].fill_sparse.push(surrogate_outline_area_only[0]); // DOUBLE-ADD
                                 up.tops[0].fill_sparse.push(surrogate_outline_area_only[0]);
                                 up.virtual_support.push(surrogate_outline_area_only[0]);
                                 
@@ -8218,7 +8214,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                                     // POLY.subtract(surrogate_enlarged_more, surrogate_enlarged, surrogate_outline_area_only, null, up.z, min);
                                     POLY.subtract(surrogate_enlarged2, surrogate.geometry, surrogate_outline_area_only2, null, up.z, min);
                                     surrogate_outline_area_only2[0].points.push(surrogate_outline_area_only2[0].points[0]);
-                                    up.tops[0].fill_sparse.push(surrogate_outline_area_only2[0]);
+                                    // up.tops[0].fill_sparse.push(surrogate_outline_area_only2[0]); // DOUBLE-ADD
                                     up.tops[0].fill_sparse.push(surrogate_outline_area_only2[0]);
                                     up.virtual_support.push(surrogate_outline_area_only2[0]);
                                 }
@@ -8839,7 +8835,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
                 for (let ascii_poly of ascii_poly_list2)  {
                     bottom_slice.tops[0].fill_sparse.push(ascii_poly);
-                    bottom_slice.tops[0].fill_sparse.push(ascii_poly);
+                    // bottom_slice.tops[0].fill_sparse.push(ascii_poly); // DOUBLE-ADD
                     // bottom_slice.up.tops[0].fill_sparse.push(ascii_poly);
                     // bottom_slice.up.tops[0].fill_sparse.push(ascii_poly);
                     bottom_slice.virtual_support.push(ascii_poly);
@@ -8873,7 +8869,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                     let ascii_poly_l = generateAsciiPolygons(additionalString, text_posX, text_posY, out_rotation, surrogate_settings.text_size);
                     for (let ascii_poly of ascii_poly_l)  {
                         bottom_slice.tops[0].fill_sparse.push(ascii_poly);
-                        bottom_slice.tops[0].fill_sparse.push(ascii_poly);
+                        // bottom_slice.tops[0].fill_sparse.push(ascii_poly); // DOUBLE-ADD
                         // bottom_slice.up.tops[0].fill_sparse.push(ascii_poly);
                         // bottom_slice.up.tops[0].fill_sparse.push(ascii_poly);
                         bottom_slice.virtual_support.push(ascii_poly);
