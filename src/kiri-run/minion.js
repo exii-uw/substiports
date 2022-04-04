@@ -1318,11 +1318,11 @@ const funcs = {
             // Name parameters for easy handling
             let chosen_x = var_list[0];
             let chosen_y = var_list[1];
-            let chosen_rotation = var_list[2];
-            let pso_desired_length = var_list[3];
-            let pso_desired_width = var_list[4];
-            let pso_desired_height = var_list[5];
-            let pso_inner_rot = var_list[6];
+            let pso_desired_length = var_list[2];
+            let pso_desired_width = var_list[3];
+            let pso_desired_height = var_list[4];
+            let pso_inner_rot = var_list[5];
+            let chosen_rotation = var_list[6];
 
             let [ pso_surrogate, pso_idx ] = getBestFittingSurrogateL2(this.surrogate_library, pso_desired_length, pso_desired_width, pso_desired_height);
 
@@ -1558,15 +1558,15 @@ const funcs = {
         // Could give each block a yes/no variable instead of the meta-#-of-surrogates
         pso_variable_list.push({ start: min_x, end: max_x});    // 0: X position
         pso_variable_list.push({ start: min_y, end: max_y});    // 1: Y position
-        pso_variable_list.push({ start: 0, end: 360});          // 2: Rotation in degrees
         // Z height from 0 to model_height for bridge surrogates
         // yes/no switch between index-height and absolute-height method
         // pso_variable_list.push({ start: 0, end: optimizer.surrogate_library.length}); 
                                                                 // 5: Which surrogate was placed: library index, mapped from 0 to library_length
-        pso_variable_list.push({ start: surrogate_settings.smallest_length, end: surrogate_settings.biggest_length});  // 3: Desired length of ideal surrogate, mapped from smallest to biggest available lengths                                                   
-        pso_variable_list.push({ start: surrogate_settings.smallest_width, end: surrogate_settings.biggest_width});  // 4 {10}: Desired length of ideal surrogate, mapped from smallest to biggest available lengths                                                   
-        pso_variable_list.push({ start: surrogate_settings.smallest_height, end: surrogate_settings.biggest_height});  // 5 {11}: Desired length of ideal surrogate, mapped from smallest to biggest available lengths                                                   
-        pso_variable_list.push({ start: 0, end: 360});          // 6: Inner rotation in degrees
+        pso_variable_list.push({ start: surrogate_settings.smallest_length, end: surrogate_settings.biggest_length});  // 2: Desired length of ideal surrogate, mapped from smallest to biggest available lengths                                                   
+        pso_variable_list.push({ start: surrogate_settings.smallest_width, end: surrogate_settings.biggest_width});  // 3 {10}: Desired length of ideal surrogate, mapped from smallest to biggest available lengths                                                   
+        pso_variable_list.push({ start: surrogate_settings.smallest_height, end: surrogate_settings.biggest_height});  // 4 {11}: Desired length of ideal surrogate, mapped from smallest to biggest available lengths                                                   
+        pso_variable_list.push({ start: 0, end: 360});          // 5: Inner rotation in degrees
+        pso_variable_list.push({ start: 0, end: 360});          // 6: Rotation in degrees
         // pso_variable_list.push({ start: 0, end: 1});            // 6: Target extension for height-varying surrogates, 0 = min_height, 1 = max_height
         // pso_variable_list.push({ start: 0, end: 0});            // 7: local meta variable: if this surrogate data should be used or not
         // pso_variable_list.push({ start: 0, end: 0});            // 8: local meta variable: Post-tower X position
@@ -1687,12 +1687,12 @@ const funcs = {
             }
         }
 
-        let t_maxIterations = optimizer.surrogate_settings.max_tower_iterations;
+        // let t_maxIterations = t_optimizer.surrogate_settings.max_tower_iterations;
         let t_iterations = 0;
         let lastFitness = 0;
         let stepFitness = 0;
         function t_loop() {
-            if (t_iterations >= t_maxIterations) {
+            if (t_iterations >= t_optimizer.surrogate_settings.max_tower_iterations) {
                 // log('Max iterations reached. Ending search.');
             }
             else {
@@ -1749,6 +1749,29 @@ const funcs = {
             // Stability check V2 // TODO: Allow altering rotations
             let x_space = (lower_surr.surro.length - pso_surrogate.length - 2.4) * 0.5; // TODO: Set to four times nozzle (+ two times padding size?)
             let y_space = (lower_surr.surro.width - pso_surrogate.width - 2.4) * 0.5;
+
+            let early_switch = false;
+
+            if (x_space < 0) {
+                early_switch = true;
+                var_list[2] = var_list[2] * 0.75; // Look for less long surrogate
+                pso_desired_length = var_list[2];
+            }
+            if (y_space < 0) {
+                early_switch = true;
+                var_list[3] = var_list[3] * 0.75; // Look for less wide surrogate                
+                pso_desired_width = var_list[3];
+            }
+
+            if (early_switch) {
+                let [ new_pso_surrogate, new_pso_idx ] = getBestFittingSurrogateL2(this.surrogate_library, pso_desired_length, pso_desired_width, pso_desired_height);
+                pso_surrogate = new_pso_surrogate;
+                pso_idx = new_pso_idx;
+                x_space = (lower_surr.surro.length - pso_surrogate.length - 2.4) * 0.5; // TODO: Set to four times nozzle (+ two times padding size?)
+                y_space = (lower_surr.surro.width - pso_surrogate.width - 2.4) * 0.5;
+            }
+
+
             if (x_space > 0 && y_space > 0) {
 
                 // Handling without rotation :/
@@ -2133,14 +2156,29 @@ const funcs = {
         pso_tower_var_list.push({ start: surrogate_settings.smallest_length, end: surrogate_settings.biggest_length});  // 2: Desired length of ideal surrogate, mapped from smallest to biggest available lengths                                                   
         pso_tower_var_list.push({ start: surrogate_settings.smallest_width, end: surrogate_settings.biggest_width});  // 3 {10}: Desired length of ideal surrogate, mapped from smallest to biggest available lengths                                                   
         pso_tower_var_list.push({ start: surrogate_settings.smallest_height, end: surrogate_settings.biggest_height});  // 4 {11}: Desired length of ideal surrogate, mapped from smallest to biggest available lengths                                                   
-        pso_tower_var_list.push({ start: 0, end: 360});          // 6: Inner rotation in degrees
+        pso_tower_var_list.push({ start: 0, end: 360});          // 5: Inner rotation in degrees
 
         function removeEquivalentSolutions(solution_list) {
             if (solution_list.length < 2) return solution_list;
             let solution_list_i = solution_list.length - 1;
             let last_fitness = solution_list[solution_list_i].fitness;
             while(solution_list_i--) {
-                if (last_fitness - solution_list[solution_list_i].fitness < 1) {
+                if (last_fitness - solution_list[solution_list_i].fitness < 5) {
+                    solution_list.splice(solution_list_i, 1);
+                } 
+                else {
+                    last_fitness = solution_list[solution_list_i].fitness;
+                }
+            }
+            return solution_list;
+        }
+
+        function removeEquivalentTowerSolutions(solution_list) {
+            if (solution_list.length < 2) return solution_list;
+            let solution_list_i = solution_list.length - 1;
+            let last_fitness = solution_list[solution_list_i].fitness;
+            while(solution_list_i--) {
+                if (last_fitness - solution_list[solution_list_i].fitness < 20) {
                     solution_list.splice(solution_list_i, 1);
                 } 
                 else {
@@ -2209,9 +2247,19 @@ const funcs = {
                     let o_valid_answers = t_optimizer.valid_answers;
 
                     if (o_valid_answers.length > 0) {
-                        if (hightest_tower_found < o_valid_answers[0].tower_size) hightest_tower_found = o_valid_answers[0].tower_size;
+                        if (hightest_tower_found < o_valid_answers[0].tower_size) {
+                            hightest_tower_found = o_valid_answers[0].tower_size;
+                            if (t_optimizer.surrogate_settings.towerParticles > 7) {
+                                t_optimizer.surrogate_settings.towerParticles -= 2;
+                            }
+                            if (hightest_tower_found > 1) {
+                                if (t_optimizer.surrogate_settings.max_tower_iterations > 2) {
+                                    t_optimizer.surrogate_settings.max_tower_iterations -= 1;
+                                }
+                            }
+                        }
                         o_valid_answers = sortSL(o_valid_answers, true);
-                        o_valid_answers = removeEquivalentSolutions(o_valid_answers);
+                        o_valid_answers = removeEquivalentTowerSolutions(o_valid_answers);
                         
                         // let best_tower = getBestResult(o_valid_answers);
                         let best_tower = o_valid_answers[o_valid_answers.length-1];
@@ -2282,7 +2330,7 @@ const funcs = {
                 }
             }
             
-            // console.log({return_list:return_list});
+            console.log({return_list:return_list.length});
         }   
         
         for (let return_obj of return_list) {
@@ -2674,7 +2722,7 @@ const funcs = {
                                 }
 
                                 let tower_selection_options = cartesian(part_ind_lists);
-                                if (tower_selection_options.length > 3) console.log({tower_selection_options:tower_selection_options});
+                                // if (tower_selection_options.length > 3) console.log({tower_selection_options:tower_selection_options});
                                 for (let opt of tower_selection_options) {
                                     let total_surrs = 0;
                                     let total_interaction_set = new Set();
