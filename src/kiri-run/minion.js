@@ -223,12 +223,12 @@ const funcs = {
     surrogateClusterSearch: (data, seq) => {
         var optimizer = new kiri.Optimizer();
         let { slice_stack_data, surrogate_library, hull_points, susu_settings, device, widget } = data;
-        console.log({slice_stack_data:slice_stack_data});
-        console.log({surrogate_library:surrogate_library});
-        console.log({hull_points:hull_points});
-        console.log({susu_settings:susu_settings});
-        console.log({device:device});
-        console.log({widget:widget});
+        // console.log({slice_stack_data:slice_stack_data});
+        // console.log({surrogate_library:surrogate_library});
+        // console.log({hull_points:hull_points});
+        // console.log({susu_settings:susu_settings});
+        // console.log({device:device});
+        // console.log({widget:widget});
 
         /**
          * calculate and return the area enclosed by the polygon.
@@ -307,19 +307,19 @@ const funcs = {
             }
             last_mock_slice = mock_slice;
         }
-        console.log({mock_slice_list:mock_slice_list});
+        // console.log({mock_slice_list:mock_slice_list});
 
         let bottom_slice = mock_slice_list[0];
         susu_settings.all_slices = mock_slice_list;
         susu_settings.start_slice = bottom_slice;
 
-        console.log({bottom_slice: bottom_slice});
-        console.log({susu_settings:susu_settings});
+        // console.log({bottom_slice: bottom_slice});
+        // console.log({susu_settings:susu_settings});
 
-        if (true)
-        {
-            console.log({status:("Threaded search starting handling starts: " + seq.toString())});
-        }
+        // if (true)
+        // {
+        //     console.log({status:("Threaded search starting handling starts: " + seq.toString())});
+        // }
 
         let surros = surrogate_library;
         let surrogate_settings = susu_settings;
@@ -342,7 +342,7 @@ const funcs = {
             }
         }
 
-        console.log({surrogate_settings:surrogate_settings});
+        // console.log({surrogate_settings:surrogate_settings});
 
 
         let minArea = surrogate_settings.supportMinArea,
@@ -1264,27 +1264,27 @@ const funcs = {
         const shift_x =  widget.track.pos.x;
         const shift_y =  widget.track.pos.y;
 
-        console.log({bedDepthArea:bedDepthArea});
-        console.log({bedWidthArea:bedWidthArea});
+        // console.log({bedDepthArea:bedDepthArea});
+        // console.log({bedWidthArea:bedWidthArea});
 
-        console.log({shift_x:shift_x});
-        console.log({shift_y:shift_y});
+        // console.log({shift_x:shift_x});
+        // console.log({shift_y:shift_y});
         
-        let surrogates_placed = [];
-        let try_x = 0;
-        let try_y = 0;
-        let try_z = 0;
-        let try_rotation = 0;
-        let try_surro = 0;
+        // let surrogates_placed = [];
+        // let try_x = 0;
+        // let try_y = 0;
+        // let try_z = 0;
+        // let try_rotation = 0;
+        // let try_surro = 0;
 
-        let pre_surrogate_support_amounts = getTotalSupportVolume(bottom_slice);
+        // let pre_surrogate_support_amounts = getTotalSupportVolume(bottom_slice);
 
         // console.log({pause_layers_start: settings.process.gcodePauseLayers});
 
-        console.log({min_x:min_x});
-        console.log({max_x:max_x});
-        console.log({min_y:min_y});
-        console.log({max_y:max_y});
+        // console.log({min_x:min_x});
+        // console.log({max_x:max_x});
+        // console.log({min_y:min_y});
+        // console.log({max_y:max_y});
 
         const log = function () { console.log(arguments); };
         
@@ -1293,11 +1293,8 @@ const funcs = {
         // Optimizer area ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         let valid_answers = [];
         var optimizer = new kiri.Optimizer();
-        console.log({surros:surros});
         optimizer.surrogate_library = surros;
         optimizer.surrogate_settings = surrogate_settings;
-        console.log({optSet:optimizer.surrogate_settings});
-        console.log({surrogate_settings:surrogate_settings});
         optimizer.valid_answers = [];
         // set the objective function
         optimizer.setObjectiveFunction(function (var_list, done) { 
@@ -1577,38 +1574,36 @@ const funcs = {
             
         // }
 
-        console.log({hull_points:hull_points});
+        // console.log({hull_points:hull_points});
 
         // set an initial population of 20 particles spread across the search space *[-10, 10] x [-10, 10]*
-        optimizer.init(hull_points.length*4 + surrogate_settings.numberOfParticles, pso_variable_list);
+        optimizer.init(surrogate_settings.numberOfParticles, pso_variable_list);
 
-        let particle_counter = 0;
-        for (let point_idx = 1; point_idx < hull_points.length; point_idx++) {
-            let x_dir = hull_points[point_idx-1].x - hull_points[point_idx].x;
-            let y_dir = hull_points[point_idx-1].y - hull_points[point_idx].y;
+        let point_idx = 1;
+        let alternate = true;
+        if (hull_points.length > 1) {
+            for (let particle_counter = 0; particle_counter < surrogate_settings.numberOfParticles * 0.9; particle_counter++) {
+                let x_dir = hull_points[point_idx-1].x - hull_points[point_idx].x;
+                let y_dir = hull_points[point_idx-1].y - hull_points[point_idx].y;
 
-            let hull_rot = Math.atan2(y_dir, x_dir)*180/Math.PI + 180;
-            let hull_rot_90 = hull_rot + 90;
-            
-            optimizer._particles[particle_counter].position[0] = hull_points[point_idx-1].x;
-            optimizer._particles[particle_counter].position[1] = hull_points[point_idx-1].y;
-            optimizer._particles[particle_counter].position[2] = hull_rot;
-            particle_counter++;
-
-            optimizer._particles[particle_counter].position[0] = hull_points[point_idx-1].x;
-            optimizer._particles[particle_counter].position[1] = hull_points[point_idx-1].y;
-            optimizer._particles[particle_counter].position[2] = hull_rot;
-            particle_counter++;
-
-            optimizer._particles[particle_counter].position[0] = hull_points[point_idx].x;
-            optimizer._particles[particle_counter].position[1] = hull_points[point_idx].y;
-            optimizer._particles[particle_counter].position[2] = hull_rot_90;
-            particle_counter++;
-
-            optimizer._particles[particle_counter].position[0] = hull_points[point_idx].x;
-            optimizer._particles[particle_counter].position[1] = hull_points[point_idx].y;
-            optimizer._particles[particle_counter].position[2] = hull_rot_90;
-            particle_counter++;
+                let hull_rot = Math.atan2(y_dir, x_dir)*180/Math.PI + 180;
+                let hull_rot_90 = hull_rot + 90;
+                
+                if (alternate) {
+                    alternate = false;
+                    optimizer._particles[particle_counter].position[0] = hull_points[point_idx-1].x;
+                    optimizer._particles[particle_counter].position[1] = hull_points[point_idx-1].y;
+                    optimizer._particles[particle_counter].position[2] = hull_rot;
+                }
+                else {
+                    alternate = true;
+                    optimizer._particles[particle_counter].position[0] = hull_points[point_idx].x;
+                    optimizer._particles[particle_counter].position[1] = hull_points[point_idx].y;
+                    optimizer._particles[particle_counter].position[2] = hull_rot_90;
+                    point_idx++;
+                    if (point_idx >= hull_points.length) point_idx = 1;
+                }
+            }
         }
 
         // console.log({optimizer_after_init2:optimizer._particles});
@@ -1648,10 +1643,10 @@ const funcs = {
         //     surrogate_settings.best_valid = last_Best;
         // }
 
-        var iterations = 0, maxIterations = 15;
+        var iterations = 0, maxIterations = optimizer.surrogate_settings.max_search_iterations;
         function loop() {
             if (iterations >= maxIterations) { // TODO: Need handling of further execution if this case is reached
-                log('Max iterations reached. Ending search.');
+                // log('Max iterations reached. Ending search.');
             } else {
                 iterations++;
                 // log('Iteration ' + iterations + '/' + maxIterations + ' ');
@@ -1692,7 +1687,7 @@ const funcs = {
             }
         }
 
-        let t_maxIterations = 5;
+        let t_maxIterations = optimizer.surrogate_settings.max_tower_iterations;
         let t_iterations = 0;
         let lastFitness = 0;
         let stepFitness = 0;
@@ -2182,15 +2177,13 @@ const funcs = {
         if (surrogate_number_goal > 0) {
             // log('Starting optimizer');
             loop();
-
             // print the best found fitness value and position in the search space
-            console.log(optimizer.getBestFitness(), optimizer.getBestPosition());
+            // console.log(optimizer.getBestFitness(), optimizer.getBestPosition());
             // Optimizer area ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
             // let pso_position_vars = optimizer.getBestPosition();
 
             valid_answers = sortSL(valid_answers, true);
-
             valid_answers = removeEquivalentSolutions(valid_answers);
             valid_answers.reverse();
             // console.log({all_valid_answers_found:optimizer.valid_answers});
@@ -2203,8 +2196,8 @@ const funcs = {
             let tower_list = [];
             let hightest_tower_found = 0;
             for (let valid_answer of valid_answers) {
-                if (surrogate_settings.allow_towers) {
-                    t_optimizer.init(20, pso_tower_var_list);
+                if (t_optimizer.surrogate_settings.allow_towers) {
+                    t_optimizer.init(t_optimizer.surrogate_settings.towerParticles, pso_tower_var_list);
                     
                     t_optimizer.surrogate_settings.lower_surr = valid_answer; 
                     t_optimizer.valid_answers = [];
@@ -2289,7 +2282,7 @@ const funcs = {
                 }
             }
             
-            console.log({return_list:return_list});
+            // console.log({return_list:return_list});
         }   
         
         for (let return_obj of return_list) {
@@ -2552,7 +2545,7 @@ const funcs = {
             index_array.splice(prune_idx, 1);
         }
 
-        console.log({index_array:index_array});
+        // console.log({index_array:index_array});
 
         let max_rank = 0;
         let graph_ranks = new Set();
@@ -2562,14 +2555,14 @@ const funcs = {
                 max_rank = ge_set.size;
             }
         }
-        console.log({max_rank:max_rank});
+        // console.log({max_rank:max_rank});
         // let graph_ranks_ordered = Array.from(graph_ranks).sort(function(a, b){return a-b});
         // console.log({graph_ranks_ordered:graph_ranks_ordered});
 
         let final_selection_list = [{final_fitness:0}, {final_fitness:0}, {final_fitness:0}]; // low, med, high interaction
 
-        const w_pieces = 0.3;
-        const w_interactions = 0.7;
+        const w_pieces = 0.5;
+        const w_interactions = 0.5;
         const surro_n_p_f_low = surrogate_settings.surrogate_N_penalty_factor_low;
         const surro_n_p_f_med = surrogate_settings.surrogate_N_penalty_factor_med;
         const surro_n_p_f_high = surrogate_settings.surrogate_N_penalty_factor_high;
@@ -2639,17 +2632,16 @@ const funcs = {
                         }
 
                         if (index_array.length > cutoff_size) {
-                            console.log("Shorten list of size: " +index_array.length+ " to size: " +cutoff_size);
+                            // console.log("Shorten list of size: " +index_array.length+ " to size: " +cutoff_size);
 
                             shuffleArray(index_array);
                             let cuttedArr = index_array.splice(cutoff_size-1, index_array.length-cutoff_size); // If there are still too many options (despite all the smart pruning before) to feasibly handle the NP problem, we just have to randomly cut some
-                            console.log({cuttedArr:cuttedArr, index_array:index_array});
+                            // console.log({cuttedArr:cuttedArr, index_array:index_array});
                         }
 
                         var candidate_combinations = k_combinations(index_array, combination_size);
 
-                        console.log({candidate_combinations:candidate_combinations});
-                        
+                        // console.log({candidate_combinations:candidate_combinations});
                         
                         let good_combination = true;
                         for (let combination of candidate_combinations) {
@@ -2708,14 +2700,18 @@ const funcs = {
                         }
 
 
-                    } else console.log("Not enough candidates of that rank exist");
-                } else console.log("No candidates of that rank exist");
+                    } else {
+                        // console.log("Not enough candidates of that rank exist");
+                    }
+                } else {
+                    // console.log("No candidates of that rank exist");
+                }
 
                 if (no_success) combination_size = 100; // Stop loop since no more combinations of this size have been found so combinations of bigger size are impossible 
             }
         }
         
-        console.log({final_selection_list:final_selection_list});
+        // console.log({final_selection_list:final_selection_list});
         reply({ seq, final_selection_list });
     },
 

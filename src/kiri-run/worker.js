@@ -315,8 +315,8 @@ kiri.minions = {
                 candidate_list: candidate_list,
                 allow_duplicates: allow_duplicates
             }, data => { // This handles the data returned by the minion function 
-                console.log({overlapLists:data.graph_edges_sets});
-                console.log({prune_list:data.prune_list});
+                // console.log({overlapLists:data.graph_edges_sets});
+                // console.log({prune_list:data.prune_list});
                 data.kn = kn;
                 resolve(data);
             });
@@ -549,8 +549,6 @@ kiri.worker = {
                 send.data({error: error});
             } else {
                 const slices = widget.slices || [];
-                console.log({widgetslices:widget.slices});
-                console.log({settingsaaa:settings});
 
                 send.data({log:widget.slices[0].efficiencyData});
 

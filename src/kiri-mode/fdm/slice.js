@@ -955,7 +955,6 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             forSlices(0.7, 0.75, slice => {
                 promises.push(doSupport(slice, process, widget.shadow, { exp: isDanger }));
             }, "support");
-            console.log({promises_Support:promises});
             await tracker(promises, (i, t) => {
                 trackupdate(i / t, 0.75, 0.8);
             });
@@ -966,8 +965,8 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             let highest_slice = slices[slices.length-1];
             let bottom_slice = slices[0];
             // doupdate(0, 0.71, 0.8, "surrogating2");
-            console.log({status:"doing surrogates"});
-            console.log({loadedDatanow:loadedData2});
+            // console.log({status:"doing surrogates"});
+            // console.log({loadedDatanow:loadedData2});
             // // let prisms_obj = [{geometry_points:parseSVGFromText(val[0], {x:0, y:10}), name:"bottom_shape", extension_range:0}];
             // let prisms_obj = [{geometry_points:parseSVGFromText(val[0]), name:"bottom_shape", extension_range:0}];
             // // for (let iter = 1; iter < val.length; iter += 1) {
@@ -977,79 +976,20 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             // prisms_obj.push({geometry_points:parseSVGFromText(val[1]), name:"blue_jack", ini_height:48.9, extension_range:35})
             let view = null; // TODO
 
-            console.log({prisms_obj:prisms_obj});
+            // console.log({prisms_obj:prisms_obj});
             let surrogate_library = getSurrogateLibrary(prisms_obj);
-            let [ support_pointsDB, support_points_simpleDB ] = getSupportPointsDebug(bottom_slice, process, settings, surrogate_library);
+            // let [ support_pointsDB, support_points_simpleDB ] = getSupportPointsDebug(bottom_slice, process, settings, surrogate_library);
 
             let [ support_points, support_points_simple ] = getSupportPoints(bottom_slice, process, settings);
 
-            console.log({support_points_simple:support_points_simple});
-            console.log({support_points:support_points});
+            // console.log({support_points_simple:support_points_simple});
+            // console.log({support_points:support_points});
 
-
-
-
-            function k_combinations(set, k) {
-                var i, j, combs, head, tailcombs;
-                
-                // There is no way to take e.g. sets of 5 elements from
-                // a set of 4.
-                if (k > set.length || k <= 0) {
-                    return [];
-                }
-                
-                // K-sized set has only one K-sized subset.
-                if (k == set.length) {
-                    return [set];
-                }
-                
-                // There is N 1-sized subsets in a N-sized set.
-                if (k == 1) {
-                    combs = [];
-                    for (i = 0; i < set.length; i++) {
-                        combs.push([set[i]]);
-                    }
-                    return combs;
-                }
-                
-                combs = [];
-                for (i = 0; i < set.length - k + 1; i++) {
-                    // head is a list that includes only our current element.
-                    head = set.slice(i, i + 1);
-                    // We take smaller combinations from the subsequent elements
-                    tailcombs = k_combinations(set.slice(i + 1), k - 1);
-                    // For each (k-1)-combination we join it with the current
-                    // and store it to the set of k-combinations.
-                    for (j = 0; j < tailcombs.length; j++) {
-                        combs.push(head.concat(tailcombs[j]));
-                    }
-                }
-    
-                return combs;
-            }
-    
-            function only_m_combinations(set, m) {
-                var k, i, combs, k_combs;
-                combs = [];
-                
-                // Calculate all non-empty k-combinations
-                for (k = 0; k <= m; k++) {
-                    k_combs = k_combinations(set, k);
-                    for (i = 0; i < k_combs.length; i++) {
-                        combs.push(k_combs[i]);
-                    }
-                }
-                return combs;
-            }
-    
-
-            let debugList = Array.from(Array(80), () => []);
-            let debugArray = [ ...Array(debugList.length).keys() ];
-    
-            console.log({debugArray:debugArray});
-    
-            var candidate_combinations = only_m_combinations(debugArray, 3); // 500_2, 100_3, 45_4, 30_5...... 21_8 for best single/tower solution from all threads
-            console.log({candidate_combinations:candidate_combinations});
+            // let debugList = Array.from(Array(80), () => []);
+            // let debugArray = [ ...Array(debugList.length).keys() ];
+            // console.log({debugArray:debugArray});
+            // var candidate_combinations = only_m_combinations(debugArray, 3); // 500_2, 100_3, 45_4, 30_5...... 21_8 for best single/tower solution from all threads
+            // console.log({candidate_combinations:candidate_combinations});
 
 
             let susu_data_objs = [];
@@ -1082,9 +1022,9 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             // let surrogate_settings = {};
 
             let sliceStackData = getEncodedData(bottom_slice);
-            console.log({sliceStackData:sliceStackData});
-            console.log({bottomMock:sliceStackData[0]});
-            console.log({bottom_slice:bottom_slice});
+            // console.log({sliceStackData:sliceStackData});
+            // console.log({bottomMock:sliceStackData[0]});
+            // console.log({bottom_slice:bottom_slice});
 
             widget.slices = prepared_slices;
             
@@ -1095,8 +1035,8 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             
     
             let test_poly_list = bottom_slice.topPolys();
-            console.log({bottom_slice:bottom_slice});
-            console.log({test_poly_list:test_poly_list});
+            // console.log({bottom_slice:bottom_slice});
+            // console.log({test_poly_list:test_poly_list});
             
             // let point1 = newPoint(0,0,0);
             // let point2 = newPoint(0,1,0);
@@ -1141,7 +1081,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             // optimizer_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, cluster_list[0].concave_cluster_hulls[0], surrogate_settings, settings.device, bottom_slice.widget, cluster_list[0].kn));
 
             for (let cluster of cluster_list) {
-                console.log({cluster:cluster});
+                // console.log({cluster:cluster});
                 for (let cluster_hull of cluster.concave_cluster_hulls) {
                     optimizer_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, cluster_hull, surrogate_settings, settings.device, bottom_slice.widget, cluster.kn-1)); // kn-1 because we plus1 them when building clusters, but susu_data_objs counting starts at 0
                 }
@@ -1214,7 +1154,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
 
             // let verify_lists = Array.from(Array(kiri.minions.concurrent), () => []);
-            let verify_lists = Array.from(Array(susu_data_objs.length), () => []);
+            // let verify_lists = Array.from(Array(susu_data_objs.length), () => []);
 
             console.log("Starting to prepare verification");
 
@@ -1270,7 +1210,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             if (verify_promises) {
                 for (let p of verify_promises) {
                     p.then(data => {
-                        console.log({verify_data:data});
+                        // console.log({verify_data:data});
                         // graph_edges_sets.push(...data.graph_edges_lists);
                         susu_data_objs[data.kn].graph_edges_sets.push(...data.graph_edges_sets);
                         susu_data_objs[data.kn].prune_list.push(...data.prune_list);
@@ -1304,7 +1244,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             if (validate_promises) {
                 for (let p of validate_promises) {
                     p.then(data => {
-                        console.log({validate_data:data});
+                        // console.log({validate_data:data});
                         susu_data_objs[data.kn].selection_list=data.final_selection_list;
                     });
                 }
@@ -1350,16 +1290,11 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             let placed_surrogates;
             if (surrogate_settings.surrogateInteraction != "off") placed_surrogates = placeSurrogates(global_selection_list, surrogate_settings, surrogate_library, bottom_slice, surrogates_placed);
 
-            console.log({surrogates_placed_list:surrogates_placed});
-            console.log({placed_surrogates:placed_surrogates});
-
+            // console.log({surrogates_placed_list:surrogates_placed});
+            // console.log({placed_surrogates:placed_surrogates});
 
             applySurrogatesToSlices(surrogates_placed, surrogate_settings, bottom_slice, process, view, surrogate_settings.all_slices, pre_surrogate_support_amounts, global_selection_list);
 
-            console.log({outer_api:api});
-            console.log({outer_kiri_api:kiri.api});
-            
-            
             // let index_array = [ ...Array(candidate_list.length).keys() ];
 
             // console.log({index_array:index_array});
@@ -1393,9 +1328,6 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
 
             profileEnd();
-            
-
-            
 
 
             profileStart("support-fill");
@@ -1496,7 +1428,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         // }
 
         // bottom_slice = last_bottom_slice;
-        console.log({bottom_slice: bottom_slice});
+        // console.log({bottom_slice: bottom_slice});
 
         let search_density = 1;
         let search_padding = 0; // TODO: Adjust to size of surrogate/largest surrogate?
@@ -1530,7 +1462,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                 }
             }
 
-            console.log({valid_points_length:valid_points.length});
+            // console.log({valid_points_length:valid_points.length});
 
             // Also add outlines of all polygons to get high fidelity clusters
             for (let support_poly of bottom_slice.supports)  {
@@ -1605,7 +1537,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         // }
 
         // bottom_slice = last_bottom_slice;
-        console.log({bottom_slice: bottom_slice});
+        // console.log({bottom_slice: bottom_slice});
 
         let search_density = 1;
         let search_padding = 0; // TODO: Adjust to size of surrogate/largest surrogate?
@@ -1639,7 +1571,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                 }
             }
 
-            console.log({valid_points_length:valid_points.length});
+            // console.log({valid_points_length:valid_points.length});
 
             // Also add outlines of all polygons to get high fidelity clusters
             for (let support_poly of bottom_slice.supports)  {
@@ -1698,7 +1630,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             }
         }
         // valid_points.push(...supp_outline_points);
-        console.log({valid_points:valid_points});
+        // console.log({valid_points:valid_points});
 
         // Calculate clusters.
 
@@ -1713,7 +1645,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         //  var hull = new HULL.hull();
         // var colorHull = HULL.hull(colors2, 500);
 
-        console.log({kiri:kiri});
+        // console.log({kiri:kiri});
         // console.log(kiri.hull());
 
         for (let cluster of clusters) {
@@ -1735,7 +1667,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             }
             hull_points.pop();
             let debug_outline_poly = base.newPolygon(hull_points);
-            console.log({debug_outline_poly:debug_outline_poly});
+            // console.log({debug_outline_poly:debug_outline_poly});
             bottom_slice.tops[0].fill_sparse.push(debug_outline_poly);
 
             function generateRectanglePolygonCenteredDEBUG(start_x, start_y, start_z, length, width, rot, padding, debug_slice) {
@@ -2239,6 +2171,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         }
 
         function checkVolumeAndCollisionsStack(all_slices, sliceIndexListList, try_surro_polygons_list, defaultHeight, addHeight) {
+            console.log({all_slices:all_slices});
             let new_volume = 0;
             let old_volume = 0;
 
@@ -2321,13 +2254,49 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             return sliceIndexList;
         }
 
+        function getStackableIndexList(precomputed_slice_heights, startHeight, addMaxNumber, addHeight) {
+            let sliceIndexListList = [];
+            let sliceIndexOneList = [];
+            let skip = true;
+            let counter = 1;
+            let currentEndHeight = startHeight + addHeight;
+            for (let sliceIndex = 0; sliceIndex < precomputed_slice_heights.length-1; sliceIndex++){
+                if (skip && precomputed_slice_heights[sliceIndex].skipBelow >= startHeight) skip = false; // Start checking 
+                if (precomputed_slice_heights[sliceIndex].stopAbove >= currentEndHeight) {
+                    sliceIndexListList.push(sliceIndexOneList);
+                    sliceIndexOneList = [sliceIndex];
+                    currentEndHeight = currentEndHeight + addHeight;
+                    counter += 1;
+                    if (counter > addMaxNumber) break;
+                }
+                else if (!skip) sliceIndexOneList.push(sliceIndex);
+            }
+            for (let listsIdx = 0; listsIdx < sliceIndexListList.length; listsIdx++) {
+                let reorderedList = []
+                reorderedList.push(sliceIndexListList[listsIdx].shift()); // Add first and last layer
+                reorderedList.push(sliceIndexListList[listsIdx].pop());
+
+                shuffleArray(sliceIndexListList[listsIdx]);
+                reorderedList.push(...sliceIndexListList[listsIdx]);
+                sliceIndexListList[listsIdx] = reorderedList;
+            }
+            return sliceIndexListList;
+        }
+
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+        }
+
         function makeCandidate(cd) {
             let candidate_detail = cd.candidate_details;
 
             counter++;
-            console.log({candidate_number:counter, useOrIgnore:candidate_detail.use_me});
+            // console.log({candidate_number:counter, useOrIgnore:candidate_detail.use_me});
 
-            console.log({surrogate_library:surrogate_library});
+            // console.log({surrogate_library:surrogate_library});
             for (let surro of surrogate_library) { // Update surrogate reference
                 if (surro.id == candidate_detail.candidate_obj.surro.id) {
                     // if (surro.type == "prism") {
@@ -2373,7 +2342,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                 surrogates_placed.push(candidate_detail.candidate_obj);
                 candidate_detail.candidate_obj.surro.available = false; // Mark surro as used
 
-                console.log({placed_surro_name:candidate_detail.candidate_obj.surro.id});
+                // console.log({placed_surro_name:candidate_detail.candidate_obj.surro.id});
 
                 // Try skipping this stuff and using delivered details instead
                 // if (candidate_detail.candidate_obj.surro.type !== "simpleRectangle") {
@@ -2399,7 +2368,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                 // Adjust position/rotation to lower surrogate in tower
                 if (candidate_detail.tower_details.tower_x !== null) {
                     is_tower = true;
-                    console.log({tower_details:candidate_detail.tower_details});
+                    // console.log({tower_details:candidate_detail.tower_details});
                     try_rotation = candidate_detail.tower_details.tower_rot;
                     try_x = candidate_detail.tower_details.tower_x;
                     try_y = candidate_detail.tower_details.tower_y;
@@ -2408,17 +2377,14 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                 let pso_polygons_list = [];
                 let prism_bottoms = [];
                 // let finalHeight = try_z + try_surro.height;
-                let finalHeight = candidate_detail.candidate_obj.end_height;
-                let id_extension;
+                // let finalHeight = candidate_detail.candidate_obj.end_height;
+                let id_extension = candidate_detail.candidate_obj.end_height - try_z;
+                id_extension = '_' + id_extension + 'mm';
 
                 // TODO Switch to tower/non-tower variants of the functions respectively
                 if (try_surro.type == "simpleRectangle") {
                     if (is_tower) pso_polygons_list = [generateRectanglePolygonCentered(try_x, try_y, try_z, try_surro.length, try_surro.width, try_rotation, surrogate_settings.surrogate_padding, bottom_slice)];
-                    else pso_polygons_list = [generateRectanglePolygon(try_x, try_y, try_z, try_surro.length, try_surro.width, try_rotation, surrogate_settings.surrogate_padding, bottom_slice)];
-                    
-                    console.log({globalSurroGeometry: pso_polygons_list});
-                    console.log({minionSurroGeometry: candidate_detail.candidate_obj.geometry});
-                
+                    else pso_polygons_list = [generateRectanglePolygon(try_x, try_y, try_z, try_surro.length, try_surro.width, try_rotation, surrogate_settings.surrogate_padding, bottom_slice)];              
                 }
                 else if (try_surro.type == "prism") {
                     if (is_tower) pso_polygons_list = [generatePrismPolygonCentered(try_x, try_y, try_z, try_surro.prism_geometry, try_rotation, try_inner_rot, surrogate_settings.surrogate_padding, bottom_slice)];
@@ -2433,18 +2399,21 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
                     if (is_tower) prism_bottoms = [generatePrismPolygonCentered(try_x, try_y, try_z, try_surro.bottom_geometry, try_rotation, try_inner_rot, surrogate_settings.surrogate_padding, bottom_slice)]; // TODO align these using SVG viewbox
                     else prism_bottoms = [generatePrismPolygon(try_x, try_y, try_z, try_surro.bottom_geometry, try_rotation, try_inner_rot, surrogate_settings.surrogate_padding, bottom_slice)]; // TODO align these using SVG viewbox
-                    const extensionIndexList = getSliceIndexList(surrogate_settings.precomputed_slice_heights, try_z + try_surro.minHeight, try_z + try_surro.maxHeight);
-                    const extensionData = checkVolumeAndCollisionsExtend(surrogate_settings.all_slices, extensionIndexList, pso_polygons_list, finalHeight);
-                    finalHeight = extensionData[0];
+                    // const extensionIndexList = getSliceIndexList(surrogate_settings.precomputed_slice_heights, try_z + try_surro.minHeight, try_z + try_surro.maxHeight);
+                    // const extensionData = checkVolumeAndCollisionsExtend(surrogate_settings.all_slices, extensionIndexList, pso_polygons_list, finalHeight);
+                    // finalHeight = extensionData[0];
                     // console.log({note:"ComparePrism", finalHeight:finalHeight, end_height:candidate_detail.candidate_obj.end_height});
                 } else {
-                    if (is_tower) pso_polygons_list = [generateRectanglePolygonCentered(try_x, try_y, try_z, try_surro.length, try_surro.width, try_rotation, surrogate_settings.surrogate_padding, bottom_slice)];
-                    else pso_polygons_list = [generateRectanglePolygon(try_x, try_y, try_z, try_surro.length, try_surro.width, try_rotation, surrogate_settings.surrogate_padding, bottom_slice)];
-                    const stackIndexList = getStackableIndexList(surrogate_settings.precomputed_slice_heights, try_z + try_surro.minHeight, try_surro.addMaxNumber, try_surro.addHeight);
-                    const stackingData = checkVolumeAndCollisionsStack(surrogate_settings.all_slices, stackIndexList, pso_polygons_list, finalHeight, try_surro.addHeight);
-                    finalHeight = stackingData[0];
-                    id_extension = stackingData[2];
-                    console.log({note:"CompareStack", finalHeight:finalHeight, end_height:candidate_detail.candidate_obj.end_height});
+                    // if (is_tower) pso_polygons_list = [generateRectanglePolygonCentered(try_x, try_y, try_z, try_surro.length, try_surro.width, try_rotation, surrogate_settings.surrogate_padding, bottom_slice)];
+                    // else pso_polygons_list = [generateRectanglePolygon(try_x, try_y, try_z, try_surro.length, try_surro.width, try_rotation, surrogate_settings.surrogate_padding, bottom_slice)];
+                    // const stackIndexList = getStackableIndexList(surrogate_settings.precomputed_slice_heights, try_z + try_surro.minHeight, try_surro.addMaxNumber, try_surro.addHeight);
+                    // const stackingData = checkVolumeAndCollisionsStack(surrogate_settings.all_slices, stackIndexList, pso_polygons_list, finalHeight, try_surro.addHeight);
+                    // finalHeight = stackingData[0];
+                    // id_extension = stackingData[2];
+                    // console.log({stackingData:stackingData});
+                    // console.log({note:"CompareStack", finalHeight:finalHeight, end_height:candidate_detail.candidate_obj.end_height});
+                    // console.log({note:"CompareStack2", pso_polygons_list:pso_polygons_list, geo:candidate_detail.candidate_obj.geometry});
+
                 }
 
                 // generate candidate and validation insertion case and layer
@@ -2499,7 +2468,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             let single_candidate = makeCandidate(candidate.cd);
             let tower_candidates = [];
             tower_candidates.push(single_candidate);
-            console.log({candidate:candidate});
+            // console.log({candidate:candidate});
             if (candidate.tower_step_selection > 0) {
                 for (let above_cd of candidate.cd.aboves[candidate.tower_step_selection]) {
                     let above_candidate = makeCandidate(above_cd);
@@ -2514,11 +2483,11 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                 return 0;
             });
 
-            console.log({tower_candidates:tower_candidates});
+            // console.log({tower_candidates:tower_candidates});
             
             if (tower_candidates.length > 1) {
                 for (let tower_candidate = 0; tower_candidate < tower_candidates.length; tower_candidate++) {
-                    console.log({tower_candidate:tower_candidate});
+                    // console.log({tower_candidate:tower_candidate});
                     if (tower_candidate > 0) {
                         tower_candidates[tower_candidate-1].candidate_details.candidate_obj.up_surrogate.push(tower_candidates[tower_candidate].candidate_details.candidate_obj);
                         tower_candidates[tower_candidate].candidate_details.candidate_obj.down_surrogate.push(tower_candidates[tower_candidate-1].candidate_details.candidate_obj);
@@ -2530,7 +2499,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             all_candidates.push(...tower_candidates);
         }
 
-        console.log({all_candidates:all_candidates});
+        // console.log({all_candidates:all_candidates});
         return all_candidates;
     }
 
@@ -2543,13 +2512,13 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             if (settings.process.gcodePauseLayers == null) settings.process.gcodePauseLayers = "";
             if (settings.process.gcodePauseLayers != "") settings.process.gcodePauseLayers += ",";
             settings.process.gcodePauseLayers += insertion_layer_index.toString();
-            console.log({pauselayer:insertion_layer_index});
-            console.log({pause_layers:settings.process.gcodePauseLayers});
+            // console.log({pauselayer:insertion_layer_index});
+            // console.log({pause_layers:settings.process.gcodePauseLayers});
             surrogate_settings.pauseLayers.push(insertion_layer_index);
             surrogate_settings.pauseLayers.sort(function(a, b) {
                 return a - b;
             });
-            console.log({pauseLayers:surrogate_settings.pauseLayers});
+            // console.log({pauseLayers:surrogate_settings.pauseLayers});
         }
 
         function getTotalSupportVolume(bottom_slice) {
@@ -2947,7 +2916,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                     // Add pause layer at index of already printed layer
                     addPauseLayer(surrogates_at_this_index[0].insertion_data.printed_layer_index, settings, surrogate_settings);
 
-                    console.log({surrogates_at_this_index:surrogates_at_this_index});
+                    // console.log({surrogates_at_this_index:surrogates_at_this_index});
                     let new_layer_height_range = get_height_range(iterating_down);
                     let printed_layer_height_range = get_height_range(iterating_down.down);
                     let new_layer_new_height_values;
@@ -3035,8 +3004,8 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                             });
 
 
-                            console.log({collected_polygons:collect_all_polygons_removed_from_support});
-                            console.log({collected_surrogate_geometries:collect_all_surrogate_geometries_removed_from_support});
+                            // console.log({collected_polygons:collect_all_polygons_removed_from_support});
+                            // console.log({collected_surrogate_geometries:collect_all_surrogate_geometries_removed_from_support});
                             // Get only the support on top of the current surrogate by subtracting original supports minus remaining supports/surrogates
                             // Must do this in two separate steps, otherwise the subtract function adds a new polygon where support/surrogate outlines meet
                             if (collect_all_polygons_removed_from_support.length > 0) {
@@ -3085,9 +3054,9 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                                 correcting_chain.index = correcting_chain.index + 1;
                             }
 
-                            console.log({slide_in_slice:slide_in_slice});
-                            console.log({iterating_down:iterating_down.index});
-                            console.log({Case:"Insert_new_support_layer"})
+                            // console.log({slide_in_slice:slide_in_slice});
+                            // console.log({iterating_down:iterating_down.index});
+                            // console.log({Case:"Insert_new_support_layer"})
 
                             // Now skip the newly added slice
                             iterating_down = iterating_down.down;
@@ -3096,17 +3065,17 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                             let highest_height = surrogates_at_this_index[0].insertion_data.max_height;
                             new_layer_new_height_values = get_slice_height_values(new_layer_height_range.top_height, highest_height);
                             printed_layer_new_height_values = get_slice_height_values(highest_height, printed_layer_height_range.bottom_height);
-                            console.log({iterating_down:iterating_down.index});
-                            console.log({Case:"extend_printed_layer"})
-                            console.log({highest_height:highest_height});
+                            // console.log({iterating_down:iterating_down.index});
+                            // console.log({Case:"extend_printed_layer"})
+                            // console.log({highest_height:highest_height});
                         }
                         else if (surrogates_at_this_index[0].insertion_data.insertion_case === "extend_new_layer") {
                             let lowest_height = surrogates_at_this_index[0].insertion_data.min_height;
                             new_layer_new_height_values = get_slice_height_values(new_layer_height_range.top_height, lowest_height);
                             printed_layer_new_height_values = get_slice_height_values(lowest_height, printed_layer_height_range.bottom_height);
-                            console.log({iterating_down:iterating_down.index});
-                            console.log({Case:"extend_new_layer"})
-                            console.log({lowest_height:lowest_height});
+                            // console.log({iterating_down:iterating_down.index});
+                            // console.log({Case:"extend_new_layer"})
+                            // console.log({lowest_height:lowest_height});
                         }
                     }
                     if (change_slices) {
@@ -3117,9 +3086,9 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
                         
                         
-                        console.log({printed_layer_height_range:printed_layer_height_range});
-                        console.log({changed_slice:iterating_down});
-                        console.log({all_slices:all_slices});
+                        // console.log({printed_layer_height_range:printed_layer_height_range});
+                        // console.log({changed_slice:iterating_down});
+                        // console.log({all_slices:all_slices});
                         console.log({insertion_case:surrogates_at_this_index[0].insertion_data.insertion_case});
                     }
                 }
@@ -3133,7 +3102,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             for (let draw_pause_text_idx = 0; draw_pause_text_idx < surrogates_placed.length; draw_pause_text_idx++) {
                 let currentSurrogate = surrogates_placed[draw_pause_text_idx];
                 // let iterateSurrogate = surrogates_placed[draw_pause_text_idx];
-                console.log({insertData:currentSurrogate});
+                // console.log({insertData:currentSurrogate});
                 if (currentSurrogate.starting_height > 0) continue;
 
                 let text_rotation = currentSurrogate.rotation;
@@ -3186,10 +3155,8 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                         topOrBottom = false;
                     }
 
-                    
-
-                    console.log({Dist1:midPoint.distTo2D(textOption1)});
-                    console.log({Dist2:midPoint.distTo2D(textOption2)});
+                    // console.log({Dist1:midPoint.distTo2D(textOption1)});
+                    // console.log({Dist2:midPoint.distTo2D(textOption2)});
 
                 }
 
@@ -3224,13 +3191,13 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
                 }
 
-                console.log({pauseLayers:surrogate_settings.pauseLayers});
-                console.log({thisSurrogateLayer:currentSurrogate.insertion_data.printed_layer_index});
-                console.log({pauseLayersIndex:surrogate_settings.pauseLayers.indexOf(Math.floor(currentSurrogate.insertion_data.printed_layer_index))}); 
+                // console.log({pauseLayers:surrogate_settings.pauseLayers});
+                // console.log({thisSurrogateLayer:currentSurrogate.insertion_data.printed_layer_index});
+                // console.log({pauseLayersIndex:surrogate_settings.pauseLayers.indexOf(Math.floor(currentSurrogate.insertion_data.printed_layer_index))}); 
 
                 
 
-                console.log({towersurrs:tower_surrogates});
+                // console.log({towersurrs:tower_surrogates});
 
                 tower_surrogates.forEach(function(upSupp) {
                     if (true) {
@@ -3255,7 +3222,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         }
 
         let post_surrogate_support_amounts = getTotalSupportVolume(bottom_slice);
-        console.log({post_surrogate_support_amounts:post_surrogate_support_amounts});
+        // console.log({post_surrogate_support_amounts:post_surrogate_support_amounts});
 
         let volume_saved = pre_surrogate_support_amounts[0] - post_surrogate_support_amounts[0];
         let volume_percentage_saved = volume_saved / pre_surrogate_support_amounts[0];
@@ -3296,11 +3263,6 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         // download(bottom_slice.widget.stats.timestamp+"_"+bottom_slice.widget.id+".txt", csv_log);
 
         // API.event.emit('log.file', {any:"thing"});
-
-        console.log({kiri:kiri});
-        console.log({kiriapi:kiri.api});
-        console.log({api:api});
-
 
         // kiri.api.event.emit('log.fileDetail', {timestamp:bottom_slice.widget.surrogate_data.timestamp, id:bottom_slice.widget.id, previous_volume:pre_surrogate_support_amounts[0], new_volume:post_surrogate_support_amounts[0], volume_percentage_saved:volume_percentage_saved});
 
@@ -3352,9 +3314,9 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         // csv_log += ","+efficiencyData.id+",,"+efficiencyData.previous_volume+","+efficiencyData.new_volume+","+efficiencyData.volume_percentage_saved+",,,,";
 
         // download(efficiencyData.timestamp+"_"+efficiencyData.id+".txt", csv_log);
-        console.log({slicing_results_obj:efficiencyData});
+        // console.log({slicing_results_obj:efficiencyData});
         // console.log({theWidget:bottom_slice.widget});
-        console.log({surrogate_all_slices:all_out_slices});
+        // console.log({surrogate_all_slices:all_out_slices});
 
     }
 
@@ -3481,7 +3443,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
     }
 
     function getSurrogateLibrary(prisms) {
-        console.log({prisms:prisms});
+        // console.log({prisms:prisms});
         let surrogates = [];
         // surrogates.push({width:100.5, length:152.7, height:10.9});
         // surrogates.push({width:136.8, length:190.1, height:24.1});
@@ -3491,7 +3453,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             const halfX = geometry_bounds_poly.bounds.maxx*0.5;
             const halfY = geometry_bounds_poly.bounds.maxy*0.5;
             
-            console.log({geometry_points:geometry_points});
+            // console.log({geometry_points:geometry_points});
             let rectanglePolygon = base.newPolygon(geometry_points);
 
             let rectanglePolygon_padded = [];
@@ -3535,83 +3497,83 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         }
         
         // Autosort this and use old automated stackable add method...
-/*
+
         addOption(surrogates, 93.8, 89.9, 3.33, "floppyx1");
         addOption(surrogates, 154.3, 105, 5.35, "saw plate");
-        // addOption(surrogates, 137.5, 55.57, 6.62, "wood plate");
-        // addOption(surrogates, 208.8, 164, 6.66, "wood plate large");
-        // addOption(surrogates, 93.8, 89.9, 6.66, "floppyx2");
-        // addOption(surrogates, 128.52, 68.25, 8.75, "medium dense foam plate");
+        addOption(surrogates, 137.5, 55.57, 6.62, "wood plate");
+        addOption(surrogates, 208.8, 164, 6.66, "wood plate large");
+        addOption(surrogates, 93.8, 89.9, 6.66, "floppyx2");
+        addOption(surrogates, 128.52, 68.25, 8.75, "medium dense foam plate");
 
-        // addOption(surrogates, 73, 10.43, 9.5, "support bar");
-        // // addOption(surrogates, 93.8, 89.9, 9.99, "floppyx3");
+        addOption(surrogates, 73, 10.43, 9.5, "support bar");
+        // addOption(surrogates, 93.8, 89.9, 9.99, "floppyx3");
         addOption(surrogates, 44.35, 18.33, 10.16, "wood bar4"); // addOption(surrogates, 44.35, 18.33, 10.16, "wood bar dirty");
         addOption(surrogates, 49.8, 47.4, 10.5, "blue support");
         addOption(surrogates, 27.31, 23.75, 10.55, "support flat");
-        // addOption(surrogates, 97, 18.35, 11.18, "wood bar3"); //addOption(surrogates, 97, 18.35, 11.18, "wood bar two holes");
-        // addOption(surrogates, 100.75, 18.52, 12.2, "wood bar2"); // addOption(surrogates, 100.75, 18.52, 12.2, "wood bar math");
+        addOption(surrogates, 97, 18.35, 11.18, "wood bar3"); //addOption(surrogates, 97, 18.35, 11.18, "wood bar two holes");
+        addOption(surrogates, 100.75, 18.52, 12.2, "wood bar2"); // addOption(surrogates, 100.75, 18.52, 12.2, "wood bar math");
 
         addOption(surrogates, 31.85, 15.9, 12.75, "Lego 4x2x1");
 
-        // // addOption(surrogates, 31.85, 31.85, 12.75, "Lego 4x4x1");
-        // // addOption(surrogates, 63.77, 31.85, 12.75, "Lego 8x4x1");
-        // // addOption(surrogates, 93.8, 89.9, 13.32, "floppyx4");
-        // // addOption(surrogates, 31.85, 15.9, 15.9, "Lego 4x2x1.3");
-        // // addOption(surrogates, 31.85, 31.85, 15.9, "Lego 4x4x1.3");
-        // // addOption(surrogates, 63.77, 31.85, 15.9, "Lego 8x4x1.3");
-        // addOption(surrogates, 68.26, 50.46, 13.1, "wood flat");
-        // // addOption(surrogates, 183.5, 80.1, 14.7, "foam plate");
-        // addOption(surrogates, 45.15, 23.35, 14.82, "dark wood");
-        // // addOption(surrogates, 93.8, 89.9, 16.65, "floppyx5");
-        // addOption(surrogates, 51, 25, 18.55, "wood offcut1"); // addOption(surrogates, 51, 25, 18.55, "wood man hair");
-        // addOption(surrogates, 52.22, 24.9, 18.6, "wood bar");
-        // addOption(surrogates, 50.4, 24.95, 18.62, "wood offcut2"); // addOption(surrogates, 50.4, 24.95, 18.62, "wood man");
-        // addOption(surrogates, 25.05, 25.05, 18.8, "wood cube"); // addOption(surrogates, 25.05, 25.05, 18.8, "cube with dent");
-        // // addOption(surrogates, 93.8, 89.9, 19.98, "floppyx6");
-        // // addOption(surrogates, 31.85, 15.9, 22.3, "Lego 4x2x2");
-        // // addOption(surrogates, 31.85, 31.85, 22.3, "Lego 4x4x2");
-        // // addOption(surrogates, 63.77, 31.85, 22.3, "Lego 8x4x2");
-        // // addOption(surrogates, 93.8, 89.9, 23.31, "floppyx7");
-        // // addOption(surrogates, 24.4, 24.4, 24.4, "XYZ cube filled");
-        // // addOption(surrogates, 31.85, 15.9, 25.45, "Lego 4x2x2.3");
-        // // addOption(surrogates, 31.85, 31.85, 25.45, "Lego 4x4x2.3");
-        // // addOption(surrogates, 63.77, 31.85, 25.45, "Lego 8x4x2.3");
-        // // addOption(surrogates, 93.8, 89.9, 26.64, "floppyx8");
-        // // addOption(surrogates, 93.8, 89.9, 29.97, "floppyx9");
-        // addOption(surrogates, 49.8, 47.4, 30.5, "blue support big");
-        // addOption(surrogates, 80.0, 70.0, 50.5, "cardboard box 1");
-        // // addOption(surrogates, 31.85, 15.9, 31.85, "Lego 4x2x3");
-        // // addOption(surrogates, 31.85, 31.85, 31.85, "Lego 4x4x3");
-        // // addOption(surrogates, 63.77, 31.85, 31.85, "Lego 8x4x3");
-        // // addOption(surrogates, 31.85, 15.9, 35, "Lego 4x2x3.3");
-        // // addOption(surrogates, 31.85, 31.85, 35, "Lego 4x4x3.3");
-        // // addOption(surrogates, 63.77, 31.85, 35, "Lego 8x4x3.3");
-        // // addOption(surrogates, 110.1, 101.75, 37.15, "mpow box");
-        // // addOption(surrogates, 172.5, 144.6, 37.3, "scale box");
-        // // addOption(surrogates, 31.85, 15.9, 41.4, "Lego 4x2x4");
-        // // addOption(surrogates, 31.85, 31.85, 41.4, "Lego 4x4x4");
-        // // addOption(surrogates, 63.77, 31.85, 41.4, "Lego 8x4x4");
-        // // addOption(surrogates, 31.85, 15.9, 44.55, "Lego 4x2x4.3");
-        // // addOption(surrogates, 31.85, 31.85, 44.55, "Lego 4x4x4.3");
-        // // addOption(surrogates, 63.77, 31.85, 44.55, "Lego 8x4x4.3");
+        // addOption(surrogates, 31.85, 31.85, 12.75, "Lego 4x4x1");
+        // addOption(surrogates, 63.77, 31.85, 12.75, "Lego 8x4x1");
+        // addOption(surrogates, 93.8, 89.9, 13.32, "floppyx4");
+        // addOption(surrogates, 31.85, 15.9, 15.9, "Lego 4x2x1.3");
+        // addOption(surrogates, 31.85, 31.85, 15.9, "Lego 4x4x1.3");
+        // addOption(surrogates, 63.77, 31.85, 15.9, "Lego 8x4x1.3");
+        addOption(surrogates, 68.26, 50.46, 13.1, "wood flat");
+        // addOption(surrogates, 183.5, 80.1, 14.7, "foam plate");
+        addOption(surrogates, 45.15, 23.35, 14.82, "dark wood");
+        // addOption(surrogates, 93.8, 89.9, 16.65, "floppyx5");
+        addOption(surrogates, 51, 25, 18.55, "wood offcut1"); // addOption(surrogates, 51, 25, 18.55, "wood man hair");
+        addOption(surrogates, 52.22, 24.9, 18.6, "wood bar");
+        addOption(surrogates, 50.4, 24.95, 18.62, "wood offcut2"); // addOption(surrogates, 50.4, 24.95, 18.62, "wood man");
+        addOption(surrogates, 25.05, 25.05, 18.8, "wood cube"); // addOption(surrogates, 25.05, 25.05, 18.8, "cube with dent");
+        // addOption(surrogates, 93.8, 89.9, 19.98, "floppyx6");
+        // addOption(surrogates, 31.85, 15.9, 22.3, "Lego 4x2x2");
+        // addOption(surrogates, 31.85, 31.85, 22.3, "Lego 4x4x2");
+        // addOption(surrogates, 63.77, 31.85, 22.3, "Lego 8x4x2");
+        // addOption(surrogates, 93.8, 89.9, 23.31, "floppyx7");
+        // addOption(surrogates, 24.4, 24.4, 24.4, "XYZ cube filled");
+        // addOption(surrogates, 31.85, 15.9, 25.45, "Lego 4x2x2.3");
+        // addOption(surrogates, 31.85, 31.85, 25.45, "Lego 4x4x2.3");
+        // addOption(surrogates, 63.77, 31.85, 25.45, "Lego 8x4x2.3");
+        // addOption(surrogates, 93.8, 89.9, 26.64, "floppyx8");
+        // addOption(surrogates, 93.8, 89.9, 29.97, "floppyx9");
+        addOption(surrogates, 49.8, 47.4, 30.5, "blue support big");
+        addOption(surrogates, 80.0, 70.0, 50.5, "cardboard box 1");
+        // addOption(surrogates, 31.85, 15.9, 31.85, "Lego 4x2x3");
+        // addOption(surrogates, 31.85, 31.85, 31.85, "Lego 4x4x3");
+        // addOption(surrogates, 63.77, 31.85, 31.85, "Lego 8x4x3");
+        // addOption(surrogates, 31.85, 15.9, 35, "Lego 4x2x3.3");
+        // addOption(surrogates, 31.85, 31.85, 35, "Lego 4x4x3.3");
+        // addOption(surrogates, 63.77, 31.85, 35, "Lego 8x4x3.3");
+        // addOption(surrogates, 110.1, 101.75, 37.15, "mpow box");
+        // addOption(surrogates, 172.5, 144.6, 37.3, "scale box");
+        // addOption(surrogates, 31.85, 15.9, 41.4, "Lego 4x2x4");
+        // addOption(surrogates, 31.85, 31.85, 41.4, "Lego 4x4x4");
+        // addOption(surrogates, 63.77, 31.85, 41.4, "Lego 8x4x4");
+        // addOption(surrogates, 31.85, 15.9, 44.55, "Lego 4x2x4.3");
+        // addOption(surrogates, 31.85, 31.85, 44.55, "Lego 4x4x4.3");
+        // addOption(surrogates, 63.77, 31.85, 44.55, "Lego 8x4x4.3");
 
         addOption(surrogates, 63.77, 31.85, 63.65, "Lego 8x4x6.3");
 
-*/
+
         addPrism(surrogates, prisms[0], prisms[1]);
         // addPrism(surrogates, prisms[0], prisms[1]);
 
-        // addStackableOptions(surrogates, 12.75, 9.55, 4, 31.85, 15.9, "Lego 4x2");
-        // addOption(surrogates, 126.35, 125.6, 52.32, "leap box");
-        // addPrism(surrogates, prisms[0], prisms[2]);
+        addStackableOptions(surrogates, 12.75, 9.55, 4, 31.85, 15.9, "Lego 4x2");
+        addOption(surrogates, 126.35, 125.6, 52.32, "leap box");
+        addPrism(surrogates, prisms[0], prisms[2]);
         // addPrism(surrogates, prisms[0], prisms[2]);
         // addPrism(surrogates, prisms[0], prisms[2]);
         
-        // addStackableOptions(surrogates, 15.9, 9.55, 4, 31.85, 15.9, "Lego+4x2");
-        // addStackableOptions(surrogates, 12.75, 9.55, 5, 31.85, 31.85, "Lego 4x4");
-        // addStackableOptions(surrogates, 15.9, 9.55, 5, 31.85, 31.85, "Lego+4x4");
-        // addStackableOptions(surrogates, 12.75, 9.55, 6, 63.77, 31.85, "Lego 4x8");
-        // addStackableOptions(surrogates, 15.9, 9.55, 6, 63.77, 31.85, "Lego+4x8");
+        addStackableOptions(surrogates, 15.9, 9.55, 4, 31.85, 15.9, "Lego+4x2");
+        addStackableOptions(surrogates, 12.75, 9.55, 5, 31.85, 31.85, "Lego 4x4");
+        addStackableOptions(surrogates, 15.9, 9.55, 5, 31.85, 31.85, "Lego+4x4");
+        addStackableOptions(surrogates, 12.75, 9.55, 6, 63.77, 31.85, "Lego 4x8");
+        addStackableOptions(surrogates, 15.9, 9.55, 6, 63.77, 31.85, "Lego+4x8");
         // for (let i = 1; i < prisms.length; i++){
         //     addPrism(surrogates, prisms[0], prisms[i]);
         // }
@@ -3867,7 +3829,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         }
 
         bottom_slice = last_bottom_slice;
-        console.log({bottom_slice: bottom_slice});
+        // console.log({bottom_slice: bottom_slice});
 
         let up = bottom_slice;
 
@@ -3881,33 +3843,33 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
         // Have all settings available in parallel
         surrogate_settings.interaction_N_penalty_factor_high = 0.0;
-        surrogate_settings.surrogate_N_penalty_factor_high = 0.0;
-        surrogate_settings.interaction_N_penalty_factor_med = 0.3;
-        surrogate_settings.surrogate_N_penalty_factor_med = 0.65;
-        surrogate_settings.interaction_N_penalty_factor_low = 0.35;
-        surrogate_settings.surrogate_N_penalty_factor_low = 0.8;
+        surrogate_settings.surrogate_N_penalty_factor_high = surrogate_settings.interaction_N_penalty_factor_high*0.9;
+
+        surrogate_settings.interaction_N_penalty_factor_med = 0.6;
+        surrogate_settings.surrogate_N_penalty_factor_med = surrogate_settings.interaction_N_penalty_factor_med*0.9;
+        
+        surrogate_settings.interaction_N_penalty_factor_low = 1;
+        surrogate_settings.surrogate_N_penalty_factor_low = surrogate_settings.interaction_N_penalty_factor_low*0.9;
+        
+        surrogate_settings.simplification_factor = 3.5;
 
 
         if (proc.surrogateInteraction == "off") {
-            surrogate_settings.minVolume = 10;
             surrogate_settings.interaction_N_penalty_factor = 0;
             surrogate_settings.surrogate_N_penalty_factor = 0;
             surrogate_settings.searchspace_min_number_of_surrogates = 0;
             surrogate_settings.surrogateInteraction = "off";
         } else if(proc.surrogateInteraction == "low") {
-            surrogate_settings.minVolume = 100;
             surrogate_settings.interaction_N_penalty_factor = 0.35;
             surrogate_settings.surrogate_N_penalty_factor = 0.8;
             surrogate_settings.searchspace_min_number_of_surrogates = 2;
             surrogate_settings.surrogateInteraction = "low";
         } else if(proc.surrogateInteraction == "medium") {
-            surrogate_settings.minVolume = 50;
             surrogate_settings.interaction_N_penalty_factor = 0.3;
             surrogate_settings.surrogate_N_penalty_factor = 0.65;
             surrogate_settings.searchspace_min_number_of_surrogates = 3;
             surrogate_settings.surrogateInteraction = "medium";
         } else if(proc.surrogateInteraction == "high") {
-            surrogate_settings.minVolume = 10;
             surrogate_settings.interaction_N_penalty_factor = 0.0;
             surrogate_settings.surrogate_N_penalty_factor = 0.0;
             surrogate_settings.searchspace_min_number_of_surrogates = 5;
@@ -3915,38 +3877,54 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         }
 
         if (proc.surrogateSearchQual == "fastest") {
+            surrogate_settings.minVolume = 100;
             surrogate_settings.exploration_factor = 0.3;
-            surrogate_settings.simplification_factor = 4.0;
-            surrogate_settings.search_persistance = 4;
-            surrogate_settings.minImprovementPercentage = 0.08;
-            surrogate_settings.numberOfParticles = 10;
+            // surrogate_settings.simplification_factor = 4.0;
+            surrogate_settings.search_persistance = 3;
+            surrogate_settings.minImprovementPercentage = 0.09;
+            surrogate_settings.numberOfParticles = 150;
+            surrogate_settings.towerParticles = 10;
+            surrogate_settings.max_search_iterations = 11;
+            surrogate_settings.max_tower_iterations = 4;
             surrogate_settings.searchspace_max_number_of_surrogates = 4;
             surrogate_settings.surrogateSearchQual = "fastest";
             
         } else if(proc.surrogateSearchQual == "fair") {
+            surrogate_settings.minVolume = 80;
             surrogate_settings.exploration_factor = 0.2;
-            surrogate_settings.simplification_factor = 3.5;
-            surrogate_settings.search_persistance = 5;
-            surrogate_settings.minImprovementPercentage = 0.04;
-            surrogate_settings.numberOfParticles = 15;
+            // surrogate_settings.simplification_factor = 3.5;
+            surrogate_settings.search_persistance = 4;
+            surrogate_settings.minImprovementPercentage = 0.08;
+            surrogate_settings.numberOfParticles = 200;
+            surrogate_settings.towerParticles = 14;
+            surrogate_settings.max_search_iterations = 13;
+            surrogate_settings.max_tower_iterations = 5;
             surrogate_settings.searchspace_max_number_of_surrogates = 5;
             surrogate_settings.surrogateSearchQual = "fair";
 
         } else if(proc.surrogateSearchQual == "good") {
-            surrogate_settings.exploration_factor = 0.12;
-            surrogate_settings.simplification_factor = 3;
+            surrogate_settings.minVolume = 60;
+            surrogate_settings.exploration_factor = 0.15;
+            // surrogate_settings.simplification_factor = 3;
             surrogate_settings.search_persistance = 5;
-            surrogate_settings.minImprovementPercentage = 0.015;
-            surrogate_settings.numberOfParticles = 20;
+            surrogate_settings.minImprovementPercentage = 0.06;
+            surrogate_settings.numberOfParticles = 250;
+            surrogate_settings.towerParticles = 18;
+            surrogate_settings.max_search_iterations = 15;
+            surrogate_settings.max_tower_iterations = 6;
             surrogate_settings.searchspace_max_number_of_surrogates = 6;
             surrogate_settings.surrogateSearchQual = "good";
 
         } else if(proc.surrogateSearchQual == "best") {
-            surrogate_settings.exploration_factor = 0.0;
-            surrogate_settings.simplification_factor = 2.5;
-            surrogate_settings.search_persistance = 8;
-            surrogate_settings.minImprovementPercentage = 0.01;
-            surrogate_settings.numberOfParticles = 30;//275;
+            surrogate_settings.minVolume = 40;
+            surrogate_settings.exploration_factor = 0.1;
+            // surrogate_settings.simplification_factor = 2.5;
+            surrogate_settings.search_persistance = 6;
+            surrogate_settings.minImprovementPercentage = 0.04;
+            surrogate_settings.numberOfParticles = 275;//275;
+            surrogate_settings.towerParticles = 22;
+            surrogate_settings.max_search_iterations = 17;
+            surrogate_settings.max_tower_iterations = 7;
             surrogate_settings.searchspace_max_number_of_surrogates = 7;
             surrogate_settings.surrogateSearchQual = "best";
         }
@@ -3965,11 +3943,11 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         const shift_x = bottom_slice.widget.track.pos.x;
         const shift_y = bottom_slice.widget.track.pos.y;
 
-        console.log({bedDepthArea:bedDepthArea});
-        console.log({bedWidthArea:bedWidthArea});
+        // console.log({bedDepthArea:bedDepthArea});
+        // console.log({bedWidthArea:bedWidthArea});
 
-        console.log({shift_x:shift_x});
-        console.log({shift_y:shift_y});
+        // console.log({shift_x:shift_x});
+        // console.log({shift_y:shift_y});
 
         let rotations = [0,45,90,135,180,225,270,315];
         let layer_height_fudge = settings.process.sliceHeight/1.75;
@@ -4272,10 +4250,10 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         surrogate_settings.total_surrogate_volume = pre_surrogate_support_amounts[0];
         surrogate_settings.total_surrogate_area = pre_surrogate_support_amounts[1];
 
-        console.log({min_x:min_x});
-        console.log({max_x:max_x});
-        console.log({min_y:min_y});
-        console.log({max_y:max_y});
+        // console.log({min_x:min_x});
+        // console.log({max_x:max_x});
+        // console.log({min_y:min_y});
+        // console.log({max_y:max_y});
 
         return [ all_slices, surrogate_settings, pre_surrogate_support_amounts ];
     }
@@ -4644,7 +4622,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             surrogate_settings.pauseLayers.sort(function(a, b) {
                 return a - b;
             });
-            console.log({pauseLayers:surrogate_settings.pauseLayers});
+            // console.log({pauseLayers:surrogate_settings.pauseLayers});
         }
 
         function getSliceIndexList(precomputed_slice_heights, startHeight, endHeight) {
@@ -5259,12 +5237,12 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                     });
 
                     const collision_area = pre_collision_area - post_collision_area;
-                    // if (collision_area < -0.00000001) {
-                    //     console.log({WARNING:"AAAAAAAAAAA ABS NEEDED"});
-                    //     console.log({collision_area:collision_area});
-                    // }
+                    if (collision_area < -0.00000001) {
+                        console.log({WARNING:"AAAAAAAAAAA ABS NEEDED"});
+                        console.log({collision_area:collision_area});
+                    }
                     
-                    if ((collision_area) > 0.00001) { // rounded the same 
+                    if ((collision_area) > 0.001) { // rounded the same 
                         issueFound = true;
                         break;
                     }
@@ -5874,9 +5852,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         }
 
         bottom_slice = last_bottom_slice;
-        console.log({bottom_slice: bottom_slice});
-
-
+        // console.log({bottom_slice: bottom_slice});
 
         let up = bottom_slice, up_collision_check = bottom_slice;
 
@@ -6066,11 +6042,11 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         const shift_x = bottom_slice.widget.track.pos.x;
         const shift_y = bottom_slice.widget.track.pos.y;
 
-        console.log({bedDepthArea:bedDepthArea});
-        console.log({bedWidthArea:bedWidthArea});
+        // console.log({bedDepthArea:bedDepthArea});
+        // console.log({bedWidthArea:bedWidthArea});
 
-        console.log({shift_x:shift_x});
-        console.log({shift_y:shift_y});
+        // console.log({shift_x:shift_x});
+        // console.log({shift_y:shift_y});
         
         let repetition_goal = 10000;
         let surrogates_placed = [];
@@ -6789,14 +6765,14 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
                     repetition_counter++;
                 }
-                console.log({best_delta_volume:best_delta_volume});
-                console.log({epsilon_0_counter:epsilon_0_counter});
+                // console.log({best_delta_volume:best_delta_volume});
+                // console.log({epsilon_0_counter:epsilon_0_counter});
                 //test_surro_rectangle_list.push(place_one_surro.geometry[0])
                 if (best_delta_volume > 1) { // TODO
                     surrogates_placed.push(place_one_surro);
                     place_one_surro.surro.available = false; // Mark surro as used
 
-                    console.log({placed_surro_name:place_one_surro.surro.id});
+                    // console.log({placed_surro_name:place_one_surro.surro.id});
                     // console.log({the_surro:place_one_surro.surro});
                     // console.log({the_surro2:surros[try_surro_index]});
                 }
@@ -7831,11 +7807,11 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
                 let pso_position_vars = optimizer.getBestPosition();
 
-                console.log({all_valid_answers_found:optimizer.valid_answers});
+                // console.log({all_valid_answers_found:optimizer.valid_answers});
                 console.log({all_valid_answers_found_global:valid_answers});
 
                 let best_result = getBestResult(optimizer.valid_answers);
-                console.log({best_result:best_result});
+                // console.log({best_result:best_result});
 
 
                 let counter = 0;
@@ -7846,7 +7822,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                     // console.log(pso_position_vars[pso_result_surrogate_index * surrogate_settings.number_of_vars + 7]);
                     // console.log({candidate_number:pso_result_surrogate_index, useOrIgnore:valid_answers[pso_result_surrogate_index].use}); // Faulty?? valid answers is all answers, not just the best/last?
                     counter++;
-                    console.log({candidate_number:counter, useOrIgnore:candidate_detail.use_me});
+                    // console.log({candidate_number:counter, useOrIgnore:candidate_detail.use_me});
                     // if (pso_position_vars[pso_result_surrogate_index * surrogate_settings.number_of_vars + 7] > 0.999999 && pso_position_vars[pso_result_surrogate_index * surrogate_settings.number_of_vars + 7] < 1.000001) {// If surrogate was placed without problem by PSO
                     if (candidate_detail.use_me) { // If surrogate was placed without problem by PSO
                     // if (pso_use_this_surrogate == 1) {// If surrogate was placed without problem by PSO
@@ -8087,7 +8063,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                         surrogates_placed.push(candidate);
                         candidate.surro.available = false; // Mark surro as used
         
-                        console.log({placed_surro_name:candidate.surro.id});
+                        // console.log({placed_surro_name:candidate.surro.id});
 
                     }
                 }
@@ -8662,9 +8638,9 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                                 correcting_chain.index = correcting_chain.index + 1;
                             }
 
-                            console.log({slide_in_slice:slide_in_slice});
-                            console.log({iterating_down:iterating_down.index});
-                            console.log({Case:"Insert_new_support_layer"})
+                            // console.log({slide_in_slice:slide_in_slice});
+                            // console.log({iterating_down:iterating_down.index});
+                            // console.log({Case:"Insert_new_support_layer"})
 
                             // Now skip the newly added slice
                             iterating_down = iterating_down.down;
@@ -8673,17 +8649,17 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                             let highest_height = surrogates_at_this_index[0].insertion_data.max_height;
                             new_layer_new_height_values = get_slice_height_values(new_layer_height_range.top_height, highest_height);
                             printed_layer_new_height_values = get_slice_height_values(highest_height, printed_layer_height_range.bottom_height);
-                            console.log({iterating_down:iterating_down.index});
-                            console.log({Case:"extend_printed_layer"})
-                            console.log({highest_height:highest_height});
+                            // console.log({iterating_down:iterating_down.index});
+                            // console.log({Case:"extend_printed_layer"})
+                            // console.log({highest_height:highest_height});
                         }
                         else if (surrogates_at_this_index[0].insertion_data.insertion_case === "extend_new_layer") {
                             let lowest_height = surrogates_at_this_index[0].insertion_data.min_height;
                             new_layer_new_height_values = get_slice_height_values(new_layer_height_range.top_height, lowest_height);
                             printed_layer_new_height_values = get_slice_height_values(lowest_height, printed_layer_height_range.bottom_height);
-                            console.log({iterating_down:iterating_down.index});
-                            console.log({Case:"extend_new_layer"})
-                            console.log({lowest_height:lowest_height});
+                            // console.log({iterating_down:iterating_down.index});
+                            // console.log({Case:"extend_new_layer"})
+                            // console.log({lowest_height:lowest_height});
                         }
                     }
                     if (change_slices) {
@@ -8694,9 +8670,9 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
                         
                         
-                        console.log({printed_layer_height_range:printed_layer_height_range});
-                        console.log({changed_slice:iterating_down});
-                        console.log({all_slices:all_slices});
+                        // console.log({printed_layer_height_range:printed_layer_height_range});
+                        // console.log({changed_slice:iterating_down});
+                        // console.log({all_slices:all_slices});
                         console.log({insertion_case:surrogates_at_this_index[0].insertion_data.insertion_case});
                     }
                 }
@@ -8710,7 +8686,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             for (let draw_pause_text_idx = 0; draw_pause_text_idx < surrogates_placed.length; draw_pause_text_idx++) {
                 let currentSurrogate = surrogates_placed[draw_pause_text_idx];
                 // let iterateSurrogate = surrogates_placed[draw_pause_text_idx];
-                console.log({insertData:currentSurrogate});
+                // console.log({insertData:currentSurrogate});
                 if (currentSurrogate.starting_height > 0) continue;
 
                 let text_rotation = currentSurrogate.rotation;
@@ -9060,7 +9036,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
 
         let post_surrogate_support_amounts = getTotalSupportVolume(bottom_slice);
-        console.log({post_surrogate_support_amounts:post_surrogate_support_amounts});
+        // console.log({post_surrogate_support_amounts:post_surrogate_support_amounts});
 
         let volume_saved = pre_surrogate_support_amounts[0] - post_surrogate_support_amounts[0];
         let volume_percentage_saved = volume_saved / pre_surrogate_support_amounts[0];

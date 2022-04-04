@@ -244,7 +244,7 @@ function prepareSlices(callback, scale = 1, offset = 0) {
         event.emit('slice.end', settings.mode);
         // print stats
         segtimes.total = Date.now() - mark;
-        console.log(segtimes);
+        // console.log(segtimes);
 
         // Log to file
         // LWW Hack to get one widget (first)
@@ -254,9 +254,7 @@ function prepareSlices(callback, scale = 1, offset = 0) {
             if (firstWidget === null) {
                 firstWidget = widget;
             }
-            console.log({one_slicing_widget:widget});
         }
-        console.log({renderapi:api});
 
         api.event.emit('log.file', {surrogating_times:surrogating_times, segtimes:segtimes, timestamp:firstWidget.surrogate_data.timestamp, startStamp:alwaysStartTime});
 

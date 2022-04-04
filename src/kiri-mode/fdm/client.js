@@ -561,7 +561,7 @@ FDM.init = function(kiri, api) {
             }
         }
 
-        console.log({eventDataTimingLog:timingData});
+        // console.log({eventDataTimingLog:timingData});
         let csv_log = "";
 
         // Header
@@ -607,7 +607,7 @@ FDM.init = function(kiri, api) {
 
         download2("SuSu_"+efficiencyData.id+".txt2", csv_log);
 
-        console.log({eventDataDetailLog:efficiencyData});
+        // console.log({eventDataDetailLog:efficiencyData});
     });
 
     // More logging for research purposes
@@ -634,7 +634,7 @@ FDM.init = function(kiri, api) {
 
         download2("SuSt_"+timeData.id+".txt", csv_log);
 
-        console.log({eventDataTimeLogFile:timeData});
+        // console.log({eventDataTimeLogFile:timeData});
     });
 
 }
