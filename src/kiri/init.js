@@ -1777,6 +1777,7 @@ gapp.register("kiri.init", [], (root, exports) => {
             sliceTopLayers:      uc.newInput(LANG.sl_ltop_s, {title:LANG.sl_ltop_l, convert:uc.toInt, modes:FDM}),
             sliceSolidLayers:    uc.newInput(LANG.sl_lsld_s, {title:LANG.sl_lsld_l, convert:uc.toInt, modes:FDM}),
             sliceBottomLayers:   uc.newInput(LANG.sl_lbot_s, {title:LANG.sl_lbot_l, convert:uc.toInt, modes:FDM}),
+            sliceStopLayer:      uc.newInput(LANG.sl_lstp_s, {title:LANG.sl_lstp_l, convert:uc.toInt, modes:FDM}), // LWW
             fdmSep:              uc.newBlank({class:"pop-sep", modes:FDM}),
             sliceDetectThin:     uc.newSelect(LANG.ad_thin_s, {title: LANG.ad_thin_l, action: thinWallSave}, "thin"),
             sliceAdaptive:       uc.newBoolean(LANG.ad_adap_s, onBooleanClick, {title: LANG.ad_adap_l, modes:FDM, trigger: true}),
@@ -1930,6 +1931,7 @@ gapp.register("kiri.init", [], (root, exports) => {
             sliceShellOrder:     uc.newSelect(LANG.sl_ordr_s, {title:LANG.sl_ordr_l, modes:FDM}, "shell"),
             sliceLayerStart:     uc.newSelect(LANG.sl_strt_s, {title:LANG.sl_strt_l, modes:FDM}, "start"),
             fdmSep:              uc.newBlank({class:"pop-sep", modes:FDM}),
+            gcodePauseLayers:    uc.newInput(LANG.ag_paws_s, {title:LANG.ag_paws_l, modes:FDM, comma:true}),
             outputLayerRetract:  uc.newBoolean(LANG.ad_lret_s, onBooleanClick, {title:LANG.ad_lret_l, modes:FDM}),
             outputAvoidGaps:     uc.newBoolean(LANG.ad_agap_s, onBooleanClick, {title:LANG.ad_agap_l, modes:FDM}),
             outputBeltFirst:     uc.newBoolean(LANG.ad_lbir_s, onBooleanClick, {title:LANG.ad_lbir_l, show: isBelt, modes:FDM}),

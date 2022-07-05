@@ -184,6 +184,11 @@ FDM.export = function(print, online, ondone, ondebug) {
     }
     let loops = isBelt && rloops.length ? rloops : undefined;
 
+    (process.gcodePauseLayers || "").split(",").forEach(function(lv) {
+        let v = parseInt(lv);
+        if (v >= 0) pause.push(v);
+    });
+
     function append(line) {
         if (line) {
             lines++;
@@ -502,6 +507,33 @@ FDM.export = function(print, online, ondone, ondebug) {
         if (isBelt) {
             pos.z = zpos;
         }
+
+        let newPauseCmd = [];
+        // if (pauseCmd && pause.indexOf(layer) >= 0) {
+        //     appendAllSub(pauseCmd)
+        // }
+        // LWW TODO: Fix loading this from the device/printer file 
+        if (true) {
+            // pauseCmd = [];
+            newPauseCmd.push("; Stopping now!");
+            newPauseCmd.push("M300 S1200 P100 ; beep three times");
+            newPauseCmd.push("M300 S0 P100");
+            newPauseCmd.push("M300 S1200 P100");
+            newPauseCmd.push("M300 S0 P100");
+            newPauseCmd.push("M300 S1200 P100");
+            newPauseCmd.push("M300 S0 P100");
+            newPauseCmd.push("G1 X2.500 Y207.870 Z200.000; parking position for easy access");
+            newPauseCmd.push("M1 Insert scrap now; user stop");
+            newPauseCmd.push("; M105; return to current temp");
+            newPauseCmd.push("M117 Insert scrap now");
+            newPauseCmd.push("G28 Y");
+        }
+
+        // Append pause commands (including automatically generated pauses)
+        if ((newPauseCmd && pause.indexOf(layer) >= 0) || layer == process.sliceStopLayer) {
+            appendAllSub(newPauseCmd)
+        }
+
 
         if (gcodePause && pause.indexOf(layer) >= 0) {
             appendAllSub(gcodePause)

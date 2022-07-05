@@ -605,7 +605,7 @@ FDM.init = function(kiri, api) {
         csv_log += ","+efficiencyData.id+","+efficiencyData.sTime+","+efficiencyData.previous_volume+","+efficiencyData.new_volume+","+efficiencyData.volume_percentage_saved+","+efficiencyData.materialWeightEstimateEllipse.toString()+",,,"+efficiencyData.numberSurrogates.toString()+","+efficiencyData.numberPauses.toString()+",,";
         csv_log += ","+efficiencyData.numberSurrogatesHigh+","+efficiencyData.numberPausesHigh+","+efficiencyData.FitnessHigh+","+efficiencyData.numberSurrogatesMedium+","+efficiencyData.numberPausesMedium+","+efficiencyData.FitnessMedium+","+efficiencyData.numberSurrogatesLow+","+efficiencyData.numberPausesLow+","+efficiencyData.FitnessLow;
 
-        download2("SuSu_"+efficiencyData.id+".txt2", csv_log);
+        download2("SuSu_"+efficiencyData.id+".txt", csv_log);
 
         // console.log({eventDataDetailLog:efficiencyData});
     });

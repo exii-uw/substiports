@@ -1360,13 +1360,13 @@ const funcs = {
                 done(fitness);
             } else {                
                 const sliceIndexList = getSliceIndexList(this.surrogate_settings.precomputed_slice_heights, pso_z, pso_z + pso_surrogate.minHeight)
+                
                 let splitLists = reorderSliceIndexList(sliceIndexList, this.surrogate_settings.skimPercentage);
                 let quickList = splitLists[0];
                 let remainderList = splitLists[1];
 
                 //   var_list[7] = 0;
                 // pso_use_this_surrogate = 0;
-
                 // let pso_collision_and_volumes = checkVolumeAndCollisions(this.surrogate_library, this.surrogate_settings, this.surrogate_settings.start_slice, library_index, pso_polygons_list, pso_z, all_surrogates);
                 let pso_collision_and_volumes = checkVolumeAndCollisionsListQuick(this.surrogate_settings.all_slices, quickList, sliceIndexList.length, pso_polygons_list, all_surrogates);
                 // console.log({pso_collision_and_volumes:pso_collision_and_volumes});
@@ -1927,14 +1927,21 @@ const funcs = {
                     let quickList = splitLists[0];
                     let remainderList = splitLists[1];
 
+                    let pso_collision_and_volumes;
+
                     //   var_list[7] = 0;
                     // pso_use_this_surrogate = 0;
-
-                    // let pso_collision_and_volumes = checkVolumeAndCollisions(this.surrogate_library, this.surrogate_settings, this.surrogate_settings.start_slice, library_index, pso_polygons_list, pso_z, all_surrogates);
-                    let pso_collision_and_volumes = checkVolumeAndCollisionsListQuick(this.surrogate_settings.all_slices, quickList, sliceIndexList.length, pso_polygons_list, all_surrogates);
-                    // console.log({pso_collision_and_volumes:pso_collision_and_volumes});
-                    // const delta_volume = pso_collision_and_volumes[1] - pso_collision_and_volumes[2];
+                    if (quickList) {
+                        // let pso_collision_and_volumes = checkVolumeAndCollisions(this.surrogate_library, this.surrogate_settings, this.surrogate_settings.start_slice, library_index, pso_polygons_list, pso_z, all_surrogates);
+                        pso_collision_and_volumes = checkVolumeAndCollisionsListQuick(this.surrogate_settings.all_slices, quickList, sliceIndexList.length, pso_polygons_list, all_surrogates);
+                        // console.log({pso_collision_and_volumes:pso_collision_and_volumes});
+                        // const delta_volume = pso_collision_and_volumes[1] - pso_collision_and_volumes[2];
+                    }
+                    else {
+                        pso_collision_and_volumes = [true, 0, 1, 0, 0, 1];
+                    }
                     let delta_volume_estimate = pso_collision_and_volumes[1];
+                    
                     if (pso_surrogate.type != "simpleRectangle") delta_volume_estimate = delta_volume_estimate * pso_surrogate.maxHeight / pso_surrogate.minHeight; // Stretch estimate to max height
                     if (delta_volume_estimate > this.surrogate_settings.minVolume) {
                         // console.log({delta_volume_estimate:delta_volume_estimate});
@@ -2296,6 +2303,7 @@ const funcs = {
             while(jump_index <= simple_list.length) {
                 return_list.push(simple_list[jump_index-1]);
                 jump_index = Math.ceil(jump_index * 1.5);
+                // jump_index = jump_index +1;
             }
 
             for (let tower_size = 2; tower_size <= hightest_tower_found; tower_size++) { // get best* towers for each discovered size

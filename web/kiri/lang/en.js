@@ -308,6 +308,8 @@ self.kiri.lang['en-us'] = {
     sl_lbot_l:      ["number of solid layers","to enforce at the","bottom of the print"],
     ad_adap_s:      "adaptive",
     ad_adap_l:      ["use adaptive layer heights","with 'layer height' as max","and 'layer min' as the min"],
+    sl_lstp_s:      "stop layer",
+    sl_lstp_l:      "where to stop mid-print",
 
     // FDM SHELLS
     sl_shel_s:      "shell count",
@@ -683,8 +685,8 @@ self.kiri.lang['en-us'] = {
     ag_nozl_l:      "select output nozzle or head",
     ag_peel_s:      "peel guard",
     ag_peel_l:      ["starting at this belt z position","periodically roll the print off and","back on to the belt to unstick it","and prevent rolling deflection"],
-    // ag_paws_s:      "pause layers",
-    // ag_paws_l:      ["comma-separated list of layers","to inject pause commands before"],
+    ag_paws_s:      "pause layers",
+    ag_paws_l:      ["comma-separated list of layers","to inject pause commands before"],
     // ag_loop_s:      "loop layers",
     // ag_loop_l:      ["layer ranges to repeat in the format","first-last-count,first-last-count,...","omitted count = 1"],
     ag_loop_s:      "loop count",

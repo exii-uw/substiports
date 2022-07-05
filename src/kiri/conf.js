@@ -274,6 +274,7 @@ const conf = exports({
                 maxHeight: 150,
                 gcodePre: [],
                 gcodePost: [],
+                gcodePause: [],
                 gcodeProc: "",
                 gcodeFan: [],
                 gcodeTrack: [],
@@ -326,6 +327,7 @@ const conf = exports({
                 sliceSolidLayers: 3,
                 sliceBottomLayers: 3,
                 sliceTopLayers: 3,
+                sliceStopLayer: 999,
                 firstSliceHeight: 0.25,
                 firstLayerRate: 30,
                 firstLayerFillRate: 35,
@@ -377,6 +379,8 @@ const conf = exports({
                 zHopDistance: 0.2,
                 arcTolerance: 0,
                 antiBacklash: 1,
+                gcodePause: "",
+                gcodePauseLayers: "0",
                 ranges: []
             }
         },
