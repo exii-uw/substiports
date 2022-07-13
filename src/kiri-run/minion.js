@@ -1297,8 +1297,8 @@ const funcs = {
         optimizer.surrogate_settings = surrogate_settings;
         optimizer.valid_answers = [];
         // set the objective function
-        optimizer.setObjectiveFunction(function (var_list, done) { 
-            // if (var_list[0] < 1) var_list[0] = 1.0;
+        optimizer.setObjectiveFunction(function (particle, done) { 
+            // if (particle.position[0] < 1) particle.position[0] = 1.0;
 
             // placeAndEval function, original source
             let all_surrogates = [];
@@ -1316,13 +1316,13 @@ const funcs = {
             let tower_details = {tower_x:null, tower_y:null, tower_rot:null};
 
             // Name parameters for easy handling
-            let chosen_x = var_list[0];
-            let chosen_y = var_list[1];
-            let pso_desired_length = var_list[2];
-            let pso_desired_width = var_list[3];
-            let pso_desired_height = var_list[4];
-            let pso_inner_rot = var_list[5];
-            let chosen_rotation = var_list[6];
+            let chosen_x = particle.position[0];
+            let chosen_y = particle.position[1];
+            let pso_desired_length = particle.position[2];
+            let pso_desired_width = particle.position[3];
+            let pso_desired_height = particle.position[4];
+            let pso_inner_rot = particle.position[5];
+            let chosen_rotation = particle.position[6];
 
             let [ pso_surrogate, pso_idx ] = getBestFittingSurrogateL2(this.surrogate_library, pso_desired_length, pso_desired_width, pso_desired_height);
 
@@ -1355,7 +1355,27 @@ const funcs = {
                 }
             }
 
+            if (this.surrogate_settings.visualize_output) {
+                candidate = {
+                    geometry:pso_polygons_list,
+                    bottom_geometry: pso_polygons_list_bottom,
+                    rotation:chosen_rotation,
+                    surro:pso_surrogate, starting_height:pso_z, 
+                    end_height:pso_z + pso_surrogate.height, 
+                    down_surrogate:[], 
+                    up_surrogate:[], 
+                    outlines_drawn:0, 
+                    insertion_data:{}
+                };
+            }
+
             if (oob) {
+                if (this.surrogate_settings.visualize_output) {
+                    results_meta_data.candidate_details = {pso_details:[...particle.position], pso_idx:pso_idx, candidate_obj:candidate, use_me:pso_use_this_surrogate, tower_details:tower_details, oob:true};
+                    results_meta_data.fitness = 0;
+                    particle.history.push(results_meta_data);
+                }
+
                 let fitness = 0;
                 done(fitness);
             } else {                
@@ -1365,7 +1385,7 @@ const funcs = {
                 let quickList = splitLists[0];
                 let remainderList = splitLists[1];
 
-                //   var_list[7] = 0;
+                //   particle.position[7] = 0;
                 // pso_use_this_surrogate = 0;
                 // let pso_collision_and_volumes = checkVolumeAndCollisions(this.surrogate_library, this.surrogate_settings, this.surrogate_settings.start_slice, library_index, pso_polygons_list, pso_z, all_surrogates);
                 let pso_collision_and_volumes = checkVolumeAndCollisionsListQuick(this.surrogate_settings.all_slices, quickList, sliceIndexList.length, pso_polygons_list, all_surrogates);
@@ -1378,7 +1398,7 @@ const funcs = {
                     
                     // console.log({pso_collision_and_volumes:pso_collision_and_volumes});
                     if (pso_collision_and_volumes[0] === true) { // Collision in quick check found: Use estimate as collided area after reducing by overlap factor.
-                        //   var_list[7] = 0;
+                        //   particle.position[7] = 0;
 
                         overlap_factor = (pso_collision_and_volumes[2] / (pso_collision_and_volumes[4]));
                         if (overlap_factor > 1 || isNaN(overlap_factor)) overlap_factor = 1.0;
@@ -1401,7 +1421,7 @@ const funcs = {
                             
                             let total_volume = pso_collision_and_volumes[3] + pso_collision_and_volumes_remaining[3];
                             if (pso_collision_and_volumes_remaining[0] === true) { // Found collision in remaining layers
-                                //   var_list[7] = 0; // Set to collision
+                                //   particle.position[7] = 0; // Set to collision
                                 pso_use_this_surrogate = 0;
                                 // console.log({pso_collision_and_volumes_remaining:pso_collision_and_volumes_remaining});
                                 // console.log("Verify: " + pso_collision_and_volumes_remaining[2].toString());
@@ -1415,7 +1435,7 @@ const funcs = {
 
                             }
                             else {
-                                //   var_list[7] = 1; // Set to no collision
+                                //   particle.position[7] = 1; // Set to no collision
                                 pso_use_this_surrogate = 1;
                                 
                                 let finalHeight = pso_z + pso_surrogate.height;
@@ -1445,10 +1465,10 @@ const funcs = {
                                 let data_array = {insertion_case:"unknown"};
                                 // if (tower_library_index >= 0) {
                                 //     lower_surrogate.push(all_surrogates[tower_library_index]);
-                                //     //   var_list[1] = chosen_x; // We moved the surrogate for the tower successfully
-                                //     //   var_list[2] = chosen_y;
-                                //     //   var_list[8] = chosen_x; // We moved the surrogate for the tower successfully
-                                //     //   var_list[9] = chosen_y;
+                                //     //   particle.position[1] = chosen_x; // We moved the surrogate for the tower successfully
+                                //     //   particle.position[2] = chosen_y;
+                                //     //   particle.position[8] = chosen_x; // We moved the surrogate for the tower successfully
+                                //     //   particle.position[9] = chosen_y;
                                 //     tower_details.tower_x = chosen_x; // We moved the surrogate for the tower successfully
                                 //     tower_details.tower_y = chosen_y;
                                 // }
@@ -1491,7 +1511,7 @@ const funcs = {
 
                     results_array = pso_collision_and_volumes;
                 }
-                let current_details = [...var_list];
+                let current_details = [...particle.position];
 
                 results_meta_data.candidate_details = {pso_details:current_details, pso_idx:pso_idx, candidate_obj:candidate, use_me:pso_use_this_surrogate, tower_details:tower_details};
                 // }
@@ -1527,7 +1547,7 @@ const funcs = {
 
                 // if (valid_combination && surrogates_placed_pso > 0) {
                 if (valid_combination) {
-                    // let current_answer = [...var_list];
+                    // let current_answer = [...particle.position];
                     // this.valid_answers.push(current_answer);
                     // valid_answers.push(current_answer);
                     results_meta_data.valid = true;
@@ -1541,6 +1561,10 @@ const funcs = {
                 if (valid_combination) {
                     this.valid_answers.push(results_meta_data);
                     valid_answers.push(results_meta_data);
+                }
+
+                if (this.surrogate_settings.visualize_output) {
+                    particle.history.push(results_meta_data);
                 }
 
                 done(fitness);
@@ -1644,6 +1668,7 @@ const funcs = {
         // }
 
         var iterations = 0, maxIterations = optimizer.surrogate_settings.max_search_iterations;
+
         function loop() {
             if (iterations >= maxIterations) { // TODO: Need handling of further execution if this case is reached
                 // log('Max iterations reached. Ending search.');
@@ -1712,7 +1737,7 @@ const funcs = {
         t_optimizer.surrogate_library = surros;
         t_optimizer.surrogate_settings = surrogate_settings;
         t_optimizer.valid_answers = [];
-        t_optimizer.setObjectiveFunction(function (var_list, done) { 
+        t_optimizer.setObjectiveFunction(function (particle, done) { 
             let all_surrogates = [];
             let lower_full = this.surrogate_settings.lower_surr;
             let lower_surr = lower_full.candidate_details.candidate_obj;
@@ -1729,12 +1754,12 @@ const funcs = {
 
             let pso_use_this_surrogate = 0;
             let tower_details = {tower_x:null, tower_y:null, tower_rot:null};
-            let pso_x = var_list[0];
-            let pso_y = var_list[1];
-            let pso_desired_length = var_list[2];
-            let pso_desired_width = var_list[3];
-            let pso_desired_height = var_list[4];
-            let pso_inner_rot = var_list[5];
+            let pso_x = particle.position[0];
+            let pso_y = particle.position[1];
+            let pso_desired_length = particle.position[2];
+            let pso_desired_width = particle.position[3];
+            let pso_desired_height = particle.position[4];
+            let pso_inner_rot = particle.position[5];
 
             let [ pso_surrogate, pso_idx ] = getBestFittingSurrogateL2(this.surrogate_library, pso_desired_length, pso_desired_width, pso_desired_height);
 
@@ -1754,13 +1779,13 @@ const funcs = {
 
             if (x_space < 0) {
                 early_switch = true;
-                var_list[2] = var_list[2] * 0.75; // Look for less long surrogate
-                pso_desired_length = var_list[2];
+                particle.position[2] = particle.position[2] * 0.75; // Look for less long surrogate
+                pso_desired_length = particle.position[2];
             }
             if (y_space < 0) {
                 early_switch = true;
-                var_list[3] = var_list[3] * 0.75; // Look for less wide surrogate                
-                pso_desired_width = var_list[3];
+                particle.position[3] = particle.position[3] * 0.75; // Look for less wide surrogate                
+                pso_desired_width = particle.position[3];
             }
 
             if (early_switch) {
@@ -1880,10 +1905,10 @@ const funcs = {
                 // console.log({pso_surrogate:pso_surrogate});
                 // console.log({bottom_surrogate:lower_surr});
                 if (x_space < 0) {
-                    var_list[2] = var_list[2] * 0.75; // Look for less long surrogate
+                    particle.position[2] = particle.position[2] * 0.75; // Look for less long surrogate
                 }
                 if (y_space < 0) {
-                    var_list[3] = var_list[3] * 0.75; // Look for less wide surrogate                
+                    particle.position[3] = particle.position[3] * 0.75; // Look for less wide surrogate                
                 }
                 bad_tower = true;
             }
@@ -1929,7 +1954,7 @@ const funcs = {
 
                     let pso_collision_and_volumes;
 
-                    //   var_list[7] = 0;
+                    //   particle.position[7] = 0;
                     // pso_use_this_surrogate = 0;
                     if (quickList) {
                         // let pso_collision_and_volumes = checkVolumeAndCollisions(this.surrogate_library, this.surrogate_settings, this.surrogate_settings.start_slice, library_index, pso_polygons_list, pso_z, all_surrogates);
@@ -1948,7 +1973,7 @@ const funcs = {
                         
                         // console.log({pso_collision_and_volumes:pso_collision_and_volumes});
                         if (pso_collision_and_volumes[0] === true) { // Collision in quick check found: Use estimate as collided area after reducing by overlap factor.
-                            //   var_list[7] = 0;
+                            //   particle.position[7] = 0;
 
                             overlap_factor = (pso_collision_and_volumes[2] / (pso_collision_and_volumes[4]));
                             if (overlap_factor > 1 || isNaN(overlap_factor)) overlap_factor = 1.0;
@@ -1971,7 +1996,7 @@ const funcs = {
                                 
                                 let total_volume = pso_collision_and_volumes[3] + pso_collision_and_volumes_remaining[3];
                                 if (pso_collision_and_volumes_remaining[0] === true) { // Found collision in remaining layers
-                                    //   var_list[7] = 0; // Set to collision
+                                    //   particle.position[7] = 0; // Set to collision
                                     pso_use_this_surrogate = 0;
                                     // console.log({pso_collision_and_volumes_remaining:pso_collision_and_volumes_remaining});
                                     // console.log("Verify: " + pso_collision_and_volumes_remaining[2].toString());
@@ -1985,7 +2010,7 @@ const funcs = {
 
                                 }
                                 else {
-                                    //   var_list[7] = 1; // Set to no collision
+                                    //   particle.position[7] = 1; // Set to no collision
                                     pso_use_this_surrogate = 1;
                                     
                                     let finalHeight = pso_z + pso_surrogate.height;
@@ -2015,10 +2040,10 @@ const funcs = {
                                     let data_array = {insertion_case:"unknown"};
                                     // if (tower_library_index >= 0) {
                                     //     lower_surrogate.push(all_surrogates[tower_library_index]);
-                                    //     //   var_list[1] = chosen_x; // We moved the surrogate for the tower successfully
-                                    //     //   var_list[2] = chosen_y;
-                                    //     //   var_list[8] = chosen_x; // We moved the surrogate for the tower successfully
-                                    //     //   var_list[9] = chosen_y;
+                                    //     //   particle.position[1] = chosen_x; // We moved the surrogate for the tower successfully
+                                    //     //   particle.position[2] = chosen_y;
+                                    //     //   particle.position[8] = chosen_x; // We moved the surrogate for the tower successfully
+                                    //     //   particle.position[9] = chosen_y;
                                     //     tower_details.tower_x = chosen_x; // We moved the surrogate for the tower successfully
                                     //     tower_details.tower_y = chosen_y;
                                     // }
@@ -2061,9 +2086,9 @@ const funcs = {
                             }
                         }
                         // if ((Math.random() < 0.2) && (pso_collision_and_volumes[0] == true) && (tower_library_index >= 0)) { // Encourage build plate exploration if bad tower
-                        //     //   var_list[3] =   var_list[3] - 0.05; // = 0
+                        //     //   particle.position[3] =   particle.position[3] - 0.05; // = 0
                         // } else if ((Math.random() < 0.05) && (pso_collision_and_volumes[0] == true) && (tower_library_index < 0)) { // Encourage tower exploration if bad build plate placement
-                        //     //   var_list[3] =   var_list[3] + 0.05; // = Math.random()
+                        //     //   particle.position[3] =   particle.position[3] + 0.05; // = Math.random()
                         // }
                         // // else results_array.push(pso_collision_and_volumes);
                         // else results_array = pso_collision_and_volumes;
@@ -2078,7 +2103,7 @@ const funcs = {
                     // }
                     // let current_details = [];
                     // for (let j = 1; j < (1+iteration_number)*this.surrogate_settings.number_of_vars; j++) {
-                    let current_details = [...var_list];
+                    let current_details = [...particle.position];
                     tower_details.tower_x = chosen_x;
                     tower_details.tower_y = chosen_y;
                     tower_details.tower_rot = chosen_rotation;
@@ -2121,7 +2146,7 @@ const funcs = {
 
                     // if (valid_combination && surrogates_placed_pso > 0) {
                     if (valid_combination) {
-                        // let current_answer = [...var_list];
+                        // let current_answer = [...particle.position];
                         // this.valid_answers.push(current_answer);
                         // valid_answers.push(current_answer);
                         results_meta_data.valid = true;
@@ -2358,7 +2383,22 @@ const funcs = {
                 }
             }
         }
-        reply({ seq, output:return_list.length, return_list:return_list });
+
+        let history_list = [];
+        if (surrogate_settings.visualize_output) {
+            let particle_N = 0;
+            for (let oneP of optimizer._particles) {
+                for (let history_entry of oneP.history) {
+                    let encoded_history_geometry = kiri.codec.encode(history_entry.candidate_details.candidate_obj.geometry);
+                    let history_obj = {valid:history_entry.valid, fitness:history_entry.fitness, polygon:encoded_history_geometry, particleID:particle_N};
+                    history_list.push(history_obj);
+                }
+                particle_N += 1;
+            }
+        }
+
+
+        reply({ seq, output:return_list.length, return_list:return_list, history_list });
     },
 
     verifyCandidateOverlap: (data, seq) => {

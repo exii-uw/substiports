@@ -794,6 +794,13 @@ class Widget {
                 if (reply.log) {
                     api.event.emit('log.fileDetail', reply.log);
                 }
+                if (reply.pso_history) {
+                    api.event.emit('log.pso_history', reply.pso_history);
+                }
+                if (reply.basicGeometryExport) {
+                    console.log({reply:reply.basicGeometryExport});
+                    api.event.emit('log.basicGeometryExport', reply.basicGeometryExport);
+                }
             });
         }
 

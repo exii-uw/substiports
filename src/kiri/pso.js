@@ -16,6 +16,8 @@ function Particle(position, velocity, options) {
 	this.bestPosition = new Array(this.position.length);
 	this.fitness = -Infinity;
 	this.bestFitness = -Infinity;
+	this.history = [];
+
 
 	this._inertiaWeight = options.inertiaWeight;
 	this._social = options.social;
@@ -190,7 +192,8 @@ Optimizer.prototype = {
 			this._waiting = true;
 			var completed = 0;
 			this._particles.forEach(function (particle) {
-				this._objectiveFunction(particle.position, function (fitness) {
+				// this._objectiveFunction(particle.position, function (fitness) {
+				this._objectiveFunction(particle, function (fitness) {
 					// console.log({async_fitness:fitness});
 					particle.fitness = fitness;
 					completed++;
@@ -203,7 +206,8 @@ Optimizer.prototype = {
 			}, this);
 		} else {
 			this._particles.forEach(function (particle) {
-				particle.fitness = this._objectiveFunction(particle.position);
+				// particle.fitness = this._objectiveFunction(particle.position);
+				particle.fitness = this._objectiveFunction(particle);
 			}, this);
 			this._completeStep();
 

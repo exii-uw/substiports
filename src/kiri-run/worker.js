@@ -280,7 +280,7 @@ kiri.minions = {
         });
     },
 
-    surrogateClusterSearch(slice_stack_data, surrogate_library, hull_points, susu_settings, device, widget, kn) {
+    surrogateClusterSearch(slice_stack_data, surrogate_library, hull_points, susu_settings, device, widget, kn, clusterID) {
         return new Promise((resolve, reject) => {
             if (concurrent < 2) {
                 console.log("CLUSTER SEARCH FAILED!");
@@ -298,6 +298,7 @@ kiri.minions = {
                 widget: mockWidget
             }, data => { // This handles the data returned by the minion function
                 data.kn = kn;
+                data.clusterID = clusterID;
                 resolve(data);
             });
         });
@@ -551,6 +552,8 @@ kiri.worker = {
                 const slices = widget.slices || [];
 
                 send.data({log:widget.slices[0].efficiencyData});
+                send.data({pso_history:widget.slices[0].historyData});
+                send.data({basicGeometryExport:widget.slices[0].basicGeometryExport})
 
                 send.data({send_start: time()});
                 send.data({

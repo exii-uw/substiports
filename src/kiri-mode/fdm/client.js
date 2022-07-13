@@ -637,6 +637,68 @@ FDM.init = function(kiri, api) {
         // console.log({eventDataTimeLogFile:timeData});
     });
 
+    // Logging for visual PSO debugging
+    api.event.on("log.pso_history", (historyData) => {
+        function download2(filename, text) {
+            var pom = document.createElement('a');
+            pom.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
+            pom.setAttribute('download', filename);
+        
+            if (document.createEvent) {
+                var event = document.createEvent('MouseEvents');
+                event.initEvent('click', true, true);
+                pom.dispatchEvent(event);
+            }
+            else {
+                pom.click();
+            }
+        }
+        let csv_log = "";
+
+        let endTime = Date.now();
+
+        let particleNumber = 0;
+
+        for (let historyD of historyData) {
+            if (csv_log != "") csv_log += "\n";
+            csv_log += historyD.clusterKN+";"+historyD.clusterID+";"+historyD.particleID+";"+historyD.valid+";"+historyD.fitness+";"+historyD.polygon;
+            particleNumber += 1;
+        }
+        
+
+        download2("latestPSOVisuals.txt", csv_log);
+
+        // console.log({eventDataTimeLogFile:timeData});
+    });
+
+    // More Logging for visual PSO debugging
+    api.event.on("log.basicGeometryExport", (basicGeometryExport) => {
+        console.log({basicGeometryExportDownload:basicGeometryExport});
+        function download2(filename, text) {
+            var pom = document.createElement('a');
+            pom.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
+            pom.setAttribute('download', filename);
+        
+            if (document.createEvent) {
+                var event = document.createEvent('MouseEvents');
+                event.initEvent('click', true, true);
+                pom.dispatchEvent(event);
+            }
+            else {
+                pom.click();
+            }
+        }
+        let csv_log = "";
+
+        for (let textPoly of basicGeometryExport) {
+            if (csv_log != "") csv_log += "\n";
+            csv_log += textPoly.type+";"+textPoly.string;
+        }
+        download2("basicGeometry.txt", csv_log);
+    
+        // console.log({eventDataTimeLogFile:timeData});
+    });
+
 }
 
 let xpdebug;

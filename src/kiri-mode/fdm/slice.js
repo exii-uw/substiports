@@ -1103,8 +1103,10 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
                 for (let cluster of cluster_list) {
                     // console.log({cluster:cluster});
+                    let clusterID = 0;
                     for (let cluster_hull of cluster.concave_cluster_hulls) {
-                        optimizer_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, cluster_hull, surrogate_settings, settings.device, bottom_slice.widget, cluster.kn-1)); // kn-1 because we plus1 them when building clusters, but susu_data_objs counting starts at 0
+                        optimizer_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, cluster_hull, surrogate_settings, settings.device, bottom_slice.widget, cluster.kn-1, clusterID)); // kn-1 because we plus1 them when building clusters, but susu_data_objs counting starts at 0
+                        clusterID += 1;
                     }
                 }
 
@@ -1143,6 +1145,8 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
 
                 let best_of_best_results = [];
+                let all_histories = [];
+
 
                 if (optimizer_promises) {
                     for (let p of optimizer_promises) {
@@ -1155,10 +1159,19 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                                     t_height += 1;
                                 }
                             }
+
+                            let decoded_histories_list = [...data.history_list];
+                            for (let decoded_history of decoded_histories_list) {
+                                decoded_history.polygon = kiri.codec.decode(decoded_history.polygon, {full: true});
+                            }
+                            all_histories.push({clusterKN:data.kn, clusterID:data.clusterID, historyList: decoded_histories_list})
+
                         });
                     }
                     await Promise.all(optimizer_promises);
                 }
+
+                console.log({all_histories:all_histories});
 
                 // Add best_of_bests combination holder
                 susu_data_objs.push({kn:k_means_depth, candidate_list:best_of_best_results, graph_edges_sets:[], verify_list:[], prune_list:[]});
@@ -1317,7 +1330,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                 // console.log({surrogates_placed_list:surrogates_placed});
                 // console.log({placed_surrogates:placed_surrogates});
 
-                let surrogatedSlices = applySurrogatesToSlices(surrogates_placed, surrogate_settings, bottom_slice, process, view, surrogate_settings.all_slices, pre_surrogate_support_amounts, global_selection_list, startTime, skip);
+                let surrogatedSlices = applySurrogatesToSlices(surrogates_placed, surrogate_settings, bottom_slice, all_histories, process, view, surrogate_settings.all_slices, pre_surrogate_support_amounts, global_selection_list, startTime, skip);
 
 
                 console.log({widgetSlices:widget.slices, newSlices:surrogatedSlices});
@@ -1325,6 +1338,31 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                 widget.slices = surrogatedSlices;
 
                 bottom_slice = surrogatedSlices[0];
+
+                bottom_slice.historyDataRaw = all_histories;
+
+                let exportPolys = [];
+                for (let topPoly of bottom_slice.topPolys()) {
+                    let pointString = "";
+                    for (let polyPoint of topPoly.points) {
+                        pointString += polyPoint.x + "#" + polyPoint.y + ","
+                    }
+                    pointString = pointString.slice(0, -1); // remove last ,
+
+                    exportPolys.push({type:"model", string:pointString});
+                }
+                for (let supportPoly of bottom_slice.supportsSaved) {
+                    let pointString = "";
+                    for (let polyPoint of supportPoly.points) {
+                        pointString += polyPoint.x + "#" + polyPoint.y + ","
+                    }
+                    pointString = pointString.slice(0, -1); // remove last ,
+
+                    exportPolys.push({type:"support", string:pointString});
+                }
+
+                console.log({exportPolys:exportPolys});
+                bottom_slice.basicGeometryExport = exportPolys;
                 // let index_array = [ ...Array(candidate_list.length).keys() ];
 
                 // console.log({index_array:index_array});
@@ -2547,7 +2585,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         return all_candidates;
     }
 
-    function applySurrogatesToSlices(surrogates_placed, surrogate_settings, bottom_slice, proc, view, all_slices, pre_surrogate_support_amounts, global_selection_list, startTime, skip) {
+    function applySurrogatesToSlices(surrogates_placed, surrogate_settings, bottom_slice, all_histories, proc, view, all_slices, pre_surrogate_support_amounts, global_selection_list, startTime, skip) {
         let minArea = proc.supportMinArea;
         let min = minArea || 0.01;
 
@@ -3364,6 +3402,25 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         bottom_slice.widget.efficiencyData = efficiencyData;
         api.efficiencyData = efficiencyData;
 
+        let historyData = [];
+
+        if (surrogate_settings.visualize_output) {
+            for (let history_list of all_histories) {
+                for (let history_entry of history_list.historyList) {
+                    let text_encoded_polygon = "";
+                    for (let point of history_entry.polygon[0].points) {
+                        text_encoded_polygon += point.x + "#" + point.y + ","
+                    }
+                    text_encoded_polygon = text_encoded_polygon.slice(0, -1); // remove last ,
+
+                    historyData.push({clusterKN:history_list.clusterKN, clusterID:history_list.clusterID, particleID:history_entry.particleID, fitness:history_entry.fitness, valid:history_entry.valid, polygon:text_encoded_polygon});
+                }
+            }
+        }
+
+        bottom_slice.historyData = historyData;
+
+
         // function download(filename, text) {
         //     var pom = document.createElement('a');
         //     pom.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
@@ -3915,6 +3972,8 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         bottom_slice.efficiencyData = {numberPauses:0, numberSurrogates:0, materialWeightEstimateTube: 0, materialWeightEstimateBar: 0, materialWeightEstimateEllipse: 0, timestamp:0, id:0, previous_volume:0, new_volume:0, volume_percentage_saved:0}; 
 
         let surrogate_settings = {};
+
+        surrogate_settings.visualize_output = true;
 
         surrogate_settings.minSupportArea = proc.supportMinArea;
 
