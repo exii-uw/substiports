@@ -1287,6 +1287,21 @@ const funcs = {
         // console.log({max_y:max_y});
 
         const log = function () { console.log(arguments); };
+
+
+        // Prepare stack of polys limited to the cluster area
+
+        let limited_supports_list = [];
+        for (let current_slice of this.surrogate_settings.all_slices) {
+            let limited_supports = [];
+            for (let current_supp of current_slice.supports) {
+                let intersected_supp = current_supp.intersect(hull_points, 0.05);
+                limited_supports.push(intersected_supp);
+            } 
+            limited_supports_list.push(limited_supports);
+        }
+
+        console.log({limited_supports_list:limited_supports_list});
         
         // Optimizer search
 
