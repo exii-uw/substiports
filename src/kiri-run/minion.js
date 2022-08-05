@@ -1291,14 +1291,34 @@ const funcs = {
 
         // Prepare stack of polys limited to the cluster area
 
+        let hull_points_objs = [];
+        for (let hull_p of hull_points) {
+            let point = newPoint(hull_p[0], hull_p[1], 0);
+            hull_points_objs.push(point)
+        }
+        let cluster_poly = base.newPolygon(hull_points_objs);
+
         let limited_supports_list = [];
-        for (let current_slice of this.surrogate_settings.all_slices) {
+        let prev_area = 0;
+        let new_area = 0;
+        for (let current_slice of surrogate_settings.all_slices) {
             let limited_supports = [];
-            for (let current_supp of current_slice.supports) {
-                let intersected_supp = current_supp.intersect(hull_points, 0.05);
-                limited_supports.push(intersected_supp);
-            } 
+            if (current_slice.supports) {
+                for (let current_supp of current_slice.supports) {
+                    prev_area += Math.abs(current_supp.area);
+                    let intersected_supp = current_supp.intersect(cluster_poly, 0.05);
+                    limited_supports.push(intersected_supp);
+                }
+                current_slice.supports = limited_supports;
+                for (let lim_supp of limited_supports) {
+                    new_area += Math.abs(lim_supp.area);
+                }
+            }
             limited_supports_list.push(limited_supports);
+            console.log({current_slice_supports:current_slice.supports});
+            console.log({prev_supp_area:prev_area});
+            console.log({prev_supp_area:new_area});
+
         }
 
         console.log({limited_supports_list:limited_supports_list});
