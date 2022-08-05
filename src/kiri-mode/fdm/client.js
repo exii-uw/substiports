@@ -693,6 +693,7 @@ FDM.init = function(kiri, api) {
         for (let textPoly of basicGeometryExport) {
             if (csv_log != "") csv_log += "\n";
             csv_log += textPoly.type+";"+textPoly.string;
+            if (textPoly.type == "cluster") csv_log += ";"+textPoly.clusterKN+";"+textPoly.clusterID;
         }
         download2("basicGeometry.txt", csv_log);
     

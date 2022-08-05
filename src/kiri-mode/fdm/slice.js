@@ -1072,7 +1072,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
                 let encodedTops = kiri.codec.encode(test_poly_list, {full: true});
 
-                let decodedTop = kiri.codec.decode(encodedTops, {full: true});
+                // let decodedTop = kiri.codec.decode(encodedTops, {full: true});
                 // console.log({encodedPolys:encodedPolys});
 
                 let test_test_array = [encodedTops,[2,3,4,[11,12]],[5,6,7]];
@@ -1359,6 +1359,23 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                     pointString = pointString.slice(0, -1); // remove last ,
 
                     exportPolys.push({type:"support", string:pointString});
+                }
+                for (let cluster of cluster_list) {
+                    // console.log({cluster:cluster});
+                    let clusterID = 0;
+                    for (let cluster_hull of cluster.concave_cluster_hulls) {
+                        // optimizer_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, cluster_hull, surrogate_settings, settings.device, bottom_slice.widget, cluster.kn-1, clusterID)); // kn-1 because we plus1 them when building clusters, but susu_data_objs counting starts at 0
+                        let pointString = "";
+                        console.log({cluster_hull:cluster_hull});
+                        for (let polyPoint of cluster_hull) {
+                            console.log({clusterP:polyPoint});
+                            pointString += polyPoint.x + "#" + polyPoint.y + ","
+                        }
+                        pointString = pointString.slice(0, -1); // remove last ,
+
+                        exportPolys.push({type:"cluster", string:pointString, clusterKN:cluster.kn-1, clusterID:clusterID});
+                        clusterID += 1;
+                    }
                 }
 
                 console.log({exportPolys:exportPolys});
