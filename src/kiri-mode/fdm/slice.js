@@ -1022,7 +1022,8 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                 // Get concave hulls of support clusters
                 let cluster_promises = [];
 
-                let k_means_depth = 6;
+                // let k_means_depth = 6;
+                let k_means_depth = 2;
 
                 for (let kn = 0; kn < k_means_depth; kn++) {
                     const kint = Math.floor(kn+1); // Not sure if required to ensure kn doesn't change during minion runtime

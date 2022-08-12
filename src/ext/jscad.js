@@ -1,1 +1,1 @@
-D:/Code/LWW_grid-apps_copy_paste/grid-apps/node_modules/@jscad/modeling/dist/jscad-modeling.min.js
+../../node_modules/@jscad/modeling/dist/jscad-modeling.min.js

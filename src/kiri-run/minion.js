@@ -1287,6 +1287,69 @@ const funcs = {
         // console.log({max_y:max_y});
 
         const log = function () { console.log(arguments); };
+
+
+        // Prepare stack of polys limited to the cluster area
+
+        let hull_points_objs = [];
+        for (let hull_p of hull_points) {
+            let point = newPoint(hull_p.x, hull_p.y, hull_p.z);
+            hull_points_objs.push(point)
+        }
+        let cluster_poly = base.newPolygon(hull_points_objs);
+
+        // let limited_supports_list = [];
+        // let prev_supports_list = [];
+        let prev_area = 0;
+        let new_area = 0;
+        let once = true;
+        for (let current_slice of surrogate_settings.all_slices) {
+            // let cluster_poly_list = [cluster_poly];
+            let limited_supports = [];
+
+            if (current_slice.supports) {
+
+                // Workaround in case intersect does not work (can cause unwanted inner polygons!)
+                // let new_cluster_poly_list = [];
+                // POLY.subtract(cluster_poly_list, current_slice.supports, new_cluster_poly_list, null, current_slice.z, 0.1);
+                // console.log({cluster_poly_list:cluster_poly_list});
+                // console.log({current_slice_supports:current_slice.supports});
+                // console.log({new_cluster_poly_list:new_cluster_poly_list});
+
+                // POLY.subtract(cluster_poly_list, new_cluster_poly_list, limited_supports, null, current_slice.z, 0.1);
+
+                for (let current_supp of current_slice.supports) {
+                    // console.log({current_supp:current_supp});
+                    prev_area += Math.abs(current_supp.area());
+                    let intersected_supp = current_supp.intersect(cluster_poly, 0.1);
+                    if (intersected_supp) {
+                        for (let one_i_supp of intersected_supp) {
+                            limited_supports.push(one_i_supp);
+                        }
+                    }
+                }
+                // console.log({limited_supports:limited_supports});
+                if (limited_supports) current_slice.supports = limited_supports;
+                else current_slice.supports = undefined;
+                if (limited_supports.length > 0) {
+                    for (let lim_supp of limited_supports) {
+                        // console.log({lim_supp:lim_supp});
+                        new_area += Math.abs(lim_supp.area());
+                    }
+                }
+            }
+            // limited_supports_list.push(limited_supports);
+            // prev_supports_list.push(current_slice.supports);
+            if (once) {
+                once = false;
+                console.log({current_slice_supports:current_slice.supports});
+                console.log({prev_supp_area:prev_area});
+                console.log({new_supp_area:new_area});
+            }
+
+        }
+        // console.log({prev_supports_list:prev_supports_list});
+        // console.log({limited_supports_list:limited_supports_list});
         
         // Optimizer search
 
