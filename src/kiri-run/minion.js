@@ -293,6 +293,7 @@ const funcs = {
             if (slice_data[2].length > 0) mock_slice.supports = codec.decode(slice_data[2]);
 
             mock_slice.height = slice_data[3];
+            mock_slice.time = slice_data[4];
 
             // else mock_slice.supports = [];
             mock_slice_list.push(mock_slice);
@@ -1617,6 +1618,27 @@ const funcs = {
                 }
 
                 fitness += total_collided_surrogates_volume;
+
+                // Check if interaction would fall outside of the hours of the day where interaction is allowed
+                if (total_surrogates_volume > 0) {
+                    const average_speed = 50 * 60; // TODO: Fix to use the process feedrate based value
+                    const total_area = total_surrogates_volume*0.3;
+                    const time_save = Math.floor(total_area / average_speed * 1000/3);
+                    const new_finish_time = this.surrogate_settings.all_slices[sliceIndexList[sliceIndexList.length-1]].time - time_save;
+
+                    let hours = Math.floor(new_finish_time / 3600),
+                        newtime = new_finish_time - hours * 3600,
+                        mins = Math.floor(newtime / 60);
+                    if ((this.surrogate_settings.printStartTime[1] + mins) >= 60) hours += 1;
+                    let hour_done = this.surrogate_settings.printStartTime[0] + hours;
+                    if (hour_done > 23) hour_done = hour_done - 24;
+                    if (hour_done > 23) hour_done = hour_done - 24;
+                    if (hour_done > 23) hour_done = hour_done - 24;
+                    if (this.surrogate_settings.no_interaction_hours.includes(hour_done)) {
+                        valid_combination = false;
+                        fitness = fitness / 100; // Set fintess to very low if interaction is at a bad time.
+                    }
+                }
                 
                 results_meta_data.fitness = fitness;
                 results_meta_data.tower_fitness.push(fitness);
@@ -1649,9 +1671,9 @@ const funcs = {
         // yes/no switch between index-height and absolute-height method
         // pso_variable_list.push({ start: 0, end: optimizer.surrogate_library.length}); 
                                                                 // 5: Which surrogate was placed: library index, mapped from 0 to library_length
-        pso_variable_list.push({ start: surrogate_settings.smallest_length, end: surrogate_settings.biggest_length});  // 2: Desired length of ideal surrogate, mapped from smallest to biggest available lengths                                                   
-        pso_variable_list.push({ start: surrogate_settings.smallest_width, end: surrogate_settings.biggest_width});  // 3 {10}: Desired length of ideal surrogate, mapped from smallest to biggest available lengths                                                   
-        pso_variable_list.push({ start: surrogate_settings.smallest_height, end: surrogate_settings.biggest_height});  // 4 {11}: Desired length of ideal surrogate, mapped from smallest to biggest available lengths                                                   
+        pso_variable_list.push({ start: 0*surrogate_settings.smallest_length, end: surrogate_settings.biggest_length});  // 2: Desired length of ideal surrogate, mapped from smallest to biggest available lengths                                                   
+        pso_variable_list.push({ start: 0*surrogate_settings.smallest_width, end: surrogate_settings.biggest_width});  // 3 {10}: Desired length of ideal surrogate, mapped from smallest to biggest available lengths                                                   
+        pso_variable_list.push({ start: 0*surrogate_settings.smallest_height, end: surrogate_settings.biggest_height});  // 4 {11}: Desired length of ideal surrogate, mapped from smallest to biggest available lengths                                                   
         pso_variable_list.push({ start: 0, end: 360});          // 5: Inner rotation in degrees
         pso_variable_list.push({ start: 0, end: 360});          // 6: Rotation in degrees
         // pso_variable_list.push({ start: 0, end: 1});            // 6: Target extension for height-varying surrogates, 0 = min_height, 1 = max_height
@@ -1680,13 +1702,13 @@ const funcs = {
                     alternate = false;
                     optimizer._particles[particle_counter].position[0] = hull_points[point_idx-1].x;
                     optimizer._particles[particle_counter].position[1] = hull_points[point_idx-1].y;
-                    optimizer._particles[particle_counter].position[2] = hull_rot;
+                    optimizer._particles[particle_counter].position[6] = hull_rot;
                 }
                 else {
                     alternate = true;
                     optimizer._particles[particle_counter].position[0] = hull_points[point_idx].x;
                     optimizer._particles[particle_counter].position[1] = hull_points[point_idx].y;
-                    optimizer._particles[particle_counter].position[2] = hull_rot_90;
+                    optimizer._particles[particle_counter].position[6] = hull_rot_90;
                     point_idx++;
                     if (point_idx >= hull_points.length) point_idx = 1;
                 }
@@ -2248,9 +2270,9 @@ const funcs = {
 
         pso_tower_var_list.push({ start: min_x, end: max_x});    // 0: X position
         pso_tower_var_list.push({ start: min_y, end: max_y});    // 1: Y position
-        pso_tower_var_list.push({ start: surrogate_settings.smallest_length, end: surrogate_settings.biggest_length});  // 2: Desired length of ideal surrogate, mapped from smallest to biggest available lengths                                                   
-        pso_tower_var_list.push({ start: surrogate_settings.smallest_width, end: surrogate_settings.biggest_width});  // 3 {10}: Desired length of ideal surrogate, mapped from smallest to biggest available lengths                                                   
-        pso_tower_var_list.push({ start: surrogate_settings.smallest_height, end: surrogate_settings.biggest_height});  // 4 {11}: Desired length of ideal surrogate, mapped from smallest to biggest available lengths                                                   
+        pso_tower_var_list.push({ start: 0*surrogate_settings.smallest_length, end: surrogate_settings.biggest_length});  // 2: Desired length of ideal surrogate, mapped from smallest to biggest available lengths                                                   
+        pso_tower_var_list.push({ start: 0*surrogate_settings.smallest_width, end: surrogate_settings.biggest_width});  // 3 {10}: Desired length of ideal surrogate, mapped from smallest to biggest available lengths                                                   
+        pso_tower_var_list.push({ start: 0*surrogate_settings.smallest_height, end: surrogate_settings.biggest_height});  // 4 {11}: Desired length of ideal surrogate, mapped from smallest to biggest available lengths                                                   
         pso_tower_var_list.push({ start: 0, end: 360});          // 5: Inner rotation in degrees
 
         function removeEquivalentSolutions(solution_list) {

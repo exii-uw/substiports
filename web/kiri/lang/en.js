@@ -335,6 +335,10 @@ self.kiri.lang['en-us'] = {
     ss_stac_l:      "Allows placing surrogates on top of each other",
     ss_text_s:      "text size",
     ss_text_l:      "Changes the text size of the instructions",
+    ss_time_s:      "no-interaction hours",
+    ss_time_l:      "Prevents interactions during these hours of the day",
+    ss_star_s:      "Printing start time",
+    ss_star_l:      "Time when the printing process will be started",
 
     // FDM FILL
     fi_menu:        "infill",

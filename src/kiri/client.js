@@ -246,6 +246,9 @@ const client = exports({
     },
 
     export(settings, online, ondone) {
+        console.log({ExportSettings:settings});
+        console.log({Exportonline:online});
+        console.log({Exportondone:ondone});
         send("export", { settings }, reply => {
             if (reply.line) {
                 online(reply.line);

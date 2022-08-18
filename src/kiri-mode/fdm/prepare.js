@@ -34,6 +34,9 @@ FDM.prepare = function(widgets, settings, update) {
     // filter ignored widgets
     widgets = widgets.filter(w => !w.track.ignore && !w.meta.disabled);
 
+
+
+
     let { device, process, controller, bounds, mode } = settings,
         { sliceHeight, firstSliceHeight, firstLayerRate } = process,
         { outputSeekrate, outputLayerRetract, outputDraftShield, outputPurgeTower } = process,
@@ -57,6 +60,7 @@ FDM.prepare = function(widgets, settings, update) {
         output = [],
         layerout = [];
 
+    console.log({FDM_prepare_print:print});
     // compute bounds if missing
     if (!bounds) {
         bounds = new THREE.Box3();

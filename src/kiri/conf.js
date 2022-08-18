@@ -247,6 +247,8 @@ const renamed = {
     outputClockwise: "camConventional"
 };
 
+const nowTime = new Date().toLocaleTimeString();
+const stringTime = String(nowTime).slice(0, -3) + "h";
 const conf = exports({
     // --------------- helper functions
     normalize,
@@ -298,6 +300,8 @@ const conf = exports({
                 surrogateInteraction: "low",
                 surrogateTowers: true,
                 surrogateTextSize: 10,
+                interactionTimes: "22-24, 0-6",
+                printStartTime: stringTime,
                 sliceHeight: 0.25,
                 sliceShells: 3,
                 sliceShellOrder: "in-out",

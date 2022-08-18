@@ -1030,6 +1030,53 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                     cluster_promises.push(kiri.minions.clusterSupports(support_points_simple, kint, bottom_slice.z));
                     susu_data_objs.push({kn:kn, candidate_list:[], graph_edges_sets:[], verify_list:[], prune_list:[], selection_list:[]});
                 }
+
+                // While waiting for clusters, do printing time estimate
+
+                let total_area = 0;
+                let average_speed = process.outputFeedrate * 60;
+                let iterate_slices = bottom_slice;
+                while (iterate_slices) {
+                    let line_length = 0;
+                    if (iterate_slices.supports) {
+                        iterate_slices.supports.forEach(function(supp) {
+                            total_area += (supp.area()*0.3); // less dense infill
+                            for (let pt = 0; pt < supp.points.length-1; pt++){
+                                line_length += (supp.points[pt].distTo2D(supp.points[pt+1]))*0.3; // one outline only
+                            }
+                            if (supp.open === false) {
+                                line_length += (supp.points[supp.points.length-1].distTo2D(supp.points[0]))*0.3;
+                            }
+                        });
+                    }
+
+                    if (iterate_slices.tops) {
+                        iterate_slices.tops.forEach(function(top) {
+                            total_area += top.poly.area();
+                            for (let pt = 0; pt < top.poly.points.length-1; pt++){
+                                line_length += top.poly.points[pt].distTo2D(top.poly.points[pt+1]);
+                            }
+                            if (top.poly.open === false) {
+                                line_length += top.poly.points[top.poly.points.length-1].distTo2D(top.poly.points[0]);
+                            }
+                        });
+                    }
+
+                    total_area += line_length;
+
+                    let time = Math.floor(total_area / average_speed * 1000/3);
+                    iterate_slices.time_until_slice_done = time;
+
+                    iterate_slices = iterate_slices.up;
+                }
+
+                
+                // hours = floor(time / 3600),
+                // newtime = time - hours * 3600,
+                // mins = floor(newtime / 60),
+                // secs = newtime - mins * 60;
+
+                // console.log({estTime:hours+":"+mins+":"+secs});
                 
                 let cluster_list = [];
                 if (cluster_promises) {
@@ -1306,6 +1353,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                 }
 
                 console.log({global_selection_list:global_selection_list});
+                
                 // for (let data_obj of susu_data_objs) {
                 //     for (let candidate of data_obj.candidate_list) {
                 //         if (candidate.candidate_details.candidate_obj.surro.type == "prism"){
@@ -1328,89 +1376,92 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                 
                 if (!skip) placed_surrogates = placeSurrogates(global_selection_list, surrogate_settings, surrogate_library, bottom_slice, surrogates_placed);
 
-                // console.log({surrogates_placed_list:surrogates_placed});
-                // console.log({placed_surrogates:placed_surrogates});
 
-                let surrogatedSlices = applySurrogatesToSlices(surrogates_placed, surrogate_settings, bottom_slice, all_histories, process, view, surrogate_settings.all_slices, pre_surrogate_support_amounts, global_selection_list, startTime, skip);
+                if (!skip) {
+                    // console.log({surrogates_placed_list:surrogates_placed});
+                    // console.log({placed_surrogates:placed_surrogates});
+
+                    let surrogatedSlices = applySurrogatesToSlices(surrogates_placed, surrogate_settings, bottom_slice, all_histories, process, view, surrogate_settings.all_slices, pre_surrogate_support_amounts, global_selection_list, startTime, skip);
 
 
-                console.log({widgetSlices:widget.slices, newSlices:surrogatedSlices});
+                    console.log({widgetSlices:widget.slices, newSlices:surrogatedSlices});
 
-                widget.slices = surrogatedSlices;
+                    widget.slices = surrogatedSlices;
 
-                bottom_slice = surrogatedSlices[0];
+                    bottom_slice = surrogatedSlices[0];
 
-                bottom_slice.historyDataRaw = all_histories;
+                    bottom_slice.historyDataRaw = all_histories;
 
-                let exportPolys = [];
-                for (let topPoly of bottom_slice.topPolys()) {
-                    let pointString = "";
-                    for (let polyPoint of topPoly.points) {
-                        pointString += polyPoint.x + "#" + polyPoint.y + ","
-                    }
-                    pointString = pointString.slice(0, -1); // remove last ,
-
-                    exportPolys.push({type:"model", string:pointString});
-                }
-                for (let supportPoly of bottom_slice.supportsSaved) {
-                    let pointString = "";
-                    for (let polyPoint of supportPoly.points) {
-                        pointString += polyPoint.x + "#" + polyPoint.y + ","
-                    }
-                    pointString = pointString.slice(0, -1); // remove last ,
-
-                    exportPolys.push({type:"support", string:pointString});
-                }
-                for (let cluster of cluster_list) {
-                    // console.log({cluster:cluster});
-                    let clusterID = 0;
-                    for (let cluster_hull of cluster.concave_cluster_hulls) {
-                        // optimizer_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, cluster_hull, surrogate_settings, settings.device, bottom_slice.widget, cluster.kn-1, clusterID)); // kn-1 because we plus1 them when building clusters, but susu_data_objs counting starts at 0
+                    let exportPolys = [];
+                    for (let topPoly of bottom_slice.topPolys()) {
                         let pointString = "";
-                        console.log({cluster_hull:cluster_hull});
-                        for (let polyPoint of cluster_hull) {
-                            console.log({clusterP:polyPoint});
+                        for (let polyPoint of topPoly.points) {
                             pointString += polyPoint.x + "#" + polyPoint.y + ","
                         }
                         pointString = pointString.slice(0, -1); // remove last ,
 
-                        exportPolys.push({type:"cluster", string:pointString, clusterKN:cluster.kn-1, clusterID:clusterID});
-                        clusterID += 1;
+                        exportPolys.push({type:"model", string:pointString});
                     }
+                    for (let supportPoly of bottom_slice.supportsSaved) {
+                        let pointString = "";
+                        for (let polyPoint of supportPoly.points) {
+                            pointString += polyPoint.x + "#" + polyPoint.y + ","
+                        }
+                        pointString = pointString.slice(0, -1); // remove last ,
+
+                        exportPolys.push({type:"support", string:pointString});
+                    }
+                    for (let cluster of cluster_list) {
+                        // console.log({cluster:cluster});
+                        let clusterID = 0;
+                        for (let cluster_hull of cluster.concave_cluster_hulls) {
+                            // optimizer_promises.push(kiri.minions.surrogateClusterSearch(sliceStackData, surrogate_library, cluster_hull, surrogate_settings, settings.device, bottom_slice.widget, cluster.kn-1, clusterID)); // kn-1 because we plus1 them when building clusters, but susu_data_objs counting starts at 0
+                            let pointString = "";
+                            console.log({cluster_hull:cluster_hull});
+                            for (let polyPoint of cluster_hull) {
+                                console.log({clusterP:polyPoint});
+                                pointString += polyPoint.x + "#" + polyPoint.y + ","
+                            }
+                            pointString = pointString.slice(0, -1); // remove last ,
+
+                            exportPolys.push({type:"cluster", string:pointString, clusterKN:cluster.kn-1, clusterID:clusterID});
+                            clusterID += 1;
+                        }
+                    }
+
+                    console.log({exportPolys:exportPolys});
+                    bottom_slice.basicGeometryExport = exportPolys;
+                    // let index_array = [ ...Array(candidate_list.length).keys() ];
+
+                    // console.log({index_array:index_array});
+
+                    // var candidate_combinations = up_to_m_combinations(index_array, 4);
+
+                    // console.log({candidate_combinations:candidate_combinations});
+                    // let good_combinations_list = [[], [], [], []];
+                    
+                    // let good_combination = true;
+                    // for (let combination of candidate_combinations) {
+                    //     next_combination:
+                    //     for (let candidate_idx of combination) { // check if the graph edges that show whether two surrogates can be placed without overlap
+                    //         for (let candidate_idx2 of combination) {
+                    //             if (!graph_edges_sets[candidate_idx].has(candidate_idx2)) {
+                    //                 good_combination = false;
+                    //                 break next_combination;
+                    //             }
+                    //         }
+                    //     }
+                    //     if (good_combination)  {
+                    //         console.log({good_combination:combination});
+                    //         // let [ low_ia, med_ia, high_ia, max_ia ] = calculateCombinationFitnesses(combination); // TODO
+                    //         // candidate_combinations[0].push(low_ia);
+                    //         // candidate_combinations[1].push(med_ia);
+                    //         // candidate_combinations[2].push(high_ia);
+                    //         // candidate_combinations[3].push(max_ia);
+                    //     }
+                    //     good_combination = true;
+                    // }
                 }
-
-                console.log({exportPolys:exportPolys});
-                bottom_slice.basicGeometryExport = exportPolys;
-                // let index_array = [ ...Array(candidate_list.length).keys() ];
-
-                // console.log({index_array:index_array});
-
-                // var candidate_combinations = up_to_m_combinations(index_array, 4);
-
-                // console.log({candidate_combinations:candidate_combinations});
-                // let good_combinations_list = [[], [], [], []];
-                
-                // let good_combination = true;
-                // for (let combination of candidate_combinations) {
-                //     next_combination:
-                //     for (let candidate_idx of combination) { // check if the graph edges that show whether two surrogates can be placed without overlap
-                //         for (let candidate_idx2 of combination) {
-                //             if (!graph_edges_sets[candidate_idx].has(candidate_idx2)) {
-                //                 good_combination = false;
-                //                 break next_combination;
-                //             }
-                //         }
-                //     }
-                //     if (good_combination)  {
-                //         console.log({good_combination:combination});
-                //         // let [ low_ia, med_ia, high_ia, max_ia ] = calculateCombinationFitnesses(combination); // TODO
-                //         // candidate_combinations[0].push(low_ia);
-                //         // candidate_combinations[1].push(med_ia);
-                //         // candidate_combinations[2].push(high_ia);
-                //         // candidate_combinations[3].push(max_ia);
-                //     }
-                //     good_combination = true;
-                // }
             } else {
                 bottom_slice.efficiencyData = {numberPauses: 0, numberSurrogates: 0, materialWeightEstimateTube: 0, materialWeightEstimateBar: 0, materialWeightEstimateEllipse: 0, timestamp:0, id:bottom_slice.widget.id, previous_volume:0, new_volume:0, volume_percentage_saved:0, sTime:startTime,
                     numberSurrogatesHigh:0,
@@ -1486,6 +1537,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             let encodedTops = [];
             let encodedSupports = [];
             let sliceHeight = current_slice.height;
+            let sliceTime = current_slice.time_until_slice_done;
 
             for (let oneTop of current_slice.tops) {
                 encodedTops.push(kiri.codec.encode(oneTop, {full: false}));
@@ -1510,7 +1562,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                 // let encodedSupportList2 = kiri.codec.encode(current_slice.supports);
             }
 
-            let sliceDetailList = [encodedSlice, encodedTops, encodedSupports, sliceHeight];
+            let sliceDetailList = [encodedSlice, encodedTops, encodedSupports, sliceHeight, sliceTime];
             encodedData.push(sliceDetailList);
             // sliceDetailList.push([current_slice.index, current_slice.z]);
             current_slice = current_slice.up;
@@ -4167,6 +4219,31 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                 surrogate_settings.biggest_height = surro.maxHeight;
             }
         }
+
+        surrogate_settings.no_interaction_hours = [];
+        const interactionHoursString = proc.interactionTimes.split(/\s+/).join('');
+        const interactionHours = interactionHoursString.split(",");
+        for (let interactionHour of interactionHours) {
+            let startEnd = interactionHour.split("-");
+            startEnd[0] = parseInt(startEnd[0]);
+            startEnd[1] = parseInt(startEnd[1]);
+            if (startEnd[1] < startEnd[0]) startEnd[1] = startEnd[1]+24;
+            for (let hour = startEnd[0]; hour < startEnd[1]; hour++) {
+                let realHour = hour;
+                
+                if (realHour > 23) realHour = realHour - 24;
+                surrogate_settings.no_interaction_hours.push(realHour);
+            }
+        }
+        console.log({noIHours:surrogate_settings.no_interaction_hours});
+
+        const startTimeString = proc.printStartTime.split(/\s+/).join('').slice(0, -1);
+        let printStartTime = startTimeString.split(":");
+        printStartTime[0] = parseInt(printStartTime[0]); printStartTime[1] = parseInt(printStartTime[1]);
+        surrogate_settings.printStartTime = printStartTime;
+
+        console.log({printStartTime:printStartTime});
+        
     
         let mina = min; //numOrDefault(min, 0.1);
         let coff = new ClipperLib.ClipperOffset();
@@ -9318,7 +9395,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             let total_material_estimate_ellipse = 0;
             // let originLength = 0;
             // let totalLength = 0;
-            while (iterate_layers_support) {
+            while (iterate_layers_support) {  
                 let support_line_length = 0;
                 if (iterate_layers_support.supports) {
                     iterate_layers_support.supports.forEach(function(supp) {

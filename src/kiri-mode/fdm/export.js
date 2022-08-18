@@ -963,6 +963,7 @@ FDM.export = function(print, online, ondone, ondebug) {
     print.lines = lines;
     print.bytes = bytes + lines - 1;
     print.time = time;
+    console.trace();
 
     if (debug) {
         console.log('segments', segments);
