@@ -325,6 +325,9 @@ const funcs = {
         let surros = surrogate_library;
         let surrogate_settings = susu_settings;
 
+        surrogate_settings.biggest_area = surrogate_settings.biggest_length * surrogate_settings.biggest_width;
+        surrogate_settings.smallest_area = surrogate_settings.smallest_length * surrogate_settings.smallest_width;
+
         for (let surro of surros) {
             if (surro.type == "prism") {
                 let point_list = [];
@@ -1619,6 +1622,13 @@ const funcs = {
 
                 fitness += total_collided_surrogates_volume;
 
+
+                // Bonus for using smaller surrogates that achieve similar results
+                // let max_bonus = surrogate_settings.biggest_area / surrogate_settings.smallest_area;
+                let fitness_per_size = fitness / (10);
+                fitness_per_size = fitness_per_size * (surrogate_settings.smallest_area / (pso_surrogate.length * pso_surrogate.width)); // the bonus gets smaller if the surrogate is big. Smallest possible surrogate gets the max bonus of 10%
+
+
                 // Check if interaction would fall outside of the hours of the day where interaction is allowed
                 if (total_surrogates_volume > 0) {
                     const average_speed = 50 * 60; // TODO: Fix to use the process feedrate based value
@@ -1631,7 +1641,7 @@ const funcs = {
                         mins = Math.floor(newtime / 60);
                     if ((this.surrogate_settings.printStartTime[1] + mins) >= 60) hours += 1;
                     let hour_done = this.surrogate_settings.printStartTime[0] + hours;
-                    if (hour_done > 23) hour_done = hour_done - 24;
+                    if (hour_done > 23) hour_done = hour_done - 24; //TODO modulo
                     if (hour_done > 23) hour_done = hour_done - 24;
                     if (hour_done > 23) hour_done = hour_done - 24;
                     if (this.surrogate_settings.no_interaction_hours.includes(hour_done)) {
@@ -1652,7 +1662,9 @@ const funcs = {
                     particle.history.push(results_meta_data);
                 }
 
-                done(fitness);
+                const searchFitness = fitness + fitness_per_size;
+
+                done(searchFitness);
             }
             
         }, {
