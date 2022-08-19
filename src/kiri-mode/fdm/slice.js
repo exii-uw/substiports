@@ -984,7 +984,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
             var startTime = new Date().getTime();
 
-            // console.log({prisms_obj:prisms_obj});
+            console.log({prisms_obj:prisms_obj});
             let surrogate_library = getSurrogateLibrary(prisms_obj);
             // let [ support_pointsDB, support_points_simpleDB ] = getSupportPointsDebug(bottom_slice, process, settings, surrogate_library);
 
@@ -2253,11 +2253,13 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             supports_after_surrogates.forEach(function(supp) {
                 new_volume += Math.abs((supp.areaDeep() * current_slice.height));
                 new_area += Math.abs(supp.areaDeep());
+                if ((supp.areaDeep() * current_slice.height) < 0) console.log({new_volume:Math.abs((supp.areaDeep() * current_slice.height))});
             });
             
             current_slice.supports.forEach(function(supp) {
                 old_volume += Math.abs((supp.areaDeep() * current_slice.height));
                 old_area += Math.abs(supp.areaDeep());
+                if ((supp.areaDeep() * current_slice.height) < 0) console.log({old_volume:Math.abs((supp.areaDeep() * current_slice.height))});
             });
             let delta_area = old_area - new_area;
             return [old_volume, new_volume, delta_area];
@@ -3768,7 +3770,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         // addPrism(surrogates, prisms[0], prisms[3]);
         addPrism(surrogates, prisms[0], prisms[4]);
 
-        // addStackableOptions(surrogates, 8.75, 9.55, 4, 31.75, 6.9, "Lego 4x1");
+        // addStackableOptions(surrogates, 8.75, 9.55, 4, 31.75, 7.9, "Lego 4x1");
         // addStackableOptions(surrogates, 15.9, 9.55, 4, 31.85, 15.9, "Lego+4x2");
         // addStackableOptions(surrogates, 12.75, 9.55, 5, 31.85, 31.85, "Lego 4x4");
         addStackableOptions(surrogates, 15.9, 9.55, 5, 31.85, 31.85, "Lego+4x4");
@@ -3787,6 +3789,9 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         // }
         return surrogates;
     }
+
+    // 1: Lego
+    const kits = [[7.95, 7.95, 3.183333, 111000, "Lego"]]; // Length increments, width increments, height increments, max volume in mm³
 
 
     /**
@@ -4066,18 +4071,24 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             surrogate_settings.searchspace_min_number_of_surrogates = 0;
             surrogate_settings.surrogateInteraction = "off";
         } else if(proc.surrogateInteraction == "low") {
-            surrogate_settings.interaction_N_penalty_factor = 0.35;
-            surrogate_settings.surrogate_N_penalty_factor = 0.8;
+            // surrogate_settings.interaction_N_penalty_factor = 0.35;
+            // surrogate_settings.surrogate_N_penalty_factor = 0.8;
+            surrogate_settings.interaction_N_penalty_factor = surrogate_settings.interaction_N_penalty_factor_low;
+            surrogate_settings.surrogate_N_penalty_factor = surrogate_settings.surrogate_N_penalty_factor_low;
             surrogate_settings.searchspace_min_number_of_surrogates = 2;
             surrogate_settings.surrogateInteraction = "low";
         } else if(proc.surrogateInteraction == "medium") {
-            surrogate_settings.interaction_N_penalty_factor = 0.3;
-            surrogate_settings.surrogate_N_penalty_factor = 0.65;
+            // surrogate_settings.interaction_N_penalty_factor = 0.3;
+            // surrogate_settings.surrogate_N_penalty_factor = 0.65;
+            surrogate_settings.interaction_N_penalty_factor = surrogate_settings.interaction_N_penalty_factor_med;
+            surrogate_settings.surrogate_N_penalty_factor = surrogate_settings.surrogate_N_penalty_factor_med;
             surrogate_settings.searchspace_min_number_of_surrogates = 3;
             surrogate_settings.surrogateInteraction = "medium";
         } else if(proc.surrogateInteraction == "high") {
-            surrogate_settings.interaction_N_penalty_factor = 0.0;
-            surrogate_settings.surrogate_N_penalty_factor = 0.0;
+            // surrogate_settings.interaction_N_penalty_factor = 0.0;
+            // surrogate_settings.surrogate_N_penalty_factor = 0.0;
+            surrogate_settings.interaction_N_penalty_factor = surrogate_settings.interaction_N_penalty_factor_high;
+            surrogate_settings.surrogate_N_penalty_factor = surrogate_settings.surrogate_N_penalty_factor_high;
             surrogate_settings.searchspace_min_number_of_surrogates = 5;
             surrogate_settings.surrogateInteraction = "high";
         }
@@ -4137,6 +4148,8 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
         console.log({surrogateSearchQual:proc.surrogateSearchQual});
         console.log({surrogateInteraction:proc.surrogateInteraction});
+
+        surrogate_settings.kits = kits; 
 
         let search_padding = 50; // TODO: Adjust to size of surrogate/largest surrogate?
         // Search bounds
@@ -4624,7 +4637,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
             // TODO: Fix this output to avoid spamming while out-of-bounds
             // else console.log({note:"There were 0 supports left"});
-
+                       
             let new_area = 0;
             let old_area = 0;
 
@@ -4636,7 +4649,6 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             current_slice.supports.forEach(function(supp) {
                 old_volume += Math.abs((supp.areaDeep() * current_slice.height));
                 old_area += Math.abs(supp.areaDeep());
-
                 // if (!current_slice.tops[0].fill_sparse) current_slice.tops[0].fill_sparse = [];
                 //current_slice.tops[0].fill_sparse.push(supp);
                 

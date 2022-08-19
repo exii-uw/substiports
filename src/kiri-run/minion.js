@@ -387,7 +387,47 @@ const funcs = {
                 }
                 idx++;
             }
+            for (let kit of surrogate_settings.kits) {
+                let chosenX = 0;
+                let chosenY = 0;
+                const chosenXs = Math.floor(desired_length/kit[0]);
+                const x_remainder = desired_length % kit[0];
+                if (x_remainder > 0.5) {
+                    chosenX = (chosenXs+1) * kit[0];
+                } else {
+                    chosenX = (chosenXs) * kit[0];
+                }
+
+                const chosenYs = Math.floor(desired_width/kit[1]);
+                const y_remainder = desired_width % kit[1];
+                if (y_remainder > 0.5) {
+                    chosenY = (chosenYs+1) * kit[1];
+                } else {
+                    chosenY = (chosenYs) * kit[1];
+                }
+
+                const maxZ = Math.floor(kit[3]/(chosenX*chosenY)) * kit[2];
+
+                let current_error = (chosenX - desired_length)**2 + (chosenY - desired_width)**2;
+                if (desired_height > maxZ) {
+                    current_error += (desired_height -maxZ)**2;
+                } else if (desired_height < kit[2]) {
+                    current_error += (desired_height - kit[2])**2;
+                }
+
+                if (current_error < lowest_error) {
+                    lowest_error = current_error;
+                    const adHocTitle = kit[4]+"x"+String(Math.floor(chosenX/kit[0]))+"x"+String(Math.floor(chosenY/kit[1]));
+                    best_option = {width:chosenX, length:chosenY, height:kit[2], minHeight:kit[2], maxHeight:maxZ, addHeight:kit[2], addMaxNumber:Math.floor(kit[3]/(chosenX*chosenY)), id:adHocTitle, available:true, type:"stackable"};
+                    chosen_idx = -1;
+                }
+
+            }
             return [ best_option, chosen_idx ];
+        }
+
+        function getBestConstructionKitL2() {
+
         }
 
         function getSurrogateReplacedVolumes(old_volume, new_volume, current_slice, surrogate_rectangle_list) {
@@ -421,11 +461,14 @@ const funcs = {
             supports_after_surrogates.forEach(function(supp) {
                 new_volume += Math.abs((supp.areaDeep() * current_slice.height));
                 new_area += Math.abs(supp.areaDeep());
+                if ((supp.areaDeep() * current_slice.height) < 0) console.log({new_volume:Math.abs((supp.areaDeep() * current_slice.height))});
+
             });
             
             current_slice.supports.forEach(function(supp) {
                 old_volume += Math.abs((supp.areaDeep() * current_slice.height));
                 old_area += Math.abs(supp.areaDeep());
+                if ((supp.areaDeep() * current_slice.height) < 0) console.log({old_volume:Math.abs((supp.areaDeep() * current_slice.height))});
 
                 // if (!current_slice.tops[0].fill_sparse) current_slice.tops[0].fill_sparse = [];
                 //current_slice.tops[0].fill_sparse.push(supp);
@@ -1394,16 +1437,22 @@ const funcs = {
             let [ pso_surrogate, pso_idx ] = getBestFittingSurrogateL2(this.surrogate_library, pso_desired_length, pso_desired_width, pso_desired_height);
 
             let pso_z = 0;
+
+            let number_of_interactions = 1;
             
             // generate polygons // TODO: Is it faster to make one poly for the surrogate and then rotate+translate /modify the points directly?
             let pso_polygons_list = [];
             let pso_polygons_list_bottom = [];
-            if (pso_surrogate.type == "simpleRectangle" || pso_surrogate.type == "stackable") {
+            if (pso_surrogate.type == "simpleRectangle") {
                 pso_polygons_list = [generateRectanglePolygon(chosen_x, chosen_y, pso_z, pso_surrogate.length, pso_surrogate.width, chosen_rotation, surrogate_settings.surrogate_padding, this.surrogate_settings.start_slice)];
             }
             else if (pso_surrogate.type == "prism") {
                 pso_polygons_list = [generatePrismPolygon(chosen_x, chosen_y, pso_z, pso_surrogate.prism_geometry, chosen_rotation, pso_inner_rot, surrogate_settings.surrogate_padding, this.surrogate_settings.start_slice)];
                 pso_polygons_list_bottom = [generatePrismPolygon(chosen_x, chosen_y, pso_z, pso_surrogate.bottom_geometry, chosen_rotation, pso_inner_rot, surrogate_settings.surrogate_padding, this.surrogate_settings.start_slice)];
+                number_of_interactions = 3;
+            } else { //Same as first, but number of interactions is higher || pso_surrogate.type == "stackable"
+                pso_polygons_list = [generateRectanglePolygon(chosen_x, chosen_y, pso_z, pso_surrogate.length, pso_surrogate.width, chosen_rotation, surrogate_settings.surrogate_padding, this.surrogate_settings.start_slice)];
+                number_of_interactions = 2;
             }
 
             let oob = false;
@@ -1580,7 +1629,7 @@ const funcs = {
                 }
                 let current_details = [...particle.position];
 
-                results_meta_data.candidate_details = {pso_details:current_details, pso_idx:pso_idx, candidate_obj:candidate, use_me:pso_use_this_surrogate, tower_details:tower_details};
+                results_meta_data.candidate_details = {pso_details:current_details, pso_idx:pso_idx, candidate_obj:candidate, use_me:pso_use_this_surrogate, tower_details:tower_details, number_of_interactions:number_of_interactions};
                 // }
 
                 let valid_combination = true;
@@ -1623,11 +1672,17 @@ const funcs = {
                 fitness += total_collided_surrogates_volume;
 
 
+                // Apply penalty for highly complex interactions
+                fitness = fitness / 
+                (Math.pow(number_of_interactions, this.surrogate_settings.interaction_N_penalty_factor));
+
+
                 // Bonus for using smaller surrogates that achieve similar results
                 // let max_bonus = surrogate_settings.biggest_area / surrogate_settings.smallest_area;
                 let fitness_per_size = fitness / (10);
-                fitness_per_size = fitness_per_size * (surrogate_settings.smallest_area / (pso_surrogate.length * pso_surrogate.width)); // the bonus gets smaller if the surrogate is big. Smallest possible surrogate gets the max bonus of 10%
-
+                // if (fitness_per_size > 0)
+                fitness_per_size = fitness_per_size * (((surrogate_settings.smallest_area / (pso_surrogate.length * pso_surrogate.width))+1)/2); // the bonus gets smaller if the surrogate is big. Smallest possible surrogate gets the max bonus of 10%
+                // Made bonus size range from 5% to 10%
 
                 // Check if interaction would fall outside of the hours of the day where interaction is allowed
                 if (total_surrogates_volume > 0) {
@@ -2707,28 +2762,43 @@ const funcs = {
 
         function validateResults(final_selection_list, result_fitness, number_of_surrogates, number_of_interactions, candidate_selection_list) {
             let fifi_list = [];
-            const final_fitness_low = result_fitness / 
-                                (w_pieces * Math.pow(number_of_surrogates, surro_n_p_f_low) + 
-                                w_interactions * Math.pow(number_of_interactions, interaction_n_p_f_low));
-            const final_fitness_med = result_fitness / 
-                                (w_pieces * Math.pow(number_of_surrogates, surro_n_p_f_med) + 
-                                w_interactions * Math.pow(number_of_interactions, interaction_n_p_f_med));
-            const final_fitness_high = result_fitness / 
-                                (w_pieces * Math.pow(number_of_surrogates, surro_n_p_f_high) + 
-                                w_interactions * Math.pow(number_of_interactions, interaction_n_p_f_high));
-            fifi_list.push(final_fitness_low);
-            fifi_list.push(final_fitness_med);
-            fifi_list.push(final_fitness_high);
-            for (let i = 0; i < 3; i++) {
-                if (final_selection_list[i].final_fitness < fifi_list[i]) {
-                    final_selection_list[i] = {
-                        final_fitness: fifi_list[i],
-                        result_fitness: result_fitness,
-                        used_candidates: candidate_selection_list,
-                        number_of_surrogates: number_of_surrogates,
-                        number_of_interactions: number_of_interactions
-                    };
-                }
+
+
+            // const final_fitness_low = result_fitness / 
+            //                     (w_pieces * Math.pow(number_of_surrogates, surro_n_p_f_low) + 
+            //                     w_interactions * Math.pow(number_of_interactions, interaction_n_p_f_low));
+            // const final_fitness_med = result_fitness / 
+            //                     (w_pieces * Math.pow(number_of_surrogates, surro_n_p_f_med) + 
+            //                     w_interactions * Math.pow(number_of_interactions, interaction_n_p_f_med));
+            // const final_fitness_high = result_fitness / 
+            //                     (w_pieces * Math.pow(number_of_surrogates, surro_n_p_f_high) + 
+            //                     w_interactions * Math.pow(number_of_interactions, interaction_n_p_f_high));
+            // fifi_list.push(final_fitness_low);
+            // fifi_list.push(final_fitness_med);
+            // fifi_list.push(final_fitness_high);
+            // 
+            // for (let i = 0; i < 3; i++) {
+            //     if (final_selection_list[i].final_fitness < fifi_list[i]) {
+            //         final_selection_list[i] = {
+            //             final_fitness: fifi_list[i],
+            //             result_fitness: result_fitness,
+            //             used_candidates: candidate_selection_list,
+            //             number_of_surrogates: number_of_surrogates,
+            //             number_of_interactions: number_of_interactions
+            //         };
+            //     }
+            // }
+
+            const final_fitness = result_fitness / 
+                                (Math.pow(number_of_surrogates, surro_n_p_f));
+            if (final_selection_list[0].final_fitness < final_fitness) {
+                final_selection_list[0] = {
+                    final_fitness: final_fitness,
+                    result_fitness: result_fitness,
+                    used_candidates: candidate_selection_list,
+                    number_of_surrogates: number_of_surrogates,
+                    number_of_interactions: number_of_interactions
+                };
             }
         }
 
@@ -2754,14 +2824,16 @@ const funcs = {
 
         let final_selection_list = [{final_fitness:0}, {final_fitness:0}, {final_fitness:0}]; // low, med, high interaction
 
-        const w_pieces = 0.5;
-        const w_interactions = 0.5;
-        const surro_n_p_f_low = surrogate_settings.surrogate_N_penalty_factor_low;
-        const surro_n_p_f_med = surrogate_settings.surrogate_N_penalty_factor_med;
-        const surro_n_p_f_high = surrogate_settings.surrogate_N_penalty_factor_high;
-        const interaction_n_p_f_low = surrogate_settings.interaction_N_penalty_factor_low;
-        const interaction_n_p_f_med = surrogate_settings.interaction_N_penalty_factor_med;
-        const interaction_n_p_f_high = surrogate_settings.interaction_N_penalty_factor_high;
+        // const w_pieces = 0.5;
+        // const w_interactions = 0.5;
+        // const surro_n_p_f_low = surrogate_settings.surrogate_N_penalty_factor_low;
+        // const surro_n_p_f_med = surrogate_settings.surrogate_N_penalty_factor_med;
+        // const surro_n_p_f_high = surrogate_settings.surrogate_N_penalty_factor_high;
+        // const interaction_n_p_f_low = surrogate_settings.interaction_N_penalty_factor_low;
+        // const interaction_n_p_f_med = surrogate_settings.interaction_N_penalty_factor_med;
+        // const interaction_n_p_f_high = surrogate_settings.interaction_N_penalty_factor_high;
+        const surro_n_p_f = surrogate_settings.surrogate_N_penalty_factor;
+        const interaction_n_p_f = surrogate_settings.interaction_N_penalty_factor;
 
 
         for (let combination_size = 1; combination_size <= 8; combination_size++) {
@@ -2780,7 +2852,7 @@ const funcs = {
                     let tower_counter = 0;
                     for (let tower_f of candidate.tower_fitness) {
                         let candidate_selection_list = [{cd:candidate, tower_step_selection:tower_counter}];
-                        validateResults(final_selection_list, tower_f, tower_counter+1, tower_counter+1, candidate_selection_list);
+                        validateResults(final_selection_list, tower_f, tower_counter+1, 1, candidate_selection_list);
                         tower_counter++;
                     }
                 }
@@ -2903,6 +2975,7 @@ const funcs = {
                 if (no_success) combination_size = 100; // Stop loop since no more combinations of this size have been found so combinations of bigger size are impossible 
             }
         }
+        final_selection_list[1] = final_selection_list[0]; final_selection_list[2] = final_selection_list[0]; // TODO: Improve this hotfix to avoid changing pipeline
         
         // console.log({final_selection_list:final_selection_list});
         reply({ seq, final_selection_list });
