@@ -290,6 +290,7 @@ Optimizer.prototype = {
 
 	// Retrieves the mean fitness of the entire swarm
 	getMeanFitness: function () {
+		
 		var sum = this._particles.reduce(function (partialSum, particle) {
 			return partialSum + particle.fitness;
 		}, 0);

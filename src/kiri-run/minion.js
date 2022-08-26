@@ -395,7 +395,11 @@ const funcs = {
                 if (x_remainder > 0.5) {
                     chosenX = (chosenXs+1) * kit[0];
                 } else {
-                    chosenX = (chosenXs) * kit[0];
+                    if (chosenXs == 0) {
+                        chosenX = kit[0];
+                    } else {
+                        chosenX = (chosenXs) * kit[0];
+                    }
                 }
 
                 const chosenYs = Math.floor(desired_width/kit[1]);
@@ -403,7 +407,11 @@ const funcs = {
                 if (y_remainder > 0.5) {
                     chosenY = (chosenYs+1) * kit[1];
                 } else {
-                    chosenY = (chosenYs) * kit[1];
+                    if (chosenYs == 0) {
+                        chosenY = kit[1];
+                    } else {
+                        chosenY = (chosenYs) * kit[1];
+                    }
                 }
 
                 const maxZ = Math.floor(kit[3]/(chosenX*chosenY)) * kit[2];
@@ -1349,7 +1357,7 @@ const funcs = {
         // let prev_supports_list = [];
         let prev_area = 0;
         let new_area = 0;
-        let once = true;
+        // let once = true;
         for (let current_slice of surrogate_settings.all_slices) {
             // let cluster_poly_list = [cluster_poly];
             let limited_supports = [];
@@ -1387,12 +1395,12 @@ const funcs = {
             }
             // limited_supports_list.push(limited_supports);
             // prev_supports_list.push(current_slice.supports);
-            if (once) {
-                once = false;
-                console.log({current_slice_supports:current_slice.supports});
-                console.log({prev_supp_area:prev_area});
-                console.log({new_supp_area:new_area});
-            }
+            // if (once) {
+            //     once = false;
+            //     console.log({current_slice_supports:current_slice.supports});
+            //     console.log({prev_supp_area:prev_area});
+            //     console.log({new_supp_area:new_area});
+            // }
 
         }
         // console.log({prev_supports_list:prev_supports_list});
@@ -1406,6 +1414,12 @@ const funcs = {
         optimizer.surrogate_library = surros;
         optimizer.surrogate_settings = surrogate_settings;
         optimizer.valid_answers = [];
+        optimizer.setOptions({
+            inertiaWeight: surrogate_settings.inertiaWeightS,
+            social: surrogate_settings.socialS,
+            personal: surrogate_settings.personalS,
+            pressure: surrogate_settings.pressureS
+        });
         // set the objective function
         optimizer.setObjectiveFunction(function (particle, done) { 
             // if (particle.position[0] < 1) particle.position[0] = 1.0;
@@ -1719,6 +1733,13 @@ const funcs = {
 
                 const searchFitness = fitness + fitness_per_size;
 
+                if (!Number.isFinite(searchFitness))  {
+                    
+                    console.log({fitness:fitness, fitness_per_size:fitness_per_size});
+                    console.log({results_meta_data:results_meta_data});
+
+                }
+
                 done(searchFitness);
             }
             
@@ -1821,25 +1842,39 @@ const funcs = {
 
         var iterations = 0, maxIterations = optimizer.surrogate_settings.max_search_iterations;
 
+        let sumMean = 0;
+        let ranX = 0;
+
+        let leniency = optimizer.surrogate_settings.leniency,
+            newW = optimizer.surrogate_settings.inertiaWeightS,
+            newS = optimizer.surrogate_settings.socialS,
+            newP = optimizer.surrogate_settings.personalS,
+            expo = optimizer.surrogate_settings.annealingExponent;
+
         function loop() {
             if (iterations >= maxIterations) { // TODO: Need handling of further execution if this case is reached
                 // log('Max iterations reached. Ending search.');
+                sumMean += optimizer.getMeanFitness();
+                ranX++;
             } else {
                 iterations++;
                 // log('Iteration ' + iterations + '/' + maxIterations + ' ');
                 // log('Iteration ' + iterations);
 
                 let stepFitness = optimizer.getBestFitness();
+
+                sumMean += optimizer.getMeanFitness();
+                ranX++;
                 // console.log({fitness:stepFitness});
                 // console.log(optimizer.surrogate_settings);
                 // const origResult = optimizer.getBestPosition();
                 // const cloneResult = [...origResult];
                 // console.log({position:origResult});
                 
-                if (optimizer.surrogate_settings.leniency > 0) {
-                    optimizer.surrogate_settings.leniency = optimizer.surrogate_settings.leniency * 0.2;
-                    // optimizer.surrogate_settings.fitness_offset = stepFitness + stepFitness * optimizer.surrogate_settings.leniency;
-                    if (optimizer.surrogate_settings.leniency < 0.1) optimizer.surrogate_settings.leniency = 0;
+                if (leniency > 0) {
+                    leniency = leniency * 0.2;
+                    // optimizer.surrogate_settings.fitness_offset = stepFitness + stepFitness * leniency;
+                    if (leniency < 0.1) leniency = 0;
                     // optimizer._bestPositionEver = null;
                     // optimizer._bestFitnessEver = -Infinity;
 
@@ -1859,6 +1894,16 @@ const funcs = {
                 }
                 last_Best = stepFitness;
                 surrogate_settings.best_valid = last_Best;
+
+                newW = Math.pow(newW, expo); // Simulated annealing
+                newS = Math.pow(newS, expo);
+                newP = Math.pow(newP, (expo+1)/2);
+
+                optimizer.setOptions({
+                    inertiaWeight: newW,
+                    social: newS,
+                    personal: newP
+                });
 
                 optimizer.step(loop);
             }
@@ -1889,6 +1934,12 @@ const funcs = {
         t_optimizer.surrogate_library = surros;
         t_optimizer.surrogate_settings = surrogate_settings;
         t_optimizer.valid_answers = [];
+        t_optimizer.setOptions({
+            inertiaWeight: surrogate_settings.inertiaWeightS,
+            social: surrogate_settings.socialS,
+            personal: surrogate_settings.personalS,
+            pressure: surrogate_settings.pressureS
+        });
         t_optimizer.setObjectiveFunction(function (particle, done) { 
             let all_surrogates = [];
             let lower_full = this.surrogate_settings.lower_surr;
@@ -2550,7 +2601,7 @@ const funcs = {
         }
 
 
-        reply({ seq, output:return_list.length, return_list:return_list, history_list });
+        reply({ seq, output:return_list.length, return_list:return_list, history_list, ranX: ranX, sumMean:sumMean });
     },
 
     verifyCandidateOverlap: (data, seq) => {
