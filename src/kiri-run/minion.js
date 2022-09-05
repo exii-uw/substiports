@@ -418,7 +418,7 @@ const funcs = {
 
                 let current_error = (chosenX - desired_length)**2 + (chosenY - desired_width)**2;
                 if (desired_height > maxZ) {
-                    current_error += (desired_height -maxZ)**2;
+                    current_error += (desired_height - maxZ)**2;
                 } else if (desired_height < kit[2]) {
                     current_error += (desired_height - kit[2])**2;
                 }
@@ -440,7 +440,7 @@ const funcs = {
 
         function getSurrogateReplacedVolumes(old_volume, new_volume, current_slice, surrogate_rectangle_list) {
             let supports_after_surrogates = [];
-            POLY.subtract(current_slice.supports, surrogate_rectangle_list, supports_after_surrogates, null, current_slice.z, 0);
+            POLY.subtract(current_slice.supports, surrogate_rectangle_list, supports_after_surrogates, null, current_slice.z, 0.0); // 0 min instead?
             // if (supports_after_surrogates.length) {
             //     console.log({debugsupp:supports_after_surrogates[0]});
             //     console.log({debugsupp:supports_after_surrogates[0].areaDeep});
@@ -469,14 +469,14 @@ const funcs = {
             supports_after_surrogates.forEach(function(supp) {
                 new_volume += Math.abs((supp.areaDeep() * current_slice.height));
                 new_area += Math.abs(supp.areaDeep());
-                if ((supp.areaDeep() * current_slice.height) < 0) console.log({new_volume:Math.abs((supp.areaDeep() * current_slice.height))});
+                // if ((supp.areaDeep() * current_slice.height) < 0) console.log({new_volume:Math.abs((supp.areaDeep() * current_slice.height))});
 
             });
             
             current_slice.supports.forEach(function(supp) {
                 old_volume += Math.abs((supp.areaDeep() * current_slice.height));
                 old_area += Math.abs(supp.areaDeep());
-                if ((supp.areaDeep() * current_slice.height) < 0) console.log({old_volume:Math.abs((supp.areaDeep() * current_slice.height))});
+                // if ((supp.areaDeep() * current_slice.height) < 0) console.log({old_volume:Math.abs((supp.areaDeep() * current_slice.height))});
 
                 // if (!current_slice.tops[0].fill_sparse) current_slice.tops[0].fill_sparse = [];
                 //current_slice.tops[0].fill_sparse.push(supp);
@@ -1452,7 +1452,7 @@ const funcs = {
 
             let pso_z = 0;
 
-            let number_of_interactions = 1;
+            let complexity_of_interactions = 1;
             
             // generate polygons // TODO: Is it faster to make one poly for the surrogate and then rotate+translate /modify the points directly?
             let pso_polygons_list = [];
@@ -1463,10 +1463,10 @@ const funcs = {
             else if (pso_surrogate.type == "prism") {
                 pso_polygons_list = [generatePrismPolygon(chosen_x, chosen_y, pso_z, pso_surrogate.prism_geometry, chosen_rotation, pso_inner_rot, surrogate_settings.surrogate_padding, this.surrogate_settings.start_slice)];
                 pso_polygons_list_bottom = [generatePrismPolygon(chosen_x, chosen_y, pso_z, pso_surrogate.bottom_geometry, chosen_rotation, pso_inner_rot, surrogate_settings.surrogate_padding, this.surrogate_settings.start_slice)];
-                number_of_interactions = 3;
+                complexity_of_interactions = 3;
             } else { //Same as first, but number of interactions is higher || pso_surrogate.type == "stackable"
                 pso_polygons_list = [generateRectanglePolygon(chosen_x, chosen_y, pso_z, pso_surrogate.length, pso_surrogate.width, chosen_rotation, surrogate_settings.surrogate_padding, this.surrogate_settings.start_slice)];
-                number_of_interactions = 2;
+                complexity_of_interactions = 2;
             }
 
             let oob = false;
@@ -1643,7 +1643,7 @@ const funcs = {
                 }
                 let current_details = [...particle.position];
 
-                results_meta_data.candidate_details = {pso_details:current_details, pso_idx:pso_idx, candidate_obj:candidate, use_me:pso_use_this_surrogate, tower_details:tower_details, number_of_interactions:number_of_interactions};
+                results_meta_data.candidate_details = {pso_details:current_details, pso_idx:pso_idx, candidate_obj:candidate, use_me:pso_use_this_surrogate, tower_details:tower_details, complexity_of_interactions:complexity_of_interactions};
                 // }
 
                 let valid_combination = true;
@@ -1688,7 +1688,7 @@ const funcs = {
 
                 // Apply penalty for highly complex interactions
                 fitness = fitness / 
-                (Math.pow(number_of_interactions, this.surrogate_settings.interaction_N_penalty_factor));
+                    (Math.pow(complexity_of_interactions, this.surrogate_settings.interaction_N_penalty_factor));
 
 
                 // Bonus for using smaller surrogates that achieve similar results
@@ -1733,12 +1733,12 @@ const funcs = {
 
                 const searchFitness = fitness + fitness_per_size;
 
-                if (!Number.isFinite(searchFitness))  {
+                // if (!Number.isFinite(searchFitness))  {
                     
-                    console.log({fitness:fitness, fitness_per_size:fitness_per_size});
-                    console.log({results_meta_data:results_meta_data});
+                //     console.log({fitness:fitness, fitness_per_size:fitness_per_size});
+                //     console.log({results_meta_data:results_meta_data});
 
-                }
+                // }
 
                 done(searchFitness);
             }
@@ -1847,8 +1847,11 @@ const funcs = {
 
         let leniency = optimizer.surrogate_settings.leniency,
             newW = optimizer.surrogate_settings.inertiaWeightS,
+            t_newW = optimizer.surrogate_settings.inertiaWeightS,
             newS = optimizer.surrogate_settings.socialS,
+            t_newS = optimizer.surrogate_settings.socialS,
             newP = optimizer.surrogate_settings.personalS,
+            t_newP = optimizer.surrogate_settings.personalS,
             expo = optimizer.surrogate_settings.annealingExponent;
 
         function loop() {
@@ -1895,9 +1898,13 @@ const funcs = {
                 last_Best = stepFitness;
                 surrogate_settings.best_valid = last_Best;
 
-                newW = Math.pow(newW, expo); // Simulated annealing
-                newS = Math.pow(newS, expo);
-                newP = Math.pow(newP, (expo+1)/2);
+                // newW = Math.pow(newW, expo); // Simulated annealing
+                // newS = Math.pow(newS, expo);
+                // newP = Math.pow(newP, (expo+1)/2);
+
+                newW = newW * expo; // Simulated annealing
+                newS = newS * expo;
+                newP = newP * ((expo+1)/2);
 
                 optimizer.setOptions({
                     inertiaWeight: newW,
@@ -1922,6 +1929,17 @@ const funcs = {
                 lastFitness = stepFitness;
                 stepFitness = t_optimizer.getBestFitness();
                 // if (stepFitness > lastFitness) console.log("New: "+stepFitness +";  last: "+lastFitness + ";  iter: " +t_iterations);
+
+                t_newW = t_newW * expo; // Simulated annealing
+                t_newS = t_newS * expo;
+                t_newP = t_newP * ((expo+1)/2);
+
+                t_optimizer.setOptions({
+                    inertiaWeight: t_newW,
+                    social: t_newS,
+                    personal: t_newP
+                });
+
                 t_optimizer.step(t_loop);
             }
         }
@@ -1998,6 +2016,10 @@ const funcs = {
                 x_space = (lower_surr.surro.length - pso_surrogate.length - 2.4) * 0.5; // TODO: Set to four times nozzle (+ two times padding size?)
                 y_space = (lower_surr.surro.width - pso_surrogate.width - 2.4) * 0.5;
             }
+
+            let complexity_of_interactions = 1;
+            if (pso_surrogate.type == "stackable") complexity_of_interactions = 2;
+            else if (pso_surrogate.type == "prism") complexity_of_interactions = 3;
 
 
             if (x_space > 0 && y_space > 0) {
@@ -2310,7 +2332,7 @@ const funcs = {
                     tower_details.tower_x = chosen_x;
                     tower_details.tower_y = chosen_y;
                     tower_details.tower_rot = chosen_rotation;
-                    results_meta_data.candidate_details = {pso_details:current_details, pso_idx:pso_idx, candidate_obj:candidate, use_me:pso_use_this_surrogate, tower_details:tower_details};                    // }
+                    results_meta_data.candidate_details = {pso_details:current_details, pso_idx:pso_idx, candidate_obj:candidate, use_me:pso_use_this_surrogate, tower_details:tower_details, complexity_of_interactions:complexity_of_interactions};                    // }
 
                     let valid_combination = true;
                     // let total_surrogates_volume = this.surrogate_settings.fitness_offset;
@@ -2357,7 +2379,12 @@ const funcs = {
 
                     fitness += total_collided_surrogates_volume;
 
-                    fitness += (pso_surrogate.width * pso_surrogate.length);
+                    fitness = fitness / 
+                        (Math.pow(complexity_of_interactions, this.surrogate_settings.interaction_N_penalty_factor));
+
+                    const extra_fill_area_fitness = fitness * 0.1 * ((pso_surrogate.width * pso_surrogate.length) / (lower_surr.surro.width * lower_surr.surro.length));
+
+                    fitness += extra_fill_area_fitness;
 
                     let lower_answer = lower_full;
                     let lower_fitness = 0;
@@ -2368,7 +2395,7 @@ const funcs = {
 
                     // if (lower_full.tower_fitness) results_meta_data.fitness = (lower_full.tower_fitness + fitness - (pso_surrogate.width * pso_surrogate.length));
                     // else results_meta_data.fitness = (lower_full.fitness + fitness - (pso_surrogate.width * pso_surrogate.length));
-                    results_meta_data.fitness = (lower_fitness + fitness - (pso_surrogate.width * pso_surrogate.length));
+                    results_meta_data.fitness = (lower_fitness + fitness - extra_fill_area_fitness);
 
                     // if (valid_combination && surrogates_placed_pso > 0) {
                     if (valid_combination) {
@@ -2478,6 +2505,14 @@ const funcs = {
                     t_iterations = 0;
                     stepFitness = 0;
                     lastFitness = 0;
+                    t_newW = optimizer.surrogate_settings.inertiaWeightS;
+                    t_newS = optimizer.surrogate_settings.socialS;
+                    t_newP = optimizer.surrogate_settings.personalS;
+                    t_optimizer.setOptions({
+                        inertiaWeight: t_newW,
+                        social: t_newS,
+                        personal: t_newP
+                    });
                     t_loop();
                     let o_valid_answers = t_optimizer.valid_answers;
 
@@ -2811,7 +2846,7 @@ const funcs = {
             return combs;
         }
 
-        function validateResults(final_selection_list, result_fitness, number_of_surrogates, number_of_interactions, candidate_selection_list) {
+        function validateResults(final_selection_list, result_fitness, number_of_surrogates, number_of_interactions, candidate_selection_list, complexity_of_interactions) {
             let fifi_list = [];
 
 
@@ -2841,14 +2876,15 @@ const funcs = {
             // }
 
             const final_fitness = result_fitness / 
-                                (Math.pow(number_of_surrogates, surro_n_p_f));
+                                ( (w_pieces * Math.pow(number_of_surrogates, surro_n_p_f)) + (w_pauses * Math.pow(number_of_interactions, surro_n_p_f)) ); // interaction_n_p_f out!
             if (final_selection_list[0].final_fitness < final_fitness) {
                 final_selection_list[0] = {
                     final_fitness: final_fitness,
                     result_fitness: result_fitness,
                     used_candidates: candidate_selection_list,
                     number_of_surrogates: number_of_surrogates,
-                    number_of_interactions: number_of_interactions
+                    number_of_interactions: number_of_interactions,
+                    complexity_of_interactions: complexity_of_interactions
                 };
             }
         }
@@ -2875,8 +2911,8 @@ const funcs = {
 
         let final_selection_list = [{final_fitness:0}, {final_fitness:0}, {final_fitness:0}]; // low, med, high interaction
 
-        // const w_pieces = 0.5;
-        // const w_interactions = 0.5;
+        const w_pieces = 0.25;
+        const w_pauses = 0.75;
         // const surro_n_p_f_low = surrogate_settings.surrogate_N_penalty_factor_low;
         // const surro_n_p_f_med = surrogate_settings.surrogate_N_penalty_factor_med;
         // const surro_n_p_f_high = surrogate_settings.surrogate_N_penalty_factor_high;
@@ -2892,18 +2928,23 @@ const funcs = {
             if (combination_size == 1) {
                 // Skip validation and go straight to fitness calculation 
                 for (let candidate of candidate_list) {
+                    let total_interaction_complexity_list = [candidate.candidate_details.complexity_of_interactions];
+
                     // Also prepares surros for later iterations 
                     simple_insertion_case_check(candidate.candidate_details.candidate_obj, surrogate_settings.precomputed_slice_heights); 
                     for (let above_idx = 1; above_idx < candidate.aboves.length; above_idx++) {
                         for (let above of candidate.aboves[above_idx]) {
                             simple_insertion_case_check(above.candidate_details.candidate_obj, surrogate_settings.precomputed_slice_heights);
+                            total_interaction_complexity_list.push(above.candidate_details.complexity_of_interactions + total_interaction_complexity_list[total_interaction_complexity_list.length-1]);
                         }
                     }
 
                     let tower_counter = 0;
+                    
                     for (let tower_f of candidate.tower_fitness) {
                         let candidate_selection_list = [{cd:candidate, tower_step_selection:tower_counter}];
-                        validateResults(final_selection_list, tower_f, tower_counter+1, 1, candidate_selection_list);
+                        validateResults(final_selection_list, tower_f, tower_counter+1, tower_counter+1, candidate_selection_list, total_interaction_complexity_list[tower_counter]);
+                        // console.log({canDet:candidate.candidate_details});
                         tower_counter++;
                     }
                 }
@@ -2994,22 +3035,26 @@ const funcs = {
                                 for (let opt of tower_selection_options) {
                                     let total_surrs = 0;
                                     let total_interaction_set = new Set();
+                                    let total_interaction_complexity = 0;
                                     let total_combined_fitness = 0;
                                     let candidate_selection_list = [];
                                     for (let opt_idxs in opt) { // 0 to combination_size
                                         // opt_idxs has the position in the combination, opt[opt_idxs] has the chosen tower height
                                         total_surrs += opt[opt_idxs]+1; // Adds one per surrogate location, plus additional tower height
                                         total_interaction_set.add(candidate_list[combination[opt_idxs]].candidate_details.candidate_obj.insertion_data.new_layer_index);
+                                        total_interaction_complexity += candidate_list[combination[opt_idxs]].candidate_details.complexity_of_interactions;
                                         total_combined_fitness += candidate_list[combination[opt_idxs]].tower_fitness[opt[opt_idxs]];
                                         candidate_selection_list.push({cd:candidate_list[combination[opt_idxs]], tower_step_selection:opt[opt_idxs]});
                                         if (opt[opt_idxs] > 0) {
                                             for (let above of candidate_list[combination[opt_idxs]].aboves[opt[opt_idxs]]) {
                                                 total_interaction_set.add(above.candidate_details.candidate_obj.insertion_data.new_layer_index);
+                                                total_interaction_complexity += above.candidate_details.complexity_of_interactions;
                                             }
                                         }
                                     }
+                                    // console.log({total_interaction_complexity:total_interaction_complexity});
                                     // console.log({comb:combination, total_combined_fitness:total_combined_fitness, total_interaction_set:total_interaction_set, total_surrs:total_surrs})
-                                    validateResults(final_selection_list, total_combined_fitness, total_surrs, total_interaction_set.size, candidate_selection_list);
+                                    validateResults(final_selection_list, total_combined_fitness, total_surrs, total_interaction_set.size, candidate_selection_list, total_interaction_complexity);
                                 }
                             }
                             good_combination = true;

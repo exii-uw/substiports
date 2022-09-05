@@ -105,6 +105,8 @@
             "sliceSolidLayers": 3,
             "sliceBottomLayers": 2,
             "sliceTopLayers": 3,
+            "surrogateSearchQual": "fair",
+            "surrogateInteraction": "low",
             "firstLayerRate": 10,
             "firstLayerPrintMult": 1,
             "firstLayerYOffset": 0,

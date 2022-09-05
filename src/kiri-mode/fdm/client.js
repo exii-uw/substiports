@@ -565,7 +565,7 @@ FDM.init = function(kiri, api) {
         let csv_log = "";
 
         // Header
-        csv_log += "stl_name,id,surrogating_duration_ms,previous_support_volume_mm3,new_support_volume_mm3,volume_percentage_saved,support_material_weight_estimate_g,total_material_weight_estimate_g,printing_time_estimate_s,number_of_surrogates,number_of_pauses,start_timestamp_ms,end_timestamp_ms,number_of_surrogates_X,number_of_pauses_X,fitness,allow_towers,search_level,interaction_level";
+        csv_log += "stl_name,id,surrogating_duration_ms,previous_support_volume_mm3,new_support_volume_mm3,volume_percentage_saved,support_material_weight_estimate_g,total_material_weight_estimate_g,printing_time_estimate_s,number_of_surrogates,number_of_pauses,start_timestamp_ms,end_timestamp_ms,number_of_surrogates_X,number_of_pauses_X,interaction_complexity,fitness,allow_towers,search_level,interaction_level";
 
         // const overall_time = timingData.segtimes.total;
         // const overall_number = timingData.surrogating_times.length;
@@ -576,7 +576,7 @@ FDM.init = function(kiri, api) {
         // });
 
         // 0, 1, 11
-        csv_log += "\n"+timingData.surrogating_times[0].filename+","+timingData.surrogating_times[0].id+",,,,,,,,,,"+timingData.startStamp.toString()+",,,,,,,";
+        csv_log += "\n"+timingData.surrogating_times[0].filename+","+timingData.surrogating_times[0].id+",,,,,,,,,,"+timingData.startStamp.toString()+",,,,,,,,";
 
         download("SurrogateSupport_timings_"+timingData.timestamp+".txt", csv_log);
     });
@@ -603,7 +603,7 @@ FDM.init = function(kiri, api) {
 
         // 1, 2, 3, 4, 5, 6, 9, 10
         csv_log += ","+efficiencyData.id+","+efficiencyData.sTime+","+efficiencyData.previous_volume+","+efficiencyData.new_volume+","+efficiencyData.volume_percentage_saved+","+efficiencyData.materialWeightEstimateEllipse.toString()+",,,"+efficiencyData.numberSurrogates.toString()+","+efficiencyData.numberPauses.toString()+",,";
-        csv_log += ","+efficiencyData.numberSurrogatesX+","+efficiencyData.numberPausesX+","+efficiencyData.Fitness+","+efficiencyData.towers+","+efficiencyData.searchQual+","+efficiencyData.interactionLevel;
+        csv_log += ","+efficiencyData.numberSurrogatesX+","+efficiencyData.numberPausesX+","+efficiencyData.interactionComplexity+","+efficiencyData.Fitness+","+efficiencyData.towers+","+efficiencyData.searchQual+","+efficiencyData.interactionLevel;
 
         download2("SuSu_"+efficiencyData.id+".txt", csv_log);
 
@@ -630,7 +630,7 @@ FDM.init = function(kiri, api) {
 
         let endTime = Date.now();
         // 1, 7, 8, 12
-        csv_log += ","+timeData.id+",,,,,,"+timeData.total_weight_estimate.toString()+","+ timeData.time.toString() +",,,,"+endTime.toString()+",,,,,,";
+        csv_log += ","+timeData.id+",,,,,,"+timeData.total_weight_estimate.toString()+","+ timeData.time.toString() +",,,,"+endTime.toString()+",,,,,,,";
 
         download2("SuSt_"+timeData.id+".txt", csv_log);
 

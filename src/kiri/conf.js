@@ -296,7 +296,7 @@ const conf = exports({
             // process defaults FDM:Process
             p:{
                 processName: "default",
-                surrogateSearchQual: "good",
+                surrogateSearchQual: "fair",
                 surrogateInteraction: "low",
                 surrogateTowers: true,
                 surrogateTextSize: 10,
