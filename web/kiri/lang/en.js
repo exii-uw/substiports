@@ -333,6 +333,8 @@ self.kiri.lang['en-us'] = {
     ss_quali:       "quality",
     ss_stac_s:      "allow stacking",
     ss_stac_l:      "Allows placing surrogates on top of each other",
+    ss_brim_s:      "brim lines",
+    ss_brim_l:      "Changes the number of brim outlines surrounding holders",
     ss_text_s:      "text size",
     ss_text_l:      "Changes the text size of the instructions",
     ss_time_s:      "no-interaction hours",

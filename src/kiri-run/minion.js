@@ -1703,7 +1703,15 @@ const funcs = {
                     const average_speed = 50 * 60; // TODO: Fix to use the process feedrate based value
                     const total_area = total_surrogates_volume*0.3;
                     const time_save = Math.floor(total_area / average_speed * 1000/3);
-                    const new_finish_time = this.surrogate_settings.all_slices[sliceIndexList[sliceIndexList.length-1]].time - time_save;
+                    let sliceTime = 0;
+                    for (let oneSlice of this.surrogate_settings.all_slices) {
+                        if (candidate.end_height < oneSlice.z) {
+                            sliceTime = this.surrogate_settings.all_slices[oneSlice.index-1].time;
+                            break;
+                        }
+                    }
+                    // const new_finish_time = this.surrogate_settings.all_slices[sliceIndexList[sliceIndexList.length-1]].time - time_save;
+                    const new_finish_time = sliceTime - time_save;
 
                     let hours = Math.floor(new_finish_time / 3600),
                         newtime = new_finish_time - hours * 3600,
@@ -1713,10 +1721,13 @@ const funcs = {
                     if (hour_done > 23) hour_done = hour_done - 24; //TODO modulo
                     if (hour_done > 23) hour_done = hour_done - 24;
                     if (hour_done > 23) hour_done = hour_done - 24;
+                    
                     if (this.surrogate_settings.no_interaction_hours.includes(hour_done)) {
+                        // console.log({endHeight: candidate.end_height, new_finish_time:new_finish_time, time_save:time_save, fitness:fitness, sliceTime:sliceTime, time_save:time_save});
                         valid_combination = false;
                         fitness = fitness / 100; // Set fintess to very low if interaction is at a bad time.
                     }
+
                 }
                 
                 results_meta_data.fitness = fitness;

@@ -366,11 +366,12 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         //     prisms_obj.push({geometry_points:parseSVGFromText(val[iter]), name:"options_plate"+iter.toString(), extension_range:17})
         // }
         prisms_obj.push({geometry_points:parseSVGFromText(val[0]), name:"bottom_shape", extension_range:0});
-        prisms_obj.push({geometry_points:parseSVGFromText(val[1]), name:"silver_jack", ini_height:28.75, extension_range:17});
+        prisms_obj.push({geometry_points:parseSVGFromText(val[1]), name:"screw_jack", ini_height:35.101, extension_range:0});
+        // prisms_obj.push({geometry_points:parseSVGFromText(val[1]), name:"screw_jack", ini_height:28.75, extension_range:17});
         prisms_obj.push({geometry_points:parseSVGFromText(val[1]), name:"blue_jack", ini_height:48.9, extension_range:17});
         prisms_obj.push({geometry_points:parseSVGFromText(val[1]), name:"teal_jack", ini_height:78, extension_range:17});
 
-        prisms_obj.push({geometry_points:parseSVGFromText(val[1]), name:"silver_jack", ini_height:20.75, extension_range:150});
+        // prisms_obj.push({geometry_points:parseSVGFromText(val[1]), name:"silver_jack", ini_height:20.75, extension_range:17});
         // prisms_obj.push({geometry_points:parseSVGFromText(val[1]), name:"silver_jack", ini_height:5, extension_range:10});
         // prisms_obj.push({geometry_points:parseSVGFromText(val[1]), name:"blue_jack", ini_height:5, extension_range:10});
     })
@@ -984,7 +985,6 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
             var startTime = new Date().getTime();
 
-            console.log({prisms_obj:prisms_obj});
             let surrogate_library = getSurrogateLibrary(prisms_obj);
             // let [ support_pointsDB, support_points_simpleDB ] = getSupportPointsDebug(bottom_slice, process, settings, surrogate_library);
 
@@ -1023,7 +1023,13 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                 let cluster_promises = [];
 
                 // let k_means_depth = 6;
-                let k_means_depth = 6;
+                let k_means_depth = 1;
+                let numberOfThreads = 1;
+
+                while((numberOfThreads + k_means_depth + 1) < kiri.minions.concurrent) {
+                    k_means_depth++;
+                    numberOfThreads += k_means_depth;
+                }
 
                 for (let kn = 0; kn < k_means_depth; kn++) {
                     const kint = Math.floor(kn+1); // Not sure if required to ensure kn doesn't change during minion runtime
@@ -3759,7 +3765,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                             for (let decoded_history of decoded_histories_list) {
                                 decoded_history.polygon = kiri.codec.decode(decoded_history.polygon, {full: true});
                             }
-                            // all_histories.push({clusterKN:data.kn, clusterID:data.clusterID, historyList: decoded_histories_list})
+                            if (surrogate_settings.visualize_output) all_histories.push({clusterKN:data.kn, clusterID:data.clusterID, historyList: decoded_histories_list})
 
                         });
                     }
@@ -3939,9 +3945,15 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
                     bottom_slice.historyDataRaw = all_histories;
 
+                    let higherSlice = bottom_slice.up;
+                    higherSlice = higherSlice.up;
+                    higherSlice = higherSlice.up;
+                    higherSlice = higherSlice.up;
+                    higherSlice = higherSlice.up;
+
                     if (surrogate_settings.visualize_output) {
                         let exportPolys = [];
-                        for (let topPoly of bottom_slice.topPolys()) {
+                        for (let topPoly of higherSlice.topPolys()) {
                             let pointString = "";
                             for (let polyPoint of topPoly.points) {
                                 pointString += polyPoint.x + "#" + polyPoint.y + ","
@@ -3950,7 +3962,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
                             exportPolys.push({type:"model", string:pointString});
                         }
-                        for (let supportPoly of bottom_slice.supportsSaved) {
+                        for (let supportPoly of higherSlice.supportsSaved) {
                             let pointString = "";
                             for (let polyPoint of supportPoly.points) {
                                 pointString += polyPoint.x + "#" + polyPoint.y + ","
@@ -5389,7 +5401,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                                 // (surrogate.surro.height + surrogate.starting_height)
                                 if (up_height_range.bottom_height < (surrogate.end_height) && up.z >= surrogate.starting_height) {
                                     let surrogated_supports = [];
-                                    POLY.subtract(up.supports, surrogate.geometry, surrogated_supports, null, up.z, 3); // TODO: Collect surro polygons and do it only once
+                                    POLY.subtract(up.supports, surrogate.geometry, surrogated_supports, null, up.z, 10); // TODO: Collect surro polygons and do it only once
                                     up.supports = surrogated_supports;
                                 }
                             }
@@ -5397,7 +5409,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                             // (surrogate.surro.height + surrogate.starting_height)
                             else if (up.z < (surrogate.end_height) && up.z >= surrogate.starting_height) {
                                 let surrogated_supports = [];
-                                POLY.subtract(up.supports, surrogate.geometry, surrogated_supports, null, up.z, 3); // TODO: Collect surro polygons and do it only once
+                                POLY.subtract(up.supports, surrogate.geometry, surrogated_supports, null, up.z, 10); // TODO: Collect surro polygons and do it only once
                                 up.supports = surrogated_supports;
                             }
                         }
@@ -5410,7 +5422,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                         let surrogate = surrogates_placed[draw_outline_idx];
                         // If the surro is at this height
                         if (up.z < (surrogate.end_height) && up.z >= surrogate.starting_height) {
-                            if (surrogate.outlines_drawn < 3) {
+                            if (surrogate.outlines_drawn < 6) {
 
                                 let geometry_to_use;
                                 if (surrogate.surro.type == "prism") geometry_to_use = surrogate.bottom_geometry;
@@ -5423,14 +5435,14 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                                 // surrogate_enlarged = POLY.expand(surrogate.geometry, surrogate_enlargement, up.z, surrogate_enlarged, 1); // For a less tight fit
                                 let surrogate_enlarged = [];
                                 let surrogate_double_enlarged = [];
-                                surrogate_enlarged = POLY.expand(geometry_to_use, 0.3, up.z, surrogate_enlarged, 1);
-                                surrogate_double_enlarged = POLY.expand(surrogate_enlarged, 0.4, up.z, surrogate_double_enlarged, 1); 
+                                surrogate_enlarged = POLY.expand(geometry_to_use, (surrogate_settings.lineWidth/2) - surrogate_settings.surrogate_padding, up.z, surrogate_enlarged, 1); // 0.1 for prism. TODO: Match padding to this
+                                surrogate_double_enlarged = POLY.expand(surrogate_enlarged, surrogate_settings.lineWidth, up.z, surrogate_double_enlarged, 1); 
 
                                 
                                 // subtract actual surrogate area to get only the outline
                                 let surrogate_outline_area_only = [];
-                                // POLY.subtract(surrogate_enlarged_more, surrogate_enlarged, surrogate_outline_area_only, null, up.z, min);
-                                POLY.subtract(surrogate_enlarged, geometry_to_use, surrogate_outline_area_only, null, up.z, min);
+                                // POLY.subtract(surrogate_enlarged_more, surrogate_enlarged, surrogate_outline_area_only, null, up.z, 3);
+                                POLY.subtract(surrogate_enlarged, geometry_to_use, surrogate_outline_area_only, null, up.z, 3);
 
                                 // surrogate_outline_area_only[0].points.forEach(function (point) {
                                 //     point.z = point.z + 3.667686;
@@ -5450,35 +5462,72 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                                     if (!(up.virtual_support)) {
                                         up.virtual_support = [];
                                     } 
-                                    // surrogate_outline_area_only[0].points.push(surrogate_outline_area_only[0].points[0]); // This seems to be not necessary anymore in new version
-                                    // console.log({points_poly:surrogate_outline_area_only[0]});
-                                    // up.tops[0].fill_sparse.push(surrogate_outline_area_only[0]);
-                                    up.tops[0].fill_sparse.push(surrogate_outline_area_only[0]); // DOUBLE-ADD
+                                    surrogate_outline_area_only[0].points.push(surrogate_outline_area_only[0].points[0]); // Visual bug still exists, but extra point or poly necessary to avoid export bug
+                                    let fix_slicer_bug = base.newPolygon([surrogate_outline_area_only[0].points[0], surrogate_outline_area_only[0].points[surrogate_outline_area_only[0].points.length-1]]);
+                                    fix_slicer_bug.open = true;
+                                    // up.tops[0].fill_sparse.push(surrogate_outline_area_only[0]); // DOUBLE-ADD
                                     up.tops[0].fill_sparse.push(surrogate_outline_area_only[0]);
+                                    // up.tops[0].fill_sparse.push(fix_slicer_bug);
                                     up.virtual_support.push(surrogate_outline_area_only[0]);
                                     
                                     let supp_minus_outlines = [];
 
+                                    if (surrogate.outlines_drawn < 1) {
+                                        /*
+                                        let extra_outlines = [];
+                                        let extra_outlines_lines = [];
+                                        extra_outlines = POLY.expand(surrogate_outline_area_only, 0.45, up.z, extra_outlines, 1);
+                                        POLY.subtract(extra_outlines, surrogate_enlarged, extra_outlines_lines, null, up.z, 3);
+                                        extra_outlines_lines[0].points.push(extra_outlines_lines[0].points[0]);
+                                        up.tops[0].fill_sparse.push(extra_outlines_lines[0]);
+                                        */
+
+                                        
+                                        for (let brim_lines = 1; brim_lines <= surrogate_settings.brim_size; brim_lines++) {
+                                            let extra_outlines = [];
+                                            let extra_outlines_inner = [];
+                                            let extra_outlines_done = [];
+                                            extra_outlines = POLY.expand(surrogate_outline_area_only, 0.45*(brim_lines), up.z, extra_outlines, 1);
+                                            if (brim_lines > 1) {
+                                                extra_outlines_inner = POLY.expand(surrogate_outline_area_only, 0.45*(brim_lines-1), up.z, extra_outlines_inner, 1);
+                                                POLY.subtract(extra_outlines, extra_outlines_inner, extra_outlines_done, null, up.z, 3);
+                                            } else {
+                                                POLY.subtract(extra_outlines, surrogate_outline_area_only, extra_outlines_done, null, up.z, 3);
+                                            }
+                                            
+                                            extra_outlines_done[0].points.push(extra_outlines_done[0].points[0]);
+                                            up.tops[0].fill_sparse.push(extra_outlines_done[0]);
+                                        }
+                                        
+
+                                        
+                                    }
+
                                     if (surrogate.outlines_drawn < 1 && surrogate.surro.type == "prism") {
                                         let surrogate_enlarged2 = [];
                                         let surrogate_double_enlarged2 = [];
-                                        surrogate_enlarged2 = POLY.expand(surrogate.geometry, 0.3, up.z, surrogate_enlarged2, 1);
+                                        surrogate_enlarged2 = POLY.expand(surrogate.geometry, 0.2, up.z, surrogate_enlarged2, 1);
                                         surrogate_double_enlarged2 = POLY.expand(surrogate_enlarged, 0.4, up.z, surrogate_double_enlarged2, 1); 
                                         let surrogate_outline_area_only2 = [];
-                                        // POLY.subtract(surrogate_enlarged_more, surrogate_enlarged, surrogate_outline_area_only, null, up.z, min);
-                                        POLY.subtract(surrogate_enlarged2, surrogate.geometry, surrogate_outline_area_only2, null, up.z, min);
-                                        // surrogate_outline_area_only2[0].points.push(surrogate_outline_area_only2[0].points[0]); // This seems to be not necessary anymore in new version
+                                        // POLY.subtract(surrogate_enlarged_more, surrogate_enlarged, surrogate_outline_area_only, null, up.z, 3);
+                                        POLY.subtract(surrogate_enlarged2, surrogate.geometry, surrogate_outline_area_only2, null, up.z, 3);
+                                        // surrogate_outline_area_only2[0].points.push(surrogate_outline_area_only2[0].points[0]); // Visual bug still exists, but extra point or poly necessary to avoid export bug
+                                        let fix_slicer_bug_prism = base.newPolygon([surrogate_outline_area_only2[0].points[0], surrogate_outline_area_only2[0].points[surrogate_outline_area_only2[0].points.length-1]]);
+                                        fix_slicer_bug_prism.open = true;
                                         // up.tops[0].fill_sparse.push(surrogate_outline_area_only2[0]); // DOUBLE-ADD
                                         up.tops[0].fill_sparse.push(surrogate_outline_area_only2[0]);
+                                        up.tops[0].fill_sparse.push(fix_slicer_bug_prism);
                                         up.virtual_support.push(surrogate_outline_area_only2[0]);
                                     }
 
                                     // Prevent overlap of outlines and support // LWW TODO: Try adding to support and combine the two
-                                    up.supports = POLY.subtract(up.supports, surrogate_double_enlarged, supp_minus_outlines, null, up.z, min);
+                                    up.supports = POLY.subtract(up.supports, surrogate_double_enlarged, supp_minus_outlines, null, up.z, 3);
 
 
                                     surrogate.text_posX = (surrogate_outline_area_only[0].bounds.maxx + surrogate_outline_area_only[0].bounds.minx)/2;
-                                    surrogate.text_posY = (surrogate_outline_area_only[0].bounds.maxy + surrogate_outline_area_only[0].bounds.miny)/2;                                
+                                    surrogate.text_posY = (surrogate_outline_area_only[0].bounds.maxy + surrogate_outline_area_only[0].bounds.miny)/2;  
+                                    
+                                    
                                 }
                                 
                                 // console.log({surrogate_outline_area_only:surrogate_outline_area_only});
@@ -5815,7 +5864,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
                 // Add pauses text and ID
 
-                for (let draw_pause_text_idx = 0; draw_pause_text_idx < surrogates_placed.length; draw_pause_text_idx++) {
+                for (let draw_pause_text_idx = 1000; draw_pause_text_idx < surrogates_placed.length; draw_pause_text_idx++) { // TODO reactivate
                     let currentSurrogate = surrogates_placed[draw_pause_text_idx];
                     // let iterateSurrogate = surrogates_placed[draw_pause_text_idx];
                     // console.log({insertData:currentSurrogate});
@@ -6042,6 +6091,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
 
         if (surrogate_settings.visualize_output) {
+            console.log({all_histories:all_histories});
             for (let history_list of all_histories) {
                 for (let history_entry of history_list.historyList) {
                     let text_encoded_polygon = "";
@@ -6252,7 +6302,6 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
             const getPrismSize = generatePrismPolygonSize(0, 0, 0, prism_obj.geometry_points, 0, 0.1);
             const PrismWidth = getPrismSize.bounds.maxy - getPrismSize.bounds.miny;
             const PrismLength = getPrismSize.bounds.maxx - getPrismSize.bounds.minx;
-            console.log({PrismWidth:PrismWidth, PrismLength:PrismLength});
 
             listOfOptions.push({width:PrismWidth, length:PrismLength, height:prism_obj.ini_height, minHeight:prism_obj.ini_height, maxHeight:prism_obj.ini_height+prism_obj.extension_range, id:prism_obj.name, available:true, type:"prism", prism_geometry:prism_obj.geometry_points, bottom_geometry:prism_bottom_obj.geometry_points});
             // debug
@@ -6263,19 +6312,19 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         // Autosort this and use old automated stackable add method...
 
         // addOption(surrogates, 93.8, 89.9, 3.33, "floppyx1");
-        // addPrism(surrogates, prisms[0], prisms[1]);
+        addPrism(surrogates, prisms[0], prisms[1]);
 
-        
+        /*
         // addOption(surrogates, 93.8, 89.9, 3.33, "floppyx1");
         addOption(surrogates, 154.3, 105, 5.35, "saw plate");
-        addOption(surrogates, 137.5, 55.57, 6.62, "wood plate");
+        addOption(surrogates, 137.46, 54.42, 6.69, "wood plate");
         // addOption(surrogates, 208.8, 164, 6.66, "wood plate large");
         // addOption(surrogates, 93.8, 89.9, 6.66, "floppyx2");
-        addOption(surrogates, 128.52, 68.25, 8.75, "medium dense foam plate");
+        addOption(surrogates, 128.35, 68.2, 8.73, "medium dense foam plate");
 
         addOption(surrogates, 73, 10.43, 9.5, "support bar");
         // addOption(surrogates, 93.8, 89.9, 9.99, "floppyx3");
-        addOption(surrogates, 44.35, 18.33, 10.16, "wood bar4"); // addOption(surrogates, 44.35, 18.33, 10.16, "wood bar dirty");
+        addOption(surrogates, 44.35, 18.35, 10.16, "wood bar4"); // addOption(surrogates, 44.35, 18.33, 10.16, "wood bar dirty");
         addOption(surrogates, 49.8, 47.4, 10.5, "blue support");
         addOption(surrogates, 27.31, 23.75, 10.55, "support flat");
         addOption(surrogates, 97, 18.35, 11.18, "wood bar3"); //addOption(surrogates, 97, 18.35, 11.18, "wood bar two holes");
@@ -6291,10 +6340,10 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         // addOption(surrogates, 63.77, 31.85, 15.9, "Lego 8x4x1.3");
         addOption(surrogates, 68.26, 50.46, 13.1, "wood flat");
         addOption(surrogates, 183.5, 80.1, 14.7, "foam plate");
-        addOption(surrogates, 45.15, 23.35, 14.82, "dark wood");
+        addOption(surrogates, 45.3, 23.35, 14.8, "dark wood"); // higer on one side
         // addOption(surrogates, 93.8, 89.9, 16.65, "floppyx5");
         addOption(surrogates, 51, 25, 18.55, "wood offcut1"); // addOption(surrogates, 51, 25, 18.55, "wood man hair");
-        addOption(surrogates, 52.22, 24.9, 18.6, "wood bar");
+        addOption(surrogates, 52.22, 24.95, 18.62, "wood bar");
         addOption(surrogates, 50.4, 24.95, 18.62, "wood offcut2"); // addOption(surrogates, 50.4, 24.95, 18.62, "wood man");
         addOption(surrogates, 25.05, 25.05, 18.8, "wood cube"); // addOption(surrogates, 25.05, 25.05, 18.8, "cube with dent");
         // addOption(surrogates, 93.8, 89.9, 19.98, "floppyx6");
@@ -6302,7 +6351,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         // addOption(surrogates, 31.85, 31.85, 22.3, "Lego 4x4x2");
         // addOption(surrogates, 63.77, 31.85, 22.3, "Lego 8x4x2");
         // addOption(surrogates, 93.8, 89.9, 23.31, "floppyx7");
-        addOption(surrogates, 24.4, 24.4, 24.4, "XYZ cube filled");
+        addOption(surrogates, 24.25, 24.25, 24.08, "XYZ cube filled");
         // addOption(surrogates, 31.85, 15.9, 25.45, "Lego 4x2x2.3");
         // addOption(surrogates, 31.85, 31.85, 25.45, "Lego 4x4x2.3");
         // addOption(surrogates, 63.77, 31.85, 25.45, "Lego 8x4x2.3");
@@ -6317,7 +6366,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         // // addOption(surrogates, 31.85, 31.85, 35, "Lego 4x4x3.3");
         // // addOption(surrogates, 63.77, 31.85, 35, "Lego 8x4x3.3");
         addOption(surrogates, 110.1-0.7, 101.75-2.25, 37.15, "mpow box");
-        addOption(surrogates, 172.5, 144.6, 37.3, "scale box");
+        addOption(surrogates, 170, 144.0, 37.6, "scale box");
         // // addOption(surrogates, 31.85, 15.9, 41.4, "Lego 4x2x4");
         // // addOption(surrogates, 31.85, 31.85, 41.4, "Lego 4x4x4");
         // // addOption(surrogates, 63.77, 31.85, 41.4, "Lego 8x4x4");
@@ -6333,7 +6382,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         // addPrism(surrogates, prisms[0], prisms[1]);
         // addPrism(surrogates, prisms[0], prisms[2]);
         // addPrism(surrogates, prisms[0], prisms[3]);
-        addPrism(surrogates, prisms[0], prisms[4]);
+        // addPrism(surrogates, prisms[0], prisms[4]);
 
         // addStackableOptions(surrogates, 8.75, 9.55, 4, 31.75, 7.9, "Lego 4x1");
         // addStackableOptions(surrogates, 15.9, 9.55, 4, 31.85, 15.9, "Lego+4x2");
@@ -6347,16 +6396,47 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         //     addPrism(surrogates, prisms[0], prisms[i]);
         // }
         
-        addStackableOptions(surrogates, 3.33, 3.33, 8, 93.8, 89.9, "FloppyDisc");
+        // addStackableOptions(surrogates, 3.33, 3.33, 8, 93.8, 89.9, "FloppyDisc");
 
         // for (let i = 1; i < prisms.length; i++){
         //     addPrism(surrogates, prisms[0], prisms[i]);
         // }
+
+        */
+
+        // Floppy disc (2x)
+        // Bigger XYZ Cube
+
+        // addOption(surrogates, 75.1, 73, 29.05, "lowDensityFoam");
+        // addOption(surrogates, 183.5, 80.1, 14.7, "foam plate");
+        // addOption(surrogates, 137.46, 54.42, 6.69, "wood plate");
+        // addOption(surrogates, 128.35, 68.2, 8.73, "medium dense foam plate");
+        // addOption(surrogates, 52.22, 24.95, 18.62, "wood bar");
+        // addOption(surrogates, 44.35, 18.35, 10.16, "wood bar4");
+        // addOption(surrogates, 45.3, 23.35, 14.8, "dark wood"); // higer on one side
+        // addOption(surrogates, 170, 144.0, 35.6, "scale box");
+
+        // addOption(surrogates, 20.1, 20.1, 20.1, "XYZcube");
+
+        //Z-0.2 fine, +0.35 is stretching it
+        // +0.5 and +0.1 has tipping but worked
+        //addOption(surrogates, 24.10-0.2, 24.16-0.2, 24.33-0.25, "   "); // -0.5 White
+        // addOption(surrogates, 31.89, 31.89, 22.3, "  ");
+
+        // addOption(surrogates, 24.15-0.1, 24.15-0.1, 23.9, "   "); //  Purple
+
+        // addOption(surrogates, 142, 210, 23.2, "   "); //  softcover book
+        // addOption(surrogates, 20, 20, 24.7, "   "); //  hardcover book
+        // addOption(surrogates, 31.8, 31.8, 22.25, "   ");
+
+        // addOption(surrogates, 31.75-0.09, 31.75-0.09, 35.101, "5x2_Lego_3tall+2thin");
+        // addOption(surrogates, 42-0.25, 28-0.25, 35.101, "Support_Block");
+
         return surrogates;
     }
 
-    // 1: Lego // 111000 = fist size block
-    const kits = [[7.95, 7.95, 3.183333, 3000000, "Lego"]]; // Length increments, width increments, height increments, max volume in mm³
+    // 1: Lego // 111000 = fist size block // 3000000 a lot
+    const kits = [[7.95, 7.95, 3.183333, 111000, "Lego"]]; // Length increments, width increments, height increments, max volume in mm³
     // const kits = [];
 
     /**
@@ -6617,6 +6697,8 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
 
         surrogate_settings.minSupportArea = proc.supportMinArea;
 
+        surrogate_settings.lineWidth = proc.sliceLineWidth || settings.device.extruders[parseInt(isSynth ? process.sliceSupportNozzle : metadata.extruder || 0)].extNozzle,
+
         // Have all settings available in parallel
         surrogate_settings.surrogate_N_penalty_factor_high = 0.0; 
         surrogate_settings.interaction_N_penalty_factor_high = surrogate_settings.surrogate_N_penalty_factor_high*0.3;
@@ -6766,6 +6848,8 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         surrogate_settings.best_valid = 0;
         surrogate_settings.leniency = 1.0;
 
+        surrogate_settings.brim_size = proc.surrogateBrimSize;
+
         surrogate_settings.text_size = proc.surrogateTextSize;
         surrogate_settings.char_size = surrogate_settings.text_size/20*4.5;
 
@@ -6776,7 +6860,6 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         // surrogate_settings.allow_height_variable = true;
         // surrogate_settings.allow_stackable = true;
         surrogate_settings.allow_duplicates = false;
-        
 
         let all_slices = [];
         surrogate_settings.all_slices = all_slices;
@@ -8976,6 +9059,8 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
         surrogate_settings.best_valid = 0;
         surrogate_settings.leniency = 1.0;
 
+        surrogate_settings.brim_size = proc.surrogateBrimSize;
+
         surrogate_settings.text_size = proc.surrogateTextSize;
 
         // surrogate_settings.minVolume = 10;
@@ -11032,7 +11117,7 @@ FDM.slice = function(settings, widget, onupdate, ondone) {
                     let surrogate = surrogates_placed[draw_outline_idx];
                     // If the surro is at this height
                     if (up.z < (surrogate.end_height) && up.z >= surrogate.starting_height) {
-                        if (surrogate.outlines_drawn < 5) {
+                        if (surrogate.outlines_drawn < 6) {
 
                             let geometry_to_use;
                             if (surrogate.surro.type == "prism") geometry_to_use = surrogate.bottom_geometry;

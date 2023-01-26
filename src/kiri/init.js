@@ -1861,6 +1861,7 @@ gapp.register("kiri.init", [], (root, exports) => {
             surrogateInteraction:uc.newSelect(LANG.ss_inte_s, {title:LANG.ss_inte_l, modes:FDM}, "interactionLevel"),
             surrogateSearchQual: uc.newSelect(LANG.ss_qual_s, {title:LANG.ss_qual_l, modes:FDM}, "qualityLevel"),
             surrogateTowers:     uc.newBoolean(LANG.ss_stac_s, onBooleanClick, {title:LANG.ss_stac_l, modes:FDM}),
+            surrogateBrimSize:   uc.newInput(LANG.ss_brim_s, {title:LANG.ss_brim_l, convert:uc.toInt, bound:uc.bound(0,12), modes:FDM}),
             surrogateTextSize:   uc.newInput(LANG.ss_text_s, {title:LANG.ss_text_l, convert:uc.toFloat, bound:uc.bound(5.0,30.0), modes:FDM}),
             interactionTimes:    uc.newInput(LANG.ss_time_s, {title:LANG.ss_time_l, modes:FDM, comma:true}), 
             printStartTime:      uc.newInput(LANG.ss_star_s, {title:LANG.ss_star_l, modes:FDM, comma:true}), 

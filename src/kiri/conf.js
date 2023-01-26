@@ -299,6 +299,7 @@ const conf = exports({
                 surrogateSearchQual: "fair",
                 surrogateInteraction: "low",
                 surrogateTowers: true,
+                surrogateBrimSize: 1,
                 surrogateTextSize: 10,
                 interactionTimes: "22-24, 0-6",
                 printStartTime: stringTime,
