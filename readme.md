@@ -40,16 +40,18 @@ https://docs.grid.space/projects/mesh-tool
 ## Testing Locally (with Docker)
 
 ```
-git clone git@github.com:GridSpace/grid-apps.git
+git clone https://github.com/LudwigWW/grid-apps.git
 cd grid-apps
+git checkout surrogate_supports_main
 docker-compose -f src/dock/compose.yml up
 ```
 
 ## Testing Locally (with NodeJS)
 
 ```
-git clone git@github.com:GridSpace/grid-apps.git
+git clone https://github.com/LudwigWW/grid-apps.git
 cd grid-apps
+git checkout surrogate_supports_main
 npm i
 npm install -g @gridspace/app-server
 gs-app-server --debug
