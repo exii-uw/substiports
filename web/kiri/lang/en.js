@@ -325,13 +325,15 @@ self.kiri.lang['en-us'] = {
 
     // SURROGATE SUPPORTS
     ss_inte_s:      "interaction level",
-    ss_inte_l:      "How much the user can\nbe involved in the\nfabrication process",
+    ss_inte_l:      "How much the user should\nbe involved in the\nfabrication process",
+    ss_cint_s:      "custom interaction level",
+    ss_cint_l:      "Custom level of user involvement\nLow values for little interaction",
     ss_qual_s:      "search quality",
     ss_qual_l:      "Fidelity level of the\nsurrogate search",
     ss_menu:        "surrogates",
     ss_level:       "level",
     ss_quali:       "quality",
-    ss_stac_s:      "allow stacking",
+    ss_stac_s:      "allow manual towers",
     ss_stac_l:      "Allows placing surrogates on top of each other",
     ss_brim_s:      "brim lines",
     ss_brim_l:      "Changes the number of brim outlines surrounding holders",

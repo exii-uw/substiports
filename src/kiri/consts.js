@@ -30,7 +30,8 @@ const LISTS = {
         { name: "high" },
         { name: "medium" },
         { name: "low" },
-        { name: "off" },
+        { name: "none" },
+        { name: "custom" },
     ],
     shell: [
         { name: "in-out" },

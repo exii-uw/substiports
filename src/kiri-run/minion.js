@@ -1290,7 +1290,7 @@ const funcs = {
 
         let surrogate_number_goal;
 
-        // if (proc.surrogateInteraction == "off") {
+        // if (proc.surrogateInteraction == "none") {
         //     surrogate_number_goal = 0;
         // } else if(proc.surrogateInteraction == "low") {
         //     surrogate_number_goal = 4;
@@ -1301,7 +1301,7 @@ const funcs = {
         // }
 
 
-        if (surrogate_settings.surrogateInteraction == "off") {
+        if (surrogate_settings.surrogateInteraction == "none") {
             surrogate_number_goal = 0;
         } 
         else {

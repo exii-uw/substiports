@@ -792,14 +792,18 @@ class Widget {
                     ondone(false, reply.error);
                 }
                 if (reply.log) {
-                    // api.event.emit('log.fileDetail', reply.log);
+                    console.log({eventType:"reply.log", reply:reply});
+                    api.event.emit('log.fileDetail', reply.log);
                 }
                 if (reply.pso_history) {
-                    // api.event.emit('log.pso_history', reply.pso_history);
+                    api.event.emit('log.pso_history', reply.pso_history);
+                }
+                if (reply.pso_history_heights) {
+                    api.event.emit('log.pso_history_heights', reply.pso_history_heights);
                 }
                 if (reply.basicGeometryExport) {
-                    // console.log({reply:reply.basicGeometryExport});
-                    // api.event.emit('log.basicGeometryExport', reply.basicGeometryExport); //visualize_output
+                    console.log({eventType:"reply.basicGeometryExport", reply:reply.basicGeometryExport});
+                    api.event.emit('log.basicGeometryExport', reply.basicGeometryExport); //visualize_output
                 }
             });
         }

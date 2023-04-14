@@ -551,9 +551,12 @@ kiri.worker = {
             } else {
                 const slices = widget.slices || [];
 
+                console.log({Status:"Sending after slicing", widget:widget});
+
                 send.data({log:widget.slices[0].efficiencyData});
                 send.data({pso_history:widget.slices[0].historyData}); // visualize_output
-                send.data({basicGeometryExport:widget.slices[0].basicGeometryExport})
+                send.data({basicGeometryExport:widget.slices[0].basicGeometryExport});
+                send.data({pso_history_heights:widget.slices[0].historyDataHeights});
 
                 send.data({send_start: time()});
                 send.data({

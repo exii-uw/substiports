@@ -298,6 +298,7 @@ const conf = exports({
                 processName: "default",
                 surrogateSearchQual: "fair",
                 surrogateInteraction: "low",
+                surrogateCustIntera: 0.5,
                 surrogateTowers: true,
                 surrogateBrimSize: 1,
                 surrogateTextSize: 10,

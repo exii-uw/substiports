@@ -1859,6 +1859,7 @@ gapp.register("kiri.init", [], (root, exports) => {
 
             fdmSurrogates:       uc.newGroup(LANG.ss_menu, $('settings'), {modes:FDM}),
             surrogateInteraction:uc.newSelect(LANG.ss_inte_s, {title:LANG.ss_inte_l, modes:FDM}, "interactionLevel"),
+            surrogateCustIntera: uc.newInput(LANG.ss_cint_s, {title:LANG.ss_cint_l, convert:uc.toFloat, bound:uc.bound(0.0,1.0), modes:FDM}, "customInteractionLevel"),
             surrogateSearchQual: uc.newSelect(LANG.ss_qual_s, {title:LANG.ss_qual_l, modes:FDM}, "qualityLevel"),
             surrogateTowers:     uc.newBoolean(LANG.ss_stac_s, onBooleanClick, {title:LANG.ss_stac_l, modes:FDM}),
             surrogateBrimSize:   uc.newInput(LANG.ss_brim_s, {title:LANG.ss_brim_l, convert:uc.toInt, bound:uc.bound(0,12), modes:FDM}),

@@ -76,6 +76,7 @@ FDM.init = function(kiri, api) {
         "outputRetractSpeed": LANG.outputRetractSpeed,
         "outputRetractDwell": LANG.ad_rdwl_s,
     };
+    const debugDL = true;
 
     for (let key of Object.keys(rangeVars)) {
         if (ui[key]) {
@@ -578,7 +579,7 @@ FDM.init = function(kiri, api) {
         // 0, 1, 11
         csv_log += "\n"+timingData.surrogating_times[0].filename+","+timingData.surrogating_times[0].id+",,,,,,,,,,"+timingData.startStamp.toString()+",,,,,,,,";
 
-        download("SurrogateSupport_timings_"+timingData.timestamp+".txt", csv_log);
+        if (debugDL) download("SurrogateSupport_timings_"+timingData.timestamp+".txt", csv_log);
     });
 
 
@@ -605,7 +606,7 @@ FDM.init = function(kiri, api) {
         csv_log += ","+efficiencyData.id+","+efficiencyData.sTime+","+efficiencyData.previous_volume+","+efficiencyData.new_volume+","+efficiencyData.volume_percentage_saved+","+efficiencyData.materialWeightEstimateEllipse.toString()+",,,"+efficiencyData.numberSurrogates.toString()+","+efficiencyData.numberPauses.toString()+",,";
         csv_log += ","+efficiencyData.numberSurrogatesX+","+efficiencyData.numberPausesX+","+efficiencyData.interactionComplexity+","+efficiencyData.Fitness+","+efficiencyData.towers+","+efficiencyData.searchQual+","+efficiencyData.interactionLevel;
 
-        download2("SuSu_"+efficiencyData.id+".txt", csv_log);
+        if (debugDL) download2("SuSu_"+efficiencyData.id+".txt", csv_log);
 
         // console.log({eventDataDetailLog:efficiencyData});
     });
@@ -632,7 +633,7 @@ FDM.init = function(kiri, api) {
         // 1, 7, 8, 12
         csv_log += ","+timeData.id+",,,,,,"+timeData.total_weight_estimate.toString()+","+ timeData.time.toString() +",,,,"+endTime.toString()+",,,,,,,";
 
-        download2("SuSt_"+timeData.id+".txt", csv_log);
+        if (debugDL) download2("SuSt_"+timeData.id+".txt", csv_log);
 
         // console.log({eventDataTimeLogFile:timeData});
     });
@@ -666,7 +667,41 @@ FDM.init = function(kiri, api) {
         }
         
 
-        download2("latestPSOVisuals.txt", csv_log);
+        if (debugDL) download2("latestPSOVisuals.txt", csv_log);
+
+        // console.log({eventDataTimeLogFile:timeData});
+    });
+
+    // Logging for visual PSO debugging with height of support
+    api.event.on("log.pso_history_heights", (historyDataHeights) => {
+        console.log({Status:"History Heights Event"});
+        function download2(filename, text) {
+            var pom = document.createElement('a');
+            pom.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
+            pom.setAttribute('download', filename);
+        
+            if (document.createEvent) {
+                var event = document.createEvent('MouseEvents');
+                event.initEvent('click', true, true);
+                pom.dispatchEvent(event);
+            }
+            else {
+                pom.click();
+            }
+        }
+        let csv_log = "";
+
+        let endTime = Date.now();
+
+        console.log({historyDataHeights:historyDataHeights});
+
+        for (let point of historyDataHeights.support_points) {
+            if (csv_log != "") csv_log += "\n";
+            csv_log += point[0]+";"+point[1]+";"+point[2];
+        }
+        
+
+        if (debugDL) download2("latestPSOVisualsHeights.txt", csv_log);
 
         // console.log({eventDataTimeLogFile:timeData});
     });
@@ -695,7 +730,7 @@ FDM.init = function(kiri, api) {
             csv_log += textPoly.type+";"+textPoly.string;
             if (textPoly.type == "cluster") csv_log += ";"+textPoly.clusterKN+";"+textPoly.clusterID;
         }
-        download2("basicGeometry.txt", csv_log);
+        if (debugDL) download2("basicGeometry.txt", csv_log);
     
         // console.log({eventDataTimeLogFile:timeData});
     });
