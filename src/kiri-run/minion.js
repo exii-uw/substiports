@@ -851,7 +851,7 @@ const funcs = {
 
                 const collision_area = pre_collision_area - post_collision_area;
                 // if (collision_area < -0.00000001) {
-                //     console.log({WARNING:"AAAAAAAAAAA ABS NEEDED"});
+                //      
                 //     console.log({collision_area:collision_area});
                 // }
                 
@@ -888,7 +888,7 @@ const funcs = {
 
                             const collision_area_other_surrogates = pre_collision_area - post_collision_area;
                             if (collision_area_other_surrogates < -0.00000001) {
-                                console.log({WARNING:"AAAAAAAAAAA ABS NEEDED"});
+                                 
                                 console.log({collision_area_other_surrogates:collision_area_other_surrogates});
                             }
                             
@@ -963,7 +963,7 @@ const funcs = {
 
                 const collision_area = pre_collision_area - post_collision_area;
                 // if (collision_area < -0.00000001) {
-                //     console.log({WARNING:"AAAAAAAAAAA ABS NEEDED"});
+                //      
                 //     console.log({collision_area:collision_area});
                 // }
                 
@@ -1002,7 +1002,7 @@ const funcs = {
 
                 //             const collision_area_other_surrogates = pre_collision_area - post_collision_area;
                 //             // if (collision_area_other_surrogates < -0.00000001) {
-                //             //     console.log({WARNING:"AAAAAAAAAAA ABS NEEDED"});
+                //             //      
                 //             //     console.log({collision_area_other_surrogates:collision_area_other_surrogates});
                 //             // }
                                                         
@@ -1067,7 +1067,7 @@ const funcs = {
 
                 const collision_area = pre_collision_area - post_collision_area;
                 // if (collision_area < -0.00000001) {
-                //     console.log({WARNING:"AAAAAAAAAAA ABS NEEDED"});
+                //      
                 //     console.log({collision_area:collision_area});
                 // }
                 
@@ -1102,7 +1102,7 @@ const funcs = {
 
                 //             const collision_area_other_surrogates = pre_collision_area - post_collision_area;
                 //             if (collision_area_other_surrogates < -0.00000001) {
-                //                 console.log({WARNING:"AAAAAAAAAAA ABS NEEDED"});
+                //                  
                 //                 console.log({collision_area_other_surrogates:collision_area_other_surrogates});
                 //             }
                                                         
@@ -1171,7 +1171,7 @@ const funcs = {
 
                     const collision_area = pre_collision_area - post_collision_area;
                     // if (collision_area < -0.00000001) {
-                    //     console.log({WARNING:"AAAAAAAAAAA ABS NEEDED"});
+                    //      
                     //     console.log({collision_area:collision_area});
                     // }
                     
@@ -1207,7 +1207,7 @@ const funcs = {
 
                     //             const collision_area_other_surrogates = pre_collision_area - post_collision_area;
                     //             if (collision_area_other_surrogates < -0.00000001) {
-                    //                 console.log({WARNING:"AAAAAAAAAAA ABS NEEDED"});
+                    //                  
                     //                 console.log({collision_area_other_surrogates:collision_area_other_surrogates});
                     //             }
                                                             
@@ -2612,7 +2612,7 @@ const funcs = {
                 }
             }
             
-            console.log({return_list:return_list.length});
+            // console.log({return_list:return_list.length});
         }   
         
         for (let return_obj of return_list) {
@@ -2695,7 +2695,7 @@ const funcs = {
         
                         const collision_area = Math.abs(pre_collision_area - post_collision_area);
                         // if (collision_area < -0.000001) {
-                        //     console.log({WARNING:"AAAAAAAAAAA ABS NEEDED"});
+                        //      
                         //     console.log({collision_area:collision_area});
                         // }
                         

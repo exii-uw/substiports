@@ -76,7 +76,7 @@ FDM.init = function(kiri, api) {
         "outputRetractSpeed": LANG.outputRetractSpeed,
         "outputRetractDwell": LANG.ad_rdwl_s,
     };
-    const debugDL = true;
+    const debugDL = false;
 
     for (let key of Object.keys(rangeVars)) {
         if (ui[key]) {
@@ -708,7 +708,7 @@ FDM.init = function(kiri, api) {
 
     // More Logging for visual PSO debugging
     api.event.on("log.basicGeometryExport", (basicGeometryExport) => {
-        console.log({basicGeometryExportDownload:basicGeometryExport});
+        // console.log({basicGeometryExportDownload:basicGeometryExport});
         function download2(filename, text) {
             var pom = document.createElement('a');
             pom.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
