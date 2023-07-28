@@ -1,3 +1,11 @@
+## Substiports
+
+User-Inserted Ad Hoc Objects as Reusable Structural Support for Unmodified FDM 3D Printers
+
+The repository is set up to use LEGO bricks as replacement objects by default.
+
+kiri:moto readme below.
+
 ## Grid.Space Web Applications
 
 [![Website](https://img.shields.io/website?url=https%3A%2F%2Fgrid.space%2F)](https://grid.space/kiri/)
