@@ -48,7 +48,7 @@ https://docs.grid.space/projects/mesh-tool
 ## Testing Locally (with Docker)
 
 ```
-git clone https://github.com/LudwigWW/grid-apps.git
+git clone https://github.com/exii-uw/substiports.git
 cd grid-apps
 git checkout surrogate_supports_main
 docker-compose -f src/dock/compose.yml up
@@ -57,7 +57,7 @@ docker-compose -f src/dock/compose.yml up
 ## Testing Locally (with NodeJS)
 
 ```
-git clone https://github.com/LudwigWW/grid-apps.git
+git clone https://github.com/exii-uw/substiports.git
 cd grid-apps
 git checkout surrogate_supports_main
 npm i
